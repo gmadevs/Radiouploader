@@ -65,6 +65,19 @@ The app instead uses the route that states series membership explicitly:
 3. `POST /image_preparation/:caseId/studies/:studyId/series` with the ordered upload ids
 4. `PUT /api/v1/cases/:id/mark_upload_finished`
 
+## Quota and taxonomy
+
+The draft-case quota (`/api/v1/users/current`) is read at sign-in and shown in the header.
+Importing is blocked before it starts when the account is signed out or the quota is full,
+so a full allowance is discovered up front rather than after importing, previewing and
+anonymising a whole study. The quota is re-checked against the server immediately before
+the case is created, because the renderer's copy can be stale.
+
+System and diagnostic certainty are chosen on the case form. Neither list is served by the
+API — `/api/v1/systems` and `/api/v1/diagnostic_certainties` both 404 — so they are
+transcribed in `src/shared/radiopaedia.ts` from Radiopaedia's own uploader. The system ids
+have gaps (5, 10, 13, 14 are unused) because retired systems keep their numbers.
+
 ## Setup
 
 Create an application at <https://radiopaedia.org/api-documentation> → *Manage your

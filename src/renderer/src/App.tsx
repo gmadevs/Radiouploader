@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { IngestResult, Progress, Series } from '@shared/types'
+import { AccountBar, quotaExhausted, type AccountState } from './components/AccountBar'
 import { CaseStep, type CaseForm } from './components/CaseStep'
 import { ReviewStep } from './components/ReviewStep'
 import { SourceStep } from './components/SourceStep'
@@ -20,6 +21,8 @@ const EMPTY_FORM: CaseForm = {
   age: '',
   gender: '',
   body: '',
+  systemId: null,
+  diagnosticCertaintyId: null,
   anchorDate: new Date().toISOString().slice(0, 10),
   studies: {}
 }
@@ -33,6 +36,19 @@ export function App(): React.JSX.Element {
   const [form, setForm] = useState<CaseForm>(EMPTY_FORM)
   const [warnings, setWarnings] = useState<{ tag: string; text: string; level: number; count: number }[]>([])
   const [result, setResult] = useState<{ caseId: string; url: string } | null>(null)
+  const [account, setAccount] = useState<AccountState>({ authenticated: false, username: null, quota: null })
+
+  /**
+   * Reasons the account cannot take a case right now. Checked before importing
+   * so a full quota surfaces before any work is done, not after anonymising.
+   */
+  const blocked = !account.authenticated
+    ? { reason: 'Sign in to Radiopaedia before importing a study.' }
+    : quotaExhausted(account.quota)
+      ? {
+          reason: `Your draft quota is full (${account.quota!.draftCaseCount} of ${account.quota!.allowedDraftCases}). Publish or delete a draft case on Radiopaedia before uploading another.`
+        }
+      : null
 
   useEffect(() => window.api.onProgress(setProgress), [])
 
@@ -134,8 +150,8 @@ export function App(): React.JSX.Element {
         caseDraft: {
           title: form.title,
           presentation: form.presentation,
-          systemId: null,
-          diagnosticCertaintyId: null,
+          systemId: form.systemId,
+          diagnosticCertaintyId: form.diagnosticCertaintyId,
           age: form.age || null,
           gender: form.gender || null,
           body: form.body || null
@@ -152,6 +168,11 @@ export function App(): React.JSX.Element {
       })
       setResult(res)
       setStep('done')
+      // The upload consumed a draft slot; reflect that in the header.
+      void window.api
+        .currentUser()
+        .then((user) => setAccount({ authenticated: true, username: user.username, quota: user.quota }))
+        .catch(() => {})
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -184,12 +205,14 @@ export function App(): React.JSX.Element {
             {s.label}
           </div>
         ))}
+        <AccountBar account={account} onChange={setAccount} />
       </nav>
 
       <main className={step === 'source' || step === 'done' ? 'content centred' : 'content'}>
         {step === 'source' && (
           <SourceStep
             busy={busy}
+            blocked={blocked}
             onPick={(kind) => {
               void window.api.pickSource(kind).then((path) => {
                 if (path) void runIngest(path, kind)
@@ -273,7 +296,12 @@ export function App(): React.JSX.Element {
             <button onClick={() => setStep('review')} disabled={busy}>
               Back
             </button>
-            <button className="primary" disabled={busy || form.title.trim() === ''} onClick={() => void upload()}>
+            <button
+              className="primary"
+              disabled={busy || form.title.trim() === '' || form.systemId === null}
+              title={form.systemId === null ? 'Choose a system first' : undefined}
+              onClick={() => void upload()}
+            >
               Upload to Radiopaedia
             </button>
           </>

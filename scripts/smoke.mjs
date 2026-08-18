@@ -6,6 +6,7 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow } from 'electron'
+import '../out/main/index.js'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const outFile = process.env.SMOKE_SCREENSHOT ?? path.join(root, 'smoke.png')
@@ -19,18 +20,14 @@ app.whenReady().then(run).catch((err) => {
 })
 
 async function run() {
-const win = new BrowserWindow({
-  width: 1280,
-  height: 860,
-  show: false,
-  backgroundColor: '#111418',
-  webPreferences: {
-    preload: path.join(root, 'out/preload/index.mjs'),
-    contextIsolation: true,
-    nodeIntegration: false,
-    sandbox: false
-  }
-})
+// The real main module creates the window and registers the IPC handlers, so
+// this exercises the actual wiring rather than a stand-in window.
+const win = BrowserWindow.getAllWindows()[0]
+if (!win) {
+  console.error('PROBLEMS: main process created no window')
+  app.exit(1)
+  return
+}
 
 win.webContents.on('console-message', (event) => {
   // level 3 is "error" in Chromium's logging levels.
@@ -43,8 +40,7 @@ win.webContents.on('render-process-gone', (_e, details) => {
   problems.push(`render-process-gone: ${details.reason}`)
 })
 
-await win.loadFile(path.join(root, 'out/renderer/index.html'))
-await new Promise((resolve) => setTimeout(resolve, 2500))
+await new Promise((resolve) => setTimeout(resolve, 3000))
 
 const reachedDom = await win.webContents.executeJavaScript(
   `({ root: !!document.querySelector('#root')?.firstChild,

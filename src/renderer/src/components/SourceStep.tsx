@@ -4,9 +4,11 @@ interface Props {
   onPick: (kind: 'folder' | 'zip') => void
   onDropPath: (path: string) => void
   busy: boolean
+  /** Set when the account is not ready to receive a case; importing is blocked. */
+  blocked: { reason: string } | null
 }
 
-export function SourceStep({ onPick, onDropPath, busy }: Props): React.JSX.Element {
+export function SourceStep({ onPick, onDropPath, busy, blocked }: Props): React.JSX.Element {
   const [over, setOver] = useState(false)
 
   return (
@@ -20,6 +22,7 @@ export function SourceStep({ onPick, onDropPath, busy }: Props): React.JSX.Eleme
       onDrop={(e) => {
         e.preventDefault()
         setOver(false)
+        if (blocked) return
         const file = e.dataTransfer.files[0]
         // Electron exposes the real filesystem path on dropped files.
         const path = (file as File & { path?: string })?.path
@@ -32,11 +35,13 @@ export function SourceStep({ onPick, onDropPath, busy }: Props): React.JSX.Eleme
           Drop a folder or a zip of DICOM files here. Nothing leaves this computer until you upload.
         </p>
       </div>
+      {blocked && <div className="notice error">{blocked.reason}</div>}
+
       <div style={{ display: 'flex', gap: 10 }}>
-        <button className="primary" disabled={busy} onClick={() => onPick('folder')}>
+        <button className="primary" disabled={busy || blocked !== null} onClick={() => onPick('folder')}>
           Choose folder
         </button>
-        <button disabled={busy} onClick={() => onPick('zip')}>
+        <button disabled={busy || blocked !== null} onClick={() => onPick('zip')}>
           Choose zip
         </button>
       </div>

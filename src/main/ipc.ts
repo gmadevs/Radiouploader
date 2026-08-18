@@ -119,6 +119,17 @@ export function registerIpc(): void {
     const stacks = session.selectedStacks()
     const bySource = new Map(anon.files.map((f) => [f.sourcePath, f]))
 
+    // Re-check the quota against the server. The renderer's copy can be stale —
+    // the user may have created drafts elsewhere since this session started —
+    // and a rejected case would otherwise surface as an opaque API error.
+    const { quota } = await c.currentUser()
+    if (quota && quota.allowedDraftCases > 0 && quota.draftCaseCount >= quota.allowedDraftCases) {
+      throw new Error(
+        `Draft quota full: ${quota.draftCaseCount} of ${quota.allowedDraftCases} used. ` +
+          'Publish or delete a draft case on Radiopaedia first.'
+      )
+    }
+
     const caseId = await c.createCase(request.caseDraft)
 
     // Studies are created oldest first so the case timeline reads in order.

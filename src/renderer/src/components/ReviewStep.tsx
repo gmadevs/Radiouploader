@@ -49,6 +49,10 @@ export function ReviewStep({ studies, failures, onToggle, onKeepOnePhase, onSele
           <h2 style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
             {study.studyDescription ?? 'Study'}
             <span className="muted small">· {study.modality ?? '—'}</span>
+            {/* The real date helps tell two close studies apart while choosing.
+                It is removed by anonymisation and never uploaded — only the
+                interval is, which is what the badge shows. */}
+            {study.studyDate && <span className="muted small">· {study.studyDate}</span>}
             {studies.length > 1 && <span className="badge">{describeInterval(study.intervalDays)}</span>}
           </h2>
 
