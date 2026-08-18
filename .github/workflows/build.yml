@@ -1,0 +1,93 @@
+name: Build
+
+# Runs on demand, and on a version tag so a release gets installers attached.
+# Not on every push: macOS and Windows runners bill at 10x and 2x on a private
+# repository, and a full three-platform run is not worth spending on a typo fix.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing should not hide whether the others build.
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            script: dist:mac
+            artifacts: release/*.dmg
+          - name: Linux
+            os: ubuntu-latest
+            script: dist:linux
+            artifacts: |
+              release/*.AppImage
+              release/*.deb
+          - name: Windows
+            os: windows-latest
+            script: dist:win
+            artifacts: release/*.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Electron ships a ~100 MB binary per platform; caching it saves most of
+      # the install time on repeat runs.
+      - name: Cache Electron download
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+            ~\AppData\Local\electron\Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - run: npm ci
+
+      - name: Typecheck and test
+        run: npm test
+
+      - name: Build installers
+        run: npm run ${{ matrix.script }}
+        env:
+          # There is no Developer ID on CI. Without this electron-builder hunts
+          # for a signing identity and fails instead of producing an unsigned dmg.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # GH_TOKEN is deliberately not set: electron-builder would then try to
+          # publish a release itself rather than leaving the files as artifacts.
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: radiouploader-${{ matrix.name }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Draft release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      # Drafted rather than published, so the installers can be checked before
+      # anyone can download them.
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: artifacts/**/*
+          generate_release_notes: true

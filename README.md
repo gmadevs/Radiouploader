@@ -189,11 +189,23 @@ that is removed on reset and on quit.
 ```bash
 npm run dist:mac     # dmg, arm64 + x64
 npm run dist:linux   # AppImage + deb, x64 + arm64
-npm run dist:win     # nsis — build this on a Windows runner
+npm run dist:win     # nsis
 ```
 
-macOS distribution needs an Apple Developer ID for signing and notarisation; without one
-the dmg still installs but Gatekeeper warns.
+All three also run on CI. `.github/workflows/build.yml` builds every platform on its own
+runner and uploads the installers as artifacts; pushing a `v*` tag additionally drafts a
+release with them attached. It is triggered manually or by a tag rather than on every push,
+because macOS and Windows runners bill at 10x and 2x on a private repository.
+
+Neither platform is signed on CI:
+
+- **macOS** needs an Apple Developer ID ($99/year) for signing and notarisation. Without
+  one the dmg installs fine, but Gatekeeper refuses the first launch — right-click → Open,
+  or `xattr -dr com.apple.quarantine /Applications/Radiouploader.app`.
+- **Windows** needs an Authenticode certificate. Without one SmartScreen warns until the
+  binary builds reputation — More info → Run anyway.
+- **Linux** needs nothing. The AppImage runs on any distribution after `chmod +x`; the deb
+  targets Debian and Ubuntu.
 
 ---
 
