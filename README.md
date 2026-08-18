@@ -147,8 +147,15 @@ the dmg still installs but Gatekeeper warns. Windows builds are easiest on a CI 
 
 - **Burnt-in text is not detected.** The anonymiser cannot touch pixel data, so review
   the images in the picker before uploading. This is why the app shows previews.
-- **Enhanced (multiframe) DICOM** is read as a single stack. Per-frame functional groups
-  are not yet unpacked, so a multiframe dynamic series will not split into phases.
+- **Only uncompressed DICOM previews.** Explicit and implicit VR little endian and
+  explicit VR big endian all render; JPEG, JPEG-LS, JPEG 2000, HTJ2K and RLE are named in
+  the placeholder instead of being mis-rendered. Adding them means pulling in the
+  standalone `@cornerstonejs/codec-*` WASM packages, which — unlike
+  `@cornerstonejs/dicom-image-loader` — do not depend on `@cornerstonejs/core`. Upload is
+  unaffected: compressed files are still anonymised and sent, only the preview is blank.
+- **Multiframe objects** (cine runs, enhanced MR) are expanded to one previewable frame
+  each, but a multiframe dynamic series is not split into phases: the per-frame functional
+  groups that carry the time axis are not unpacked yet.
 - The app requests only the `cases` scope and never writes patient data outside the
   session temp directory, which is removed on reset and on quit.
 

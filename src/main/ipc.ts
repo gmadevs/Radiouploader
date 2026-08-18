@@ -152,7 +152,11 @@ export function registerIpc(): void {
         const stack = stacks.find((s) => s.id === stackId)
         if (!stack) continue
 
+        // Frames of a multiframe file share one path and one uploaded file;
+        // Radiopaedia expands the frames on its side.
+        const seen = new Set<string>()
         const files = stack.slices
+          .filter((slice) => !seen.has(slice.path) && seen.add(slice.path) !== undefined)
           .map((slice) => bySource.get(slice.path))
           .filter((f): f is NonNullable<typeof f> => f !== undefined)
         if (files.length === 0) continue

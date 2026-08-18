@@ -16,6 +16,12 @@ export type ImageComponent = 'magnitude' | 'phase' | 'real' | 'imaginary' | 'swi
 export interface SliceRef {
   /** Absolute path on disk (inside the temp dir for zip sources). */
   path: string
+  /**
+   * Frame within the file, 0-based. Single-frame instances are always 0; a
+   * multiframe object such as an XA cine run contributes one SliceRef per frame,
+   * so the picker can scrub through it. Upload still sends the file once.
+   */
+  frame: number
   instanceNumber: number | null
   /** ImagePositionPatient projected on the slice normal; used for ordering. */
   sliceLocation: number | null

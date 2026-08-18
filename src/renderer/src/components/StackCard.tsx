@@ -20,7 +20,7 @@ export function StackCard({ stack, onToggle }: Props): React.JSX.Element {
     if (!canvas || !slice) return
 
     let cancelled = false
-    renderSlice(slice.path, canvas)
+    renderSlice(slice.path, slice.frame, canvas)
       .then(() => {
         if (!cancelled) setError(null)
       })
@@ -42,7 +42,7 @@ export function StackCard({ stack, onToggle }: Props): React.JSX.Element {
             min={0}
             max={stack.slices.length - 1}
             value={index}
-            aria-label={`Slice of ${stack.label}`}
+            aria-label={`Image of ${stack.label}`}
             onChange={(e) => setIndex(Number(e.target.value))}
           />
         )}

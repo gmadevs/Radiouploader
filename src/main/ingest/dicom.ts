@@ -36,7 +36,7 @@ export interface InstanceMeta {
   /** AcquisitionTime, falling back to ContentTime. */
   acquisitionTime: string | null
   bValue: number | null
-  /** Enhanced (multiframe) objects carry their structure in per-frame groups. */
+  /** Frames inside this object; more than 1 for cine and enhanced objects. */
   numberOfFrames: number
 }
 
@@ -170,6 +170,13 @@ export async function readInstance(filePath: string): Promise<InstanceMeta> {
   const seriesInstanceUid = str(ds, 'x0020000e')
   if (!studyInstanceUid || !seriesInstanceUid) {
     throw new Error('Missing StudyInstanceUID or SeriesInstanceUID')
+  }
+
+  // Presentation states, structured reports and key-object selections live
+  // alongside the images and parse fine, but they have no pixels and must not
+  // appear as series to upload.
+  if (ds.uint16('x00280010') === undefined || ds.uint16('x00280011') === undefined) {
+    throw new Error('Not an image object (no Rows/Columns)')
   }
 
   const imageType = multiValue(ds, 'x00080008')

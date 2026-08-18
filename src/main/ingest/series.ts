@@ -107,13 +107,23 @@ function splitByRepetition(instances: InstanceMeta[]): InstanceMeta[][] | null {
   return phases
 }
 
-function toSliceRef(meta: InstanceMeta): SliceRef {
-  return {
+/**
+ * Expand one instance into its slices.
+ *
+ * A cine or enhanced object holds many frames in a single file, so it becomes
+ * one SliceRef per frame — otherwise a 200-frame angiography run would show as
+ * a single unscrubbable image. Anonymisation and upload deduplicate by path, so
+ * the file is still processed and sent once.
+ */
+function toSliceRefs(meta: InstanceMeta): SliceRef[] {
+  const frames = Math.max(1, Math.floor(meta.numberOfFrames))
+  return Array.from({ length: frames }, (_, frame) => ({
     path: meta.path,
+    frame,
     instanceNumber: meta.instanceNumber,
     sliceLocation: meta.sliceLocation,
     sopInstanceUid: meta.sopInstanceUid
-  }
+  }))
 }
 
 function buildLabel(d: Dimensions, phaseIndex: number | null, echoTime: number | null, multi: Set<StackKind>): string {
@@ -215,7 +225,7 @@ function makeStack(
     echoNumber: dims.echoNumber,
     phaseIndex,
     acquisitionTime: instances[0].acquisitionTime,
-    slices: sorted.map(toSliceRef),
+    slices: sorted.flatMap(toSliceRefs),
     selected: true
   }
 }

@@ -32,9 +32,6 @@ export default defineConfig({
     }
   },
   renderer: {
-    // Cornerstone's codec workers are code-split ES modules, which rules out
-    // the default iife worker format.
-    worker: { format: 'es' },
     resolve: {
       alias: {
         '@renderer': resolve(__dirname, 'src/renderer/src'),

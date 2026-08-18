@@ -19,10 +19,16 @@ export async function anonymiseStacks(
   const outputDir = path.join(workDir, 'anonymised')
   await fs.mkdir(outputDir, { recursive: true })
 
+  // A multiframe file appears once per frame in the stack; anonymise it once.
   const files: AnonJob['files'] = []
+  const seen = new Set<string>()
   stacks.forEach((stack, stackIndex) => {
-    stack.slices.forEach((slice, sliceIndex) => {
+    let sliceIndex = 0
+    stack.slices.forEach((slice) => {
+      if (seen.has(slice.path)) return
+      seen.add(slice.path)
       const name = `${String(stackIndex).padStart(3, '0')}-${String(sliceIndex).padStart(4, '0')}.dcm`
+      sliceIndex++
       files.push({ sourcePath: slice.path, outputName: name })
     })
   })

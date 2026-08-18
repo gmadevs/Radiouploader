@@ -128,6 +128,31 @@ describe('buildStacks — dynamic series', () => {
   })
 })
 
+describe('buildStacks — multiframe objects', () => {
+  it('expands a cine run into one slice per frame so it can be scrubbed', () => {
+    const { stacks } = buildStacks('s', [inst({ numberOfFrames: 17, sliceLocation: 0 })])
+    expect(stacks).toHaveLength(1)
+    expect(stacks[0].slices).toHaveLength(17)
+    expect(stacks[0].slices.map((s) => s.frame)).toEqual([...Array(17).keys()])
+    // Every frame points at the same file, which is uploaded once.
+    expect(new Set(stacks[0].slices.map((s) => s.path)).size).toBe(1)
+  })
+
+  it('keeps several multiframe files in one stack, frames in order', () => {
+    const { stacks } = buildStacks('s', [
+      inst({ numberOfFrames: 3, instanceNumber: 1, sliceLocation: 0 }),
+      inst({ numberOfFrames: 2, instanceNumber: 2, sliceLocation: 1 })
+    ])
+    expect(stacks[0].slices.map((s) => s.frame)).toEqual([0, 1, 2, 0, 1])
+    expect(new Set(stacks[0].slices.map((s) => s.path)).size).toBe(2)
+  })
+
+  it('gives a single-frame instance exactly one slice at frame 0', () => {
+    const { stacks } = buildStacks('s', [inst()])
+    expect(stacks[0].slices).toEqual([expect.objectContaining({ frame: 0 })])
+  })
+})
+
 describe('buildStacks — plain series', () => {
   it('leaves an ordinary volume as a single stack', () => {
     const { stacks, splitReason } = buildStacks('s', volume(40))

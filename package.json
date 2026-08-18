@@ -16,8 +16,6 @@
     "smoke": "electron scripts/smoke.mjs"
   },
   "dependencies": {
-    "@cornerstonejs/core": "^5.8.2",
-    "@cornerstonejs/dicom-image-loader": "^5.8.2",
     "dicom-parser": "^1.8.21",
     "dicomanon": "github:radiopaedia/dicom-anonymiser",
     "react": "^19.2.8",
