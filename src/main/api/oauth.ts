@@ -7,8 +7,19 @@ export const RADIOPAEDIA_ORIGIN = 'https://radiopaedia.org'
 const AUTHORIZE_URL = `${RADIOPAEDIA_ORIGIN}/oauth/authorize`
 const TOKEN_URL = `${RADIOPAEDIA_ORIGIN}/oauth/token`
 
-/** The only scope the uploader needs; it is what the application form asks for. */
-export const SCOPE = 'cases'
+/**
+ * The scope the uploader needs.
+ *
+ * Doorkeeper validates a requested scope against the ones declared on the
+ * application, so `cases` must be in the application's Scopes field for this to
+ * be accepted — otherwise the authorization page answers "The requested scope
+ * is invalid, unknown, or malformed".
+ *
+ * Radiopaedia's own uploader sends no scope parameter at all and lets the
+ * application's configured scopes apply, so an empty scope is supported here
+ * too and is the reliable fallback.
+ */
+export const DEFAULT_SCOPE = 'cases'
 
 /**
  * Out-of-band redirect.
@@ -30,6 +41,11 @@ export interface OAuthConfig {
   clientSecret?: string
   /** Must match a redirect URI registered on the Radiopaedia application. */
   redirectUri: string
+  /**
+   * Scope to request. Leave empty to omit the parameter entirely and let the
+   * application's own scopes apply, which is what Radiopaedia's uploader does.
+   */
+  scope?: string
 }
 
 export interface TokenSet {
@@ -88,7 +104,8 @@ export function buildAuthorization(config: OAuthConfig): PendingAuthorization {
   authUrl.searchParams.set('client_id', config.clientId)
   authUrl.searchParams.set('redirect_uri', config.redirectUri)
   authUrl.searchParams.set('response_type', 'code')
-  authUrl.searchParams.set('scope', SCOPE)
+  const scope = config.scope ?? DEFAULT_SCOPE
+  if (scope.trim() !== '') authUrl.searchParams.set('scope', scope.trim())
   authUrl.searchParams.set('state', state)
   authUrl.searchParams.set('code_challenge', codeChallenge)
   authUrl.searchParams.set('code_challenge_method', 'S256')

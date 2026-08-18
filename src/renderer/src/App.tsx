@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { IngestResult, Progress, Series } from '@shared/types'
-import { AccountBar, quotaExhausted, type AccountState } from './components/AccountBar'
+import { AccountBar } from './components/AccountBar'
+import { quotaExhausted, type AccountState } from './quota'
 import { CaseStep, type CaseForm } from './components/CaseStep'
 import { ReviewStep } from './components/ReviewStep'
 import { SourceStep } from './components/SourceStep'

@@ -12,13 +12,19 @@ const api = {
   anonymise: (): Promise<AnonResult & { summary: { tag: string; text: string; level: number; count: number }[] }> =>
     ipcRenderer.invoke('anon:run'),
 
-  configureAuth: (config: { clientId: string; clientSecret?: string; redirectUri: string }): Promise<void> =>
+  configureAuth: (config: {
+    clientId: string
+    clientSecret?: string
+    redirectUri: string
+    scope?: string
+  }): Promise<void> =>
     ipcRenderer.invoke('auth:configure', config),
   authStatus: (): Promise<{
     configured: boolean
     authenticated: boolean
     redirectUri: string | null
     clientId: string | null
+    scope: string | null
     usesOutOfBandFlow: boolean
   }> => ipcRenderer.invoke('auth:status'),
   /** Opens the authorization page. needsCode marks the out-of-band flow. */

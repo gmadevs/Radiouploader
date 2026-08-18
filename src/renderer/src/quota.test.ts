@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { quotaExhausted } from './AccountBar'
+import { quotaExhausted } from './quota'
 
 describe('quotaExhausted', () => {
   it('is true only once the allowance is used up', () => {

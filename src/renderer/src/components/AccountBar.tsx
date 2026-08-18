@@ -1,23 +1,8 @@
 import { useEffect, useState } from 'react'
+import { quotaExhausted, type AccountState } from '../quota'
 
 /** Doorkeeper's out-of-band redirect: the code is shown on screen to copy. */
 const OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
-
-export interface Quota {
-  draftCaseCount: number
-  allowedDraftCases: number
-}
-
-export interface AccountState {
-  authenticated: boolean
-  username: string | null
-  quota: Quota | null
-}
-
-/** True when the account cannot hold another draft case. */
-export function quotaExhausted(quota: Quota | null): boolean {
-  return quota !== null && quota.allowedDraftCases > 0 && quota.draftCaseCount >= quota.allowedDraftCases
-}
 
 interface Props {
   account: AccountState
@@ -37,6 +22,7 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
   // Radiopaedia refuses non-https redirect URIs, so the out-of-band URN is the
   // realistic default for a desktop app; their application form says as much.
   const [redirectUri, setRedirectUri] = useState(OOB_REDIRECT_URI)
+  const [scope, setScope] = useState('cases')
   const [code, setCode] = useState('')
   const [awaitingCode, setAwaitingCode] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -48,6 +34,7 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
       .then((status) => {
         if (status.clientId) setClientId(status.clientId)
         if (status.redirectUri) setRedirectUri(status.redirectUri)
+        if (status.scope !== null) setScope(status.scope)
         if (!status.authenticated) {
           onChange({ authenticated: false, username: null, quota: null })
           return
@@ -70,7 +57,7 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
     setBusy(true)
     setError(null)
     void window.api
-      .configureAuth({ clientId, clientSecret: clientSecret || undefined, redirectUri })
+      .configureAuth({ clientId, clientSecret: clientSecret || undefined, redirectUri, scope })
       .then(() => window.api.beginSignIn())
       .then((res) => {
         if (res.needsCode) {
@@ -141,6 +128,11 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
               <label className="field">
                 Redirect URI (must match the application exactly)
                 <input value={redirectUri} onChange={(e) => setRedirectUri(e.target.value)} />
+              </label>
+              <label className="field">
+                Scope — must also be listed in the application's Scopes field. Leave empty to let the
+                application's own scopes apply.
+                <input value={scope} onChange={(e) => setScope(e.target.value)} placeholder="cases" />
               </label>
               {error && <div className="notice error">{error}</div>}
               <div>

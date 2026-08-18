@@ -91,6 +91,7 @@ export function registerIpc(): void {
       configured: Boolean(stored.oauth?.clientId),
       authenticated: client?.isAuthenticated ?? false,
       redirectUri: stored.oauth?.redirectUri ?? null,
+      scope: stored.oauth?.scope ?? null,
       usesOutOfBandFlow: client?.usesOutOfBandFlow ?? true,
       clientId: stored.oauth?.clientId ?? null
     }
