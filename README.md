@@ -98,6 +98,23 @@ listener automatically — no code to copy.
 Paste the Application ID and secret into the sign-in panel in the app header. Tokens are
 stored encrypted through the OS keychain (Keychain / libsecret / DPAPI).
 
+### Distributing builds
+
+**No credentials are compiled into the app.** The Application ID and secret are entered at
+runtime and stored per-user in the OS keychain, so a build can be handed to anyone without
+sharing yours — each person registers their own application, and each signs in to their
+own Radiopaedia account.
+
+Do not embed your own credentials to save users that step. A client secret shipped inside
+a desktop binary is trivially extractable and stops being a secret (RFC 8252 §8.5), any
+per-application rate limit would then be shared by every user, and a single revocation
+would break all installs.
+
+If Radiopaedia's application form offers a *Confidential* checkbox, unticking it creates a
+public client with no secret. Client ids are not secret, so that variant could be shipped
+embedded and would rely on PKCE alone — which this app already sends. The secret field is
+optional for exactly this reason.
+
 ## Development
 
 ```bash

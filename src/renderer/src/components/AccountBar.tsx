@@ -126,16 +126,16 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
           {!awaitingCode ? (
             <>
               <p className="muted small" style={{ margin: 0 }}>
-                Create an application on Radiopaedia with scope <code>cases</code>. Its Redirect URI must be an https
-                address or the out-of-band URN below — a plain <code>http://127.0.0.1</code> address is rejected by
-                their form.
+                Create your own application on Radiopaedia with scope <code>cases</code> — these credentials stay on
+                this computer and are never bundled with the app. Its Redirect URI must be an https address or the
+                out-of-band URN below; a plain <code>http://127.0.0.1</code> address is rejected by their form.
               </p>
               <label className="field">
                 Application ID
                 <input value={clientId} onChange={(e) => setClientId(e.target.value)} />
               </label>
               <label className="field">
-                Client secret
+                Client secret — leave empty for a public application
                 <input type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} />
               </label>
               <label className="field">
