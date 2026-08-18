@@ -42,11 +42,11 @@ A case can carry several studies, and for a follow-up the spacing between them i
 point. `StudyDate` (0008,0020) is blanked by the anonymiser exactly like the private
 tags, so it is read during ingest and only the **interval** survives.
 
-Studies are ordered oldest first and each is measured in whole days from the earliest.
-At upload the user picks a date for the baseline; every follow-up is placed at
-`baseline + its real interval`, so the true dates are never sent while the timeline stays
-faithful. A study whose date could not be read sits on the baseline and is labelled
-"date unknown" rather than being given an invented interval.
+The study endpoint has **no date parameter** — the documented fields are `modality`,
+`findings`, `position` and `caption` — so ordering is carried by `position` (1 is reserved
+for the case discussion, studies start at 2) and the interval goes in the caption,
+pre-filled as "Baseline", "3 months later", "1.5 years later". A study whose date could not
+be read is captioned "Date unknown" rather than given an invented interval.
 
 One Radiopaedia study is created per DICOM study, oldest first, and each selected stack
 becomes a series on the right one.
@@ -73,18 +73,24 @@ so a full allowance is discovered up front rather than after importing, previewi
 anonymising a whole study. The quota is re-checked against the server immediately before
 the case is created, because the renderer's copy can be stale.
 
-System and diagnostic certainty are chosen on the case form. Neither list is served by the
-API — `/api/v1/systems` and `/api/v1/diagnostic_certainties` both 404 — so they are
-transcribed in `src/shared/radiopaedia.ts` from Radiopaedia's own uploader. The system ids
-have gaps (5, 10, 13, 14 are unused) because retired systems keep their numbers.
+System, diagnostic certainty and modality are chosen on the case form. None of these lists
+is served by the API, so they are transcribed in `src/shared/radiopaedia.ts` from the API
+reference. The system ids have gaps (5, 10, 13, 14 are unused) because retired systems keep
+their numbers, and modality is a closed enum — `DSA (angiography)` rather than
+"Angiography", and there is no PET-CT value.
+
+An `allowed_draft_cases` of `null` means an unlimited allowance, not zero.
 
 ## Setup
 
 Create an application at <https://radiopaedia.org/api-documentation> → *Manage your
 applications* → *New Application*:
 
-- **Scopes**: `cases`
 - **Redirect URI**: `urn:ietf:wg:oauth:2.0:oob`
+
+**Do not send a scope.** The API reference never passes a `scope` parameter and neither
+does Radiopaedia's own uploader — permitted scopes are declared on the application itself.
+Requesting one explicitly answers "The requested scope is invalid, unknown, or malformed".
 
 Radiopaedia's form requires an https redirect URI and rejects a plain
 `http://127.0.0.1:…` loopback, so the usual RFC 8252 native-app pattern is not available.

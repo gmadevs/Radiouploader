@@ -1,57 +1,50 @@
 import type { Study } from '@shared/types'
+import { describeInterval } from '@shared/interval'
 
 export interface StudyDraftInput {
   /** Internal Study.id from the ingest tree. */
   studyId: string
   modality: string
   findings: string
+  /** Shown under the study; carries the follow-up interval. No HTML. */
+  caption: string
   stackIds: string[]
 }
 
 export interface PlannedStudy extends StudyDraftInput {
-  /** ISO yyyy-mm-dd actually sent to Radiopaedia. */
-  studyDate: string
+  /**
+   * Display order within the case. Position 1 is reserved for the case
+   * discussion, so studies start at 2.
+   */
+  position: number
   intervalDays: number | null
 }
 
-/** Add whole days to an ISO yyyy-mm-dd date. */
-export function addDays(isoDate: string, days: number): string {
-  const ms = Date.parse(`${isoDate}T00:00:00Z`) + days * 86_400_000
-  return new Date(ms).toISOString().slice(0, 10)
-}
-
 /**
- * Work out the date to send for each study.
+ * Order the studies and assign their positions.
  *
- * Real study dates are identifying and the anonymiser blanks them anyway, so
- * they are never sent. What matters clinically is the spacing between studies,
- * so each one is placed at `anchorDate + its interval from the earliest study`.
- * Studies with no readable date fall back to the anchor, which keeps them on the
- * case in their existing order without inventing an interval.
+ * Real study dates are never sent: the API has no field for them and they are
+ * identifying anyway. What survives is the ordering, via `position`, and the
+ * interval, via the caption.
  *
- * Returns the studies in chronological order, dropping any with no selection.
+ * Returns the studies oldest first, dropping any with nothing selected.
  */
-export function planStudies(studies: Study[], drafts: StudyDraftInput[], anchorDate: string): PlannedStudy[] {
-  const byId = new Map(studies.map((s) => [s.id, s]))
+export function planStudies(studies: Study[], drafts: StudyDraftInput[]): PlannedStudy[] {
+  const order = new Map(studies.map((study, index) => [study.id, index]))
+  const byId = new Map(studies.map((study) => [study.id, study]))
 
   return drafts
     .filter((draft) => draft.stackIds.length > 0 && byId.has(draft.studyId))
-    .map((draft) => {
-      const study = byId.get(draft.studyId)!
-      return {
-        ...draft,
-        intervalDays: study.intervalDays,
-        studyDate: addDays(anchorDate, study.intervalDays ?? 0)
-      }
-    })
-    .sort((a, b) => (a.studyDate < b.studyDate ? -1 : a.studyDate > b.studyDate ? 1 : 0))
+    .sort((a, b) => (order.get(a.studyId) ?? 0) - (order.get(b.studyId) ?? 0))
+    .map((draft, index) => ({
+      ...draft,
+      position: index + 2,
+      intervalDays: byId.get(draft.studyId)!.intervalDays
+    }))
 }
 
-/**
- * Default anchor: place the most recent study on `today` so the whole timeline
- * sits in the past, which is what a reader expects of a published case.
- */
-export function defaultAnchorDate(studies: Study[], today = new Date()): string {
-  const span = Math.max(0, ...studies.map((s) => s.intervalDays ?? 0))
-  return addDays(today.toISOString().slice(0, 10), -span)
+/** Caption suggested for a study, which the user can overwrite. */
+export function defaultCaption(study: Study, isOnlyStudy: boolean): string {
+  if (isOnlyStudy) return ''
+  return describeInterval(study.intervalDays)
 }

@@ -26,16 +26,20 @@ export interface CaseDraft {
 }
 
 export interface StudyDraft {
+  /** Must be one of Radiopaedia's modality values, or blank. */
   modality: string
+  /** HTML; paragraphs wrapped in <p>. */
   findings: string
-  /** ISO yyyy-mm-dd. Defaults to today. */
-  studyDate?: string
+  /** Display order in the case. Position 1 is the case discussion. */
+  position?: number
+  /** Plain text, no HTML. */
   caption?: string
 }
 
 export interface UserQuota {
   draftCaseCount: number
-  allowedDraftCases: number
+  /** null means an unlimited allowance, which is how the API reports it. */
+  allowedDraftCases: number | null
 }
 
 /** Thrown for non-2xx API responses, carrying the status so callers can react to 429. */
@@ -157,11 +161,15 @@ export class RadiopaediaClient {
     const body = (await res.json()) as Record<string, any>
     const quotas = body.quotas
     return {
-      username: typeof body.username === 'string' ? body.username : null,
+      // The documented field is `login`; `username` is accepted as a fallback.
+      username: typeof body.login === 'string' ? body.login : typeof body.username === 'string' ? body.username : null,
       quota: quotas
         ? {
             draftCaseCount: Number(quotas.draft_case_count ?? 0),
-            allowedDraftCases: Number(quotas.allowed_draft_cases ?? 0)
+            allowedDraftCases:
+              quotas.allowed_draft_cases === null || quotas.allowed_draft_cases === undefined
+                ? null
+                : Number(quotas.allowed_draft_cases)
           }
         : null
     }
@@ -188,7 +196,7 @@ export class RadiopaediaClient {
     const body = await this.postJson(`cases/${caseId}/studies`, {
       modality: draft.modality,
       findings: draft.findings,
-      study_date: draft.studyDate ?? new Date().toISOString().slice(0, 10),
+      position: draft.position,
       caption: draft.caption
     })
     const id = body.id

@@ -37,3 +37,48 @@ export const DIAGNOSTIC_CERTAINTIES: { id: number; name: string }[] = [
   { id: 4, name: 'Certain' },
   { id: 5, name: 'Not applicable' }
 ]
+
+/**
+ * The modality values the study endpoint accepts. Anything outside this list is
+ * rejected; a blank value is also allowed.
+ */
+export const MODALITIES: string[] = [
+  'CT',
+  'DSA (angiography)',
+  'Fluoroscopy',
+  'MRI',
+  'Mammography',
+  'Nuclear medicine',
+  'Ultrasound',
+  'X-ray',
+  'Annotated image',
+  'Illustration',
+  'Pathology',
+  'Photograph'
+]
+
+/** Map a DICOM Modality value onto Radiopaedia's list, where one exists. */
+export function modalityFromDicom(dicomModality: string | null): string {
+  switch (dicomModality) {
+    case 'CT':
+      return 'CT'
+    case 'MR':
+      return 'MRI'
+    case 'US':
+      return 'Ultrasound'
+    case 'CR':
+    case 'DX':
+    case 'RG':
+      return 'X-ray'
+    case 'MG':
+      return 'Mammography'
+    case 'XA':
+    case 'RF':
+      return 'DSA (angiography)'
+    case 'NM':
+    case 'PT':
+      return 'Nuclear medicine'
+    default:
+      return 'CT'
+  }
+}

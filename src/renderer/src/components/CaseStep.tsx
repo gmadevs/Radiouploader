@@ -1,9 +1,12 @@
 import type { Study } from '@shared/types'
-import { DIAGNOSTIC_CERTAINTIES, SYSTEMS } from '@shared/radiopaedia'
+import { DIAGNOSTIC_CERTAINTIES, MODALITIES, SYSTEMS } from '@shared/radiopaedia'
+import { describeInterval } from '@shared/interval'
 
 export interface StudyForm {
   modality: string
   findings: string
+  /** Shown under the study on the case; carries the follow-up interval. */
+  caption: string
 }
 
 export interface CaseForm {
@@ -15,8 +18,6 @@ export interface CaseForm {
   /** Radiopaedia system id, e.g. 3 for Central Nervous System. */
   systemId: number | null
   diagnosticCertaintyId: number | null
-  /** Date given to the earliest study; the rest keep their real spacing. */
-  anchorDate: string
   /** Keyed by Study.id. */
   studies: Record<string, StudyForm>
 }
@@ -35,23 +36,6 @@ interface Props {
   studies: Study[]
   warnings: { tag: string; text: string; level: number; count: number }[]
 }
-
-/** "3 months later" style label for a follow-up study. */
-function describeInterval(days: number | null): string {
-  if (days === null) return 'date unknown'
-  if (days === 0) return 'baseline'
-  if (days < 31) return `${days} day${days === 1 ? '' : 's'} later`
-  const months = Math.round(days / 30.44)
-  if (days < 365) return `${months} month${months === 1 ? '' : 's'} later`
-  const years = days / 365.25
-  return `${years.toFixed(years < 10 ? 1 : 0)} years later`
-}
-
-function addDays(isoDate: string, days: number): string {
-  return new Date(Date.parse(`${isoDate}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
-}
-
-const MODALITIES = ['CT', 'MRI', 'X-ray', 'Ultrasound', 'Fluoroscopy', 'Angiography', 'Nuclear medicine', 'PET-CT', 'Mammography']
 
 export function CaseStep({ form, onChange, studies, warnings }: Props): React.JSX.Element {
   const set = <K extends keyof CaseForm>(key: K, value: CaseForm[K]): void => onChange({ ...form, [key]: value })
@@ -139,24 +123,15 @@ export function CaseStep({ form, onChange, studies, warnings }: Props): React.JS
         <h2>{studies.length > 1 ? `Studies (${studies.length})` : 'Study'}</h2>
 
         {studies.length > 1 && (
-          <>
-            <p className="muted small" style={{ margin: 0 }}>
-              The real study dates are removed during anonymisation. The spacing between them is what carries meaning,
-              so it is preserved: pick a date for the baseline and the follow-ups move with it.
-            </p>
-            <label className="field" style={{ maxWidth: 240 }}>
-              Baseline date
-              <input
-                type="date"
-                value={form.anchorDate}
-                onChange={(e) => set('anchorDate', e.target.value)}
-              />
-            </label>
-          </>
+          <p className="muted small" style={{ margin: 0 }}>
+            The study endpoint takes no date, and the real dates are removed during anonymisation anyway. The interval
+            between studies goes in each caption instead, pre-filled from the originals — edit it if you prefer
+            different wording.
+          </p>
         )}
 
         {studies.map((study, i) => {
-          const entry = form.studies[study.id] ?? { modality: 'MRI', findings: '' }
+          const entry = form.studies[study.id] ?? { modality: 'MRI', findings: '', caption: '' }
           const update = (patch: Partial<StudyForm>): void =>
             onChange({ ...form, studies: { ...form.studies, [study.id]: { ...entry, ...patch } } })
 
@@ -173,9 +148,7 @@ export function CaseStep({ form, onChange, studies, warnings }: Props): React.JS
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                 <h3>{study.studyDescription ?? `Study ${i + 1}`}</h3>
                 <span className="badge">{describeInterval(study.intervalDays)}</span>
-                <span className="muted small">
-                  uploaded as {addDays(form.anchorDate, study.intervalDays ?? 0)}
-                </span>
+                <span className="muted small">position {i + 2}</span>
               </div>
 
               <div className="row2">
@@ -189,7 +162,14 @@ export function CaseStep({ form, onChange, studies, warnings }: Props): React.JS
                     ))}
                   </select>
                 </label>
-                <div />
+                <label className="field">
+                  Caption (plain text)
+                  <input
+                    value={entry.caption}
+                    placeholder={describeInterval(study.intervalDays)}
+                    onChange={(e) => update({ caption: e.target.value })}
+                  />
+                </label>
               </div>
 
               <label className="field">

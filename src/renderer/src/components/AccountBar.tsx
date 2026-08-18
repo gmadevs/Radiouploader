@@ -22,7 +22,9 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
   // Radiopaedia refuses non-https redirect URIs, so the out-of-band URN is the
   // realistic default for a desktop app; their application form says as much.
   const [redirectUri, setRedirectUri] = useState(OOB_REDIRECT_URI)
-  const [scope, setScope] = useState('cases')
+  // Radiopaedia declares permitted scopes on the application itself; sending one
+  // explicitly is what triggers "The requested scope is invalid".
+  const [scope, setScope] = useState('')
   const [code, setCode] = useState('')
   const [awaitingCode, setAwaitingCode] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -95,7 +97,9 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
           <span className="muted small">{account.username ?? 'Signed in'}</span>
           {account.quota && (
             <span className={full ? 'badge full' : 'badge'}>
-              {account.quota.draftCaseCount}/{account.quota.allowedDraftCases} drafts
+              {account.quota.allowedDraftCases === null
+                ? `${account.quota.draftCaseCount} drafts`
+                : `${account.quota.draftCaseCount}/${account.quota.allowedDraftCases} drafts`}
             </span>
           )}
           <button className="small ghost" onClick={() => void window.api.signOut().then(load)}>
@@ -130,8 +134,8 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
                 <input value={redirectUri} onChange={(e) => setRedirectUri(e.target.value)} />
               </label>
               <label className="field">
-                Scope — must also be listed in the application's Scopes field. Leave empty to let the
-                application's own scopes apply.
+                Scope — leave empty. Radiopaedia declares the permitted scopes on the application itself, and
+                requesting one here is rejected.
                 <input value={scope} onChange={(e) => setScope(e.target.value)} placeholder="cases" />
               </label>
               {error && <div className="notice error">{error}</div>}

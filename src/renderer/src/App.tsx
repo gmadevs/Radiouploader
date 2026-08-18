@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { IngestResult, Progress, Series } from '@shared/types'
 import { AccountBar } from './components/AccountBar'
 import { quotaExhausted, type AccountState } from './quota'
+import { describeInterval } from '@shared/interval'
+import { modalityFromDicom } from '@shared/radiopaedia'
 import { CaseStep, type CaseForm } from './components/CaseStep'
 import { ReviewStep } from './components/ReviewStep'
 import { SourceStep } from './components/SourceStep'
@@ -24,7 +26,6 @@ const EMPTY_FORM: CaseForm = {
   body: '',
   systemId: null,
   diagnosticCertaintyId: null,
-  anchorDate: new Date().toISOString().slice(0, 10),
   studies: {}
 }
 
@@ -122,15 +123,19 @@ export function App(): React.JSX.Element {
         setError(`${res.errors.length} file(s) could not be anonymised and will not be uploaded.`)
       }
 
-      // Seed one form per study, keeping anything already typed.
-      const anchorDate = await window.api.defaultAnchorDate()
+      // Seed one form per study, keeping anything already typed. Captions are
+      // pre-filled with the interval read from the originals.
+      const multiple = studiesToUpload.length > 1
       setForm((current) => ({
         ...current,
-        anchorDate: current.studies && Object.keys(current.studies).length > 0 ? current.anchorDate : anchorDate,
         studies: Object.fromEntries(
           studiesToUpload.map((study) => [
             study.id,
-            current.studies[study.id] ?? { modality: study.modality === 'CT' ? 'CT' : 'MRI', findings: '' }
+            current.studies[study.id] ?? {
+              modality: modalityFromDicom(study.modality),
+              findings: '',
+              caption: multiple ? describeInterval(study.intervalDays) : ''
+            }
           ])
         )
       }))
@@ -157,11 +162,11 @@ export function App(): React.JSX.Element {
           gender: form.gender || null,
           body: form.body || null
         },
-        anchorDate: form.anchorDate,
         studies: studiesToUpload.map((study) => ({
           studyId: study.id,
           modality: form.studies[study.id]?.modality ?? 'MRI',
           findings: form.studies[study.id]?.findings ?? '',
+          caption: form.studies[study.id]?.caption ?? '',
           stackIds: study.series.flatMap((series) =>
             series.stacks.filter((stack) => stack.selected).map((stack) => stack.id)
           )

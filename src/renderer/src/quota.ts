@@ -1,6 +1,7 @@
 export interface Quota {
   draftCaseCount: number
-  allowedDraftCases: number
+  /** null means unlimited, which is how Radiopaedia reports an uncapped account. */
+  allowedDraftCases: number | null
 }
 
 export interface AccountState {
@@ -12,10 +13,10 @@ export interface AccountState {
 /**
  * True when the account cannot hold another draft case.
  *
- * An allowance of 0 means "not reported" rather than "none permitted", so it
- * never blocks; Radiopaedia can also report a count above the allowance after a
- * limit change, which does.
+ * A null allowance means unlimited and never blocks. Radiopaedia can report a
+ * count above the allowance after a limit change, which does block.
  */
 export function quotaExhausted(quota: Quota | null): boolean {
-  return quota !== null && quota.allowedDraftCases > 0 && quota.draftCaseCount >= quota.allowedDraftCases
+  if (quota === null || quota.allowedDraftCases === null) return false
+  return quota.draftCaseCount >= quota.allowedDraftCases
 }

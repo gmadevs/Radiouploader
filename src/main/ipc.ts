@@ -8,7 +8,7 @@ import { loadConfig, saveConfig } from './api/store'
 import { uploadStack } from './api/upload'
 import { ingest } from './ingest'
 import { session } from './session'
-import { defaultAnchorDate, planStudies, type StudyDraftInput } from './uploadPlan'
+import { planStudies, type StudyDraftInput } from './uploadPlan'
 
 let client: RadiopaediaClient | null = null
 
@@ -28,8 +28,6 @@ export interface UploadRequest {
   caseDraft: CaseDraft
   /** One entry per DICOM study; each becomes a study on the Radiopaedia case. */
   studies: StudyDraftInput[]
-  /** ISO date for the earliest study. Later studies keep their real spacing. */
-  anchorDate: string
 }
 
 export function registerIpc(): void {
@@ -76,8 +74,6 @@ export function registerIpc(): void {
     return { ...result, summary: summariseWarnings(result.warnings) }
   })
 
-  ipcMain.handle('upload:defaultAnchorDate', () => defaultAnchorDate(session.ingest?.studies ?? []))
-
   ipcMain.handle('auth:configure', async (_e, config: OAuthConfig) => {
     const stored = await loadConfig()
     await saveConfig({ ...stored, oauth: config })
@@ -120,7 +116,7 @@ export function registerIpc(): void {
     const anon = session.anon
     if (!anon) throw new Error('Anonymise the selected series before uploading')
 
-    const planned = planStudies(session.ingest?.studies ?? [], request.studies, request.anchorDate)
+    const planned = planStudies(session.ingest?.studies ?? [], request.studies)
     if (planned.length === 0) throw new Error('No studies to upload')
 
     const stacks = session.selectedStacks()
@@ -130,10 +126,11 @@ export function registerIpc(): void {
     // the user may have created drafts elsewhere since this session started —
     // and a rejected case would otherwise surface as an opaque API error.
     const { quota } = await c.currentUser()
-    if (quota && quota.allowedDraftCases > 0 && quota.draftCaseCount >= quota.allowedDraftCases) {
+    if (quota?.allowedDraftCases !== null && quota !== null && quota.draftCaseCount >= quota.allowedDraftCases) {
       throw new Error(
         `Draft quota full: ${quota.draftCaseCount} of ${quota.allowedDraftCases} used. ` +
-          'Publish or delete a draft case on Radiopaedia first.'
+          'Publish or delete a draft case on Radiopaedia first. ' +
+          'You can raise your quota at https://radiopaedia.org/supporters'
       )
     }
 
@@ -147,7 +144,8 @@ export function registerIpc(): void {
       const studyId = await c.createStudy(caseId, {
         modality: plan.modality,
         findings: plan.findings,
-        studyDate: plan.studyDate
+        position: plan.position,
+        caption: plan.caption
       })
 
       for (const stackId of plan.stackIds) {

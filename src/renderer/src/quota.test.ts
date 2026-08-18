@@ -11,6 +11,11 @@ describe('quotaExhausted', () => {
 
   it('does not block when the quota is unknown or unlimited', () => {
     expect(quotaExhausted(null)).toBe(false)
-    expect(quotaExhausted({ draftCaseCount: 12, allowedDraftCases: 0 })).toBe(false)
+    // The API reports an uncapped allowance as null, not as a large number.
+    expect(quotaExhausted({ draftCaseCount: 120, allowedDraftCases: null })).toBe(false)
+  })
+
+  it('blocks an account with a zero allowance', () => {
+    expect(quotaExhausted({ draftCaseCount: 0, allowedDraftCases: 0 })).toBe(true)
   })
 })

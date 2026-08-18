@@ -8,18 +8,15 @@ const AUTHORIZE_URL = `${RADIOPAEDIA_ORIGIN}/oauth/authorize`
 const TOKEN_URL = `${RADIOPAEDIA_ORIGIN}/oauth/token`
 
 /**
- * The scope the uploader needs.
+ * Scope requested at authorization.
  *
- * Doorkeeper validates a requested scope against the ones declared on the
- * application, so `cases` must be in the application's Scopes field for this to
- * be accepted — otherwise the authorization page answers "The requested scope
- * is invalid, unknown, or malformed".
- *
- * Radiopaedia's own uploader sends no scope parameter at all and lets the
- * application's configured scopes apply, so an empty scope is supported here
- * too and is the reliable fallback.
+ * Empty on purpose. Radiopaedia's API reference never sends a scope parameter,
+ * and neither does their own uploader — the permitted scopes are declared on
+ * the application itself. Requesting one explicitly is what produces "The
+ * requested scope is invalid, unknown, or malformed", so the parameter is
+ * omitted unless the user deliberately sets it.
  */
-export const DEFAULT_SCOPE = 'cases'
+export const DEFAULT_SCOPE = ''
 
 /**
  * Out-of-band redirect.

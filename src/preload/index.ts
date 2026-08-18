@@ -31,16 +31,15 @@ const api = {
   beginSignIn: (): Promise<{ needsCode: boolean }> => ipcRenderer.invoke('auth:beginSignIn'),
   completeSignIn: (
     code: string
-  ): Promise<{ username: string | null; quota: { draftCaseCount: number; allowedDraftCases: number } | null }> =>
+  ): Promise<{ username: string | null; quota: { draftCaseCount: number; allowedDraftCases: number | null } | null }> =>
     ipcRenderer.invoke('auth:completeSignIn', code),
   signOut: (): Promise<void> => ipcRenderer.invoke('auth:signOut'),
   currentUser: (): Promise<{
     username: string | null
-    quota: { draftCaseCount: number; allowedDraftCases: number } | null
+    quota: { draftCaseCount: number; allowedDraftCases: number | null } | null
   }> => ipcRenderer.invoke('api:currentUser'),
 
   upload: (request: unknown): Promise<{ caseId: string; url: string }> => ipcRenderer.invoke('upload:run', request),
-  defaultAnchorDate: (): Promise<string> => ipcRenderer.invoke('upload:defaultAnchorDate'),
 
   onProgress: (handler: (p: Progress) => void): (() => void) => {
     const listener = (_e: unknown, p: Progress): void => handler(p)
