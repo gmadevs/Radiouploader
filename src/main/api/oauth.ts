@@ -152,7 +152,7 @@ export async function authorizeViaLoopback(config: OAuthConfig): Promise<TokenSe
 
       const finish = (message: string): void => {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-        res.end(`<!doctype html><meta charset="utf-8"><title>Radiopaedia Uploader</title>
+        res.end(`<!doctype html><meta charset="utf-8"><title>Radiouploader</title>
           <body style="font:16px/1.5 system-ui;padding:3rem;text-align:center">${message}</body>`)
         server.close()
       }

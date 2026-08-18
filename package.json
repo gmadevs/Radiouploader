@@ -1,5 +1,5 @@
 {
-  "name": "radiopaedia-uploader",
+  "name": "radiouploader",
   "version": "0.1.0",
   "description": "Desktop uploader for Radiopaedia.org: DICOM ingest, anonymisation and case upload",
   "license": "AGPL-3.0-only",

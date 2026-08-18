@@ -40,7 +40,7 @@ function createWindow(): BrowserWindow {
 }
 
 void app.whenReady().then(() => {
-  app.setAppUserModelId('org.radiopaedia.uploader')
+  app.setAppUserModelId('io.github.gmadevs.radiouploader')
   registerIpc()
   createWindow()
 

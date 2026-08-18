@@ -1,5 +1,5 @@
-appId: org.radiopaedia.uploader
-productName: Radiopaedia Uploader
+appId: io.github.gmadevs.radiouploader
+productName: Radiouploader
 directories:
   output: release
   buildResources: resources

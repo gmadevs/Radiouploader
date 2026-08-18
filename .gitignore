@@ -5,5 +5,5 @@ release/
 .DS_Store
 *.log
 .env
-smoke.png
+smoke*.png
 *.tsbuildinfo
