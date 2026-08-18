@@ -14,6 +14,8 @@ export function StackCard({ stack, onToggle, onTrim }: Props): React.JSX.Element
   // Open on the middle image — the ends of a volume are rarely informative.
   const [index, setIndex] = useState(() => Math.floor(stack.slices.length / 2))
   const [error, setError] = useState<string | null>(null)
+  // Trimming is the exception, so the controls stay out of the way until asked for.
+  const [showTrim, setShowTrim] = useState(false)
 
   const last = stack.slices.length - 1
   const kept = stack.trimEnd - stack.trimStart + 1
@@ -76,7 +78,7 @@ export function StackCard({ stack, onToggle, onTrim }: Props): React.JSX.Element
         )}
       </div>
 
-      {stack.slices.length > 2 && (
+      {showTrim && (
         <div className="trim">
           <label>
             <span>First</span>
@@ -102,11 +104,16 @@ export function StackCard({ stack, onToggle, onTrim }: Props): React.JSX.Element
             />
             <span className="n">{stack.trimEnd + 1}</span>
           </label>
-          {trimmed && (
-            <button className="small ghost" onClick={() => onTrim(stack.id, 0, last)}>
-              Reset trim
+          <div style={{ display: 'flex', gap: 6 }}>
+            {trimmed && (
+              <button className="small ghost" onClick={() => onTrim(stack.id, 0, last)}>
+                Reset
+              </button>
+            )}
+            <button className="small ghost" onClick={() => setShowTrim(false)}>
+              Done
             </button>
-          )}
+          </div>
         </div>
       )}
 
@@ -122,7 +129,7 @@ export function StackCard({ stack, onToggle, onTrim }: Props): React.JSX.Element
           <div className="muted small">
             {trimmed ? (
               <>
-                {kept} of {stack.slices.length} images
+                {kept} of {stack.slices.length} images · {stack.trimStart + 1}–{stack.trimEnd + 1}
               </>
             ) : (
               <>
@@ -131,6 +138,15 @@ export function StackCard({ stack, onToggle, onTrim }: Props): React.JSX.Element
             )}
           </div>
         </label>
+        {stack.slices.length > 2 && !showTrim && (
+          <button
+            className={trimmed ? 'small trim-toggle on' : 'small trim-toggle'}
+            title="Choose the first and last image to upload"
+            onClick={() => setShowTrim(true)}
+          >
+            Trim
+          </button>
+        )}
       </div>
     </div>
   )
