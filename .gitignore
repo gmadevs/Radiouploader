@@ -6,3 +6,4 @@ release/
 *.log
 .env
 smoke.png
+*.tsbuildinfo
