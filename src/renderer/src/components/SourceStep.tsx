@@ -2,13 +2,13 @@ import { useState } from 'react'
 
 interface Props {
   onPick: (kind: 'folder' | 'zip') => void
-  onDropPath: (path: string) => void
+  onDropPaths: (paths: string[]) => void
   busy: boolean
   /** Set when the account is not ready to receive a case; importing is blocked. */
   blocked: { reason: string } | null
 }
 
-export function SourceStep({ onPick, onDropPath, busy, blocked }: Props): React.JSX.Element {
+export function SourceStep({ onPick, onDropPaths, busy, blocked }: Props): React.JSX.Element {
   const [over, setOver] = useState(false)
 
   return (
@@ -23,10 +23,11 @@ export function SourceStep({ onPick, onDropPath, busy, blocked }: Props): React.
         e.preventDefault()
         setOver(false)
         if (blocked) return
-        const file = e.dataTransfer.files[0]
-        // Electron exposes the real filesystem path on dropped files.
-        const path = (file as File & { path?: string })?.path
-        if (path) onDropPath(path)
+        // Electron 32 removed File.path; the preload resolves the real path.
+        const paths = [...e.dataTransfer.files]
+          .map((file) => window.api.getPathForFile(file))
+          .filter((path) => path !== '')
+        if (paths.length > 0) onDropPaths(paths)
       }}
     >
       <div>

@@ -37,12 +37,12 @@ export function registerIpc(): void {
       properties: kind === 'folder' ? ['openDirectory'] : ['openFile'],
       filters: kind === 'zip' ? [{ name: 'Zip archive', extensions: ['zip'] }] : undefined
     })
-    return result.canceled ? null : result.filePaths[0]
+    return result.canceled ? null : result.filePaths
   })
 
-  ipcMain.handle('ingest:run', async (_e, sourcePath: string, kind: 'folder' | 'zip'): Promise<IngestResult> => {
+  ipcMain.handle('ingest:run', async (_e, paths: string[]): Promise<IngestResult> => {
     await session.reset()
-    const result = await ingest(sourcePath, kind, broadcast)
+    const result = await ingest(paths, broadcast)
     session.ingest = result
     return result
   })

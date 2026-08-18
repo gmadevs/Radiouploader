@@ -1,11 +1,16 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { AnonResult, IngestResult, Progress } from '@shared/types'
 
 /** The only surface the renderer has onto the filesystem and the network. */
 const api = {
-  pickSource: (kind: 'folder' | 'zip'): Promise<string | null> => ipcRenderer.invoke('source:pick', kind),
-  ingest: (sourcePath: string, kind: 'folder' | 'zip'): Promise<IngestResult> =>
-    ipcRenderer.invoke('ingest:run', sourcePath, kind),
+  pickSource: (kind: 'folder' | 'zip'): Promise<string[] | null> => ipcRenderer.invoke('source:pick', kind),
+  /**
+   * Resolve a dropped File to its path. Electron 32 removed the non-standard
+   * File.path property, and this is its documented replacement — it has to run
+   * here in the preload, not in the renderer.
+   */
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
+  ingest: (paths: string[]): Promise<IngestResult> => ipcRenderer.invoke('ingest:run', paths),
   resetIngest: (): Promise<void> => ipcRenderer.invoke('ingest:reset'),
   setSelection: (selection: { id: string; trimStart: number; trimEnd: number }[]): Promise<void> =>
     ipcRenderer.invoke('selection:set', selection),

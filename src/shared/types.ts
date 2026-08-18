@@ -1,6 +1,6 @@
 /** Types shared between the main process, the preload bridge and the renderer. */
 
-export type SourceKind = 'folder' | 'zip'
+export type SourceKind = 'folder' | 'zip' | 'files'
 
 /** How a stack was split out of its parent DICOM series. */
 export type StackKind =

@@ -1,8 +1,8 @@
 # Radiopaedia Uploader
 
 Desktop app for preparing and uploading cases to [Radiopaedia.org](https://radiopaedia.org).
-Reads a folder or zip of DICOM files, splits multiphase / diffusion / SWI series into
-selectable stacks, anonymises with Radiopaedia's reference anonymiser, and uploads the
+Reads a folder, a zip or individual DICOM files — chosen or dropped onto the window —
+splits multiphase / diffusion / SWI series into selectable stacks, anonymises with Radiopaedia's reference anonymiser, and uploads the
 result as a draft case.
 
 Runs on macOS, Linux and Windows (Electron).

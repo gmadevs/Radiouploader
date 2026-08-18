@@ -95,12 +95,12 @@ export function App(): React.JSX.Element {
     })
   }
 
-  const runIngest = async (sourcePath: string, kind: 'folder' | 'zip'): Promise<void> => {
+  const runIngest = async (paths: string[]): Promise<void> => {
     setBusy(true)
     setError(null)
     clearPreviewCache()
     try {
-      const res = await window.api.ingest(sourcePath, kind)
+      const res = await window.api.ingest(paths)
       if (res.studies.length === 0) {
         setError(`No readable DICOM files found (scanned ${res.scannedFileCount} files).`)
         return
@@ -225,11 +225,11 @@ export function App(): React.JSX.Element {
             busy={busy}
             blocked={blocked}
             onPick={(kind) => {
-              void window.api.pickSource(kind).then((path) => {
-                if (path) void runIngest(path, kind)
+              void window.api.pickSource(kind).then((paths) => {
+                if (paths && paths.length > 0) void runIngest(paths)
               })
             }}
-            onDropPath={(path) => void runIngest(path, path.toLowerCase().endsWith('.zip') ? 'zip' : 'folder')}
+            onDropPaths={(paths) => void runIngest(paths)}
           />
         )}
 
