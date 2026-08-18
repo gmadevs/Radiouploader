@@ -250,6 +250,34 @@ function applyDefaultSelection(stacks: Stack[], varying: Set<StackKind>): void {
   }
 }
 
+/** Whole days from `from` to `to`, both ISO yyyy-mm-dd. */
+function daysBetween(from: string, to: string): number {
+  const ms = Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)
+  return Math.round(ms / 86_400_000)
+}
+
+/**
+ * Order studies as they were acquired and express each one as an offset from the
+ * earliest. Radiopaedia presents a multi-study case as a timeline, and the
+ * interval is the part that carries clinical meaning — the absolute dates are
+ * both identifying and blanked by the anonymiser, so only the offsets survive.
+ *
+ * Studies with no readable date keep their original order and get a null
+ * interval rather than being guessed at.
+ */
+function orderByDate(studies: Study[]): Study[] {
+  const dated = studies.filter((s) => s.studyDate !== null)
+  const undated = studies.filter((s) => s.studyDate === null)
+
+  dated.sort((a, b) => (a.studyDate! < b.studyDate! ? -1 : a.studyDate! > b.studyDate! ? 1 : 0))
+  const earliest = dated[0]?.studyDate ?? null
+
+  for (const study of dated) {
+    study.intervalDays = earliest === null ? null : daysBetween(earliest, study.studyDate!)
+  }
+  return [...dated, ...undated]
+}
+
 /** Assemble parsed instances into the study / series / stack tree. */
 export function buildStudies(instances: InstanceMeta[]): Study[] {
   const byStudy = new Map<string, InstanceMeta[]>()
@@ -290,8 +318,11 @@ export function buildStudies(instances: InstanceMeta[]): Study[] {
       studyInstanceUid: studyUid,
       studyDescription: studyInstances[0].studyDescription,
       modality: studyInstances[0].modality,
+      // Some instances of a study may lack the date; take the first that has one.
+      studyDate: studyInstances.find((i) => i.studyDate !== null)?.studyDate ?? null,
+      intervalDays: null,
       series
     })
   }
-  return studies
+  return orderByDate(studies)
 }

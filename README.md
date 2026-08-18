@@ -36,6 +36,21 @@ off, the highest b-value and the ADC map are on, and **every** time point of a d
 series stays on — dropping phases is a deliberate act, so the UI offers a "Keep one phase"
 button rather than doing it silently.
 
+## Multi-study cases and the interval between studies
+
+A case can carry several studies, and for a follow-up the spacing between them is the
+point. `StudyDate` (0008,0020) is blanked by the anonymiser exactly like the private
+tags, so it is read during ingest and only the **interval** survives.
+
+Studies are ordered oldest first and each is measured in whole days from the earliest.
+At upload the user picks a date for the baseline; every follow-up is placed at
+`baseline + its real interval`, so the true dates are never sent while the timeline stays
+faithful. A study whose date could not be read sits on the baseline and is labelled
+"date unknown" rather than being given an invented interval.
+
+One Radiopaedia study is created per DICOM study, oldest first, and each selected stack
+becomes a series on the right one.
+
 ## Why upload goes through S3 rather than the zip endpoint
 
 `POST /api/v1/cases/:id/studies/:id/images` accepts a zip, but Radiopaedia then rebuilds

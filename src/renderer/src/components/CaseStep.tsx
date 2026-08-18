@@ -1,4 +1,10 @@
 import { useEffect, useState } from 'react'
+import type { Study } from '@shared/types'
+
+export interface StudyForm {
+  modality: string
+  findings: string
+}
 
 export interface CaseForm {
   title: string
@@ -6,8 +12,10 @@ export interface CaseForm {
   age: string
   gender: '' | 'Male' | 'Female'
   body: string
-  modality: string
-  findings: string
+  /** Date given to the earliest study; the rest keep their real spacing. */
+  anchorDate: string
+  /** Keyed by Study.id. */
+  studies: Record<string, StudyForm>
 }
 
 interface AuthState {
@@ -20,12 +28,29 @@ interface AuthState {
 interface Props {
   form: CaseForm
   onChange: (form: CaseForm) => void
+  /** Studies that have at least one stack selected, oldest first. */
+  studies: Study[]
   warnings: { tag: string; text: string; level: number; count: number }[]
+}
+
+/** "3 months later" style label for a follow-up study. */
+function describeInterval(days: number | null): string {
+  if (days === null) return 'date unknown'
+  if (days === 0) return 'baseline'
+  if (days < 31) return `${days} day${days === 1 ? '' : 's'} later`
+  const months = Math.round(days / 30.44)
+  if (days < 365) return `${months} month${months === 1 ? '' : 's'} later`
+  const years = days / 365.25
+  return `${years.toFixed(years < 10 ? 1 : 0)} years later`
+}
+
+function addDays(isoDate: string, days: number): string {
+  return new Date(Date.parse(`${isoDate}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
 }
 
 const MODALITIES = ['CT', 'MRI', 'X-ray', 'Ultrasound', 'Fluoroscopy', 'Angiography', 'Nuclear medicine', 'PET-CT', 'Mammography']
 
-export function CaseStep({ form, onChange, warnings }: Props): React.JSX.Element {
+export function CaseStep({ form, onChange, studies, warnings }: Props): React.JSX.Element {
   const [auth, setAuth] = useState<AuthState | null>(null)
   const [user, setUser] = useState<{ username: string | null; quota: { draftCaseCount: number; allowedDraftCases: number } | null } | null>(null)
   const [clientId, setClientId] = useState('')
@@ -152,21 +177,69 @@ export function CaseStep({ form, onChange, warnings }: Props): React.JSX.Element
       </div>
 
       <div className="card rows">
-        <h2>Study</h2>
-        <label className="field">
-          Modality
-          <select value={form.modality} onChange={(e) => set('modality', e.target.value)}>
-            {MODALITIES.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          Findings
-          <textarea value={form.findings} onChange={(e) => set('findings', e.target.value)} />
-        </label>
+        <h2>{studies.length > 1 ? `Studies (${studies.length})` : 'Study'}</h2>
+
+        {studies.length > 1 && (
+          <>
+            <p className="muted small" style={{ margin: 0 }}>
+              The real study dates are removed during anonymisation. The spacing between them is what carries meaning,
+              so it is preserved: pick a date for the baseline and the follow-ups move with it.
+            </p>
+            <label className="field" style={{ maxWidth: 240 }}>
+              Baseline date
+              <input
+                type="date"
+                value={form.anchorDate}
+                onChange={(e) => set('anchorDate', e.target.value)}
+              />
+            </label>
+          </>
+        )}
+
+        {studies.map((study, i) => {
+          const entry = form.studies[study.id] ?? { modality: 'MRI', findings: '' }
+          const update = (patch: Partial<StudyForm>): void =>
+            onChange({ ...form, studies: { ...form.studies, [study.id]: { ...entry, ...patch } } })
+
+          return (
+            <div
+              key={study.id}
+              style={{
+                borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+                paddingTop: i === 0 ? 0 : 14,
+                display: 'grid',
+                gap: 12
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <h3>{study.studyDescription ?? `Study ${i + 1}`}</h3>
+                <span className="badge">{describeInterval(study.intervalDays)}</span>
+                <span className="muted small">
+                  uploaded as {addDays(form.anchorDate, study.intervalDays ?? 0)}
+                </span>
+              </div>
+
+              <div className="row2">
+                <label className="field">
+                  Modality
+                  <select value={entry.modality} onChange={(e) => update({ modality: e.target.value })}>
+                    {MODALITIES.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div />
+              </div>
+
+              <label className="field">
+                Findings
+                <textarea value={entry.findings} onChange={(e) => update({ findings: e.target.value })} />
+              </label>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

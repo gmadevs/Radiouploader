@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { classifyComponent } from './dicom'
 import type { InstanceMeta } from './dicom'
-import { buildStacks } from './series'
+import { buildStacks, buildStudies } from './series'
 
 let counter = 0
 
@@ -13,6 +13,8 @@ function inst(overrides: Partial<InstanceMeta> = {}): InstanceMeta {
     seriesInstanceUid: '1.2.3.4',
     sopInstanceUid: `1.2.3.4.${counter}`,
     studyDescription: 'Brain',
+    studyDate: '2024-01-15',
+    studyTime: '143000',
     seriesDescription: 'Series',
     modality: 'MR',
     seriesNumber: 1,
@@ -144,5 +146,46 @@ describe('buildStacks — plain series', () => {
   it('does not mistake a two-slice localiser for a dynamic series', () => {
     const { stacks } = buildStacks('s', [inst({ sliceLocation: 0 }), inst({ sliceLocation: 0 })])
     expect(stacks).toHaveLength(1)
+  })
+})
+
+describe('buildStudies — multi-study cases', () => {
+  /** One study of `slices` images on a given date. */
+  function study(uid: string, date: string | null, time = '090000'): InstanceMeta[] {
+    return volume(5, { studyInstanceUid: uid, seriesInstanceUid: `${uid}.1`, studyDate: date, studyTime: time })
+  }
+
+  it('orders studies by date and measures each interval from the earliest', () => {
+    const studies = buildStudies([
+      ...study('1.2.3.B', '2024-03-01'),
+      ...study('1.2.3.A', '2024-01-15'),
+      ...study('1.2.3.C', '2025-01-15')
+    ])
+
+    expect(studies.map((s) => s.studyInstanceUid)).toEqual(['1.2.3.A', '1.2.3.B', '1.2.3.C'])
+    expect(studies.map((s) => s.studyDate)).toEqual(['2024-01-15', '2024-03-01', '2025-01-15'])
+    // 46 days to the follow-up, then a full leap year to the third study.
+    expect(studies.map((s) => s.intervalDays)).toEqual([0, 46, 366])
+  })
+
+  it('keeps series separate per study rather than merging them', () => {
+    const studies = buildStudies([...study('1.2.3.A', '2024-01-15'), ...study('1.2.3.B', '2024-03-01')])
+    expect(studies).toHaveLength(2)
+    expect(studies.every((s) => s.series.length === 1)).toBe(true)
+    expect(studies.every((s) => s.series[0].stacks[0].slices.length === 5)).toBe(true)
+  })
+
+  it('does not invent an interval for a study with no readable date', () => {
+    const studies = buildStudies([...study('1.2.3.A', '2024-01-15'), ...study('1.2.3.Z', null)])
+    const undated = studies.find((s) => s.studyInstanceUid === '1.2.3.Z')!
+    expect(undated.studyDate).toBeNull()
+    expect(undated.intervalDays).toBeNull()
+    // Dated studies still sort first so the timeline stays readable.
+    expect(studies[0].studyInstanceUid).toBe('1.2.3.A')
+  })
+
+  it('gives a single-study import a zero interval', () => {
+    const studies = buildStudies(study('1.2.3.A', '2024-01-15'))
+    expect(studies[0].intervalDays).toBe(0)
   })
 })

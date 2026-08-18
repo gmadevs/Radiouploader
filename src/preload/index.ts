@@ -29,6 +29,7 @@ const api = {
   }> => ipcRenderer.invoke('api:currentUser'),
 
   upload: (request: unknown): Promise<{ caseId: string; url: string }> => ipcRenderer.invoke('upload:run', request),
+  defaultAnchorDate: (): Promise<string> => ipcRenderer.invoke('upload:defaultAnchorDate'),
 
   onProgress: (handler: (p: Progress) => void): (() => void) => {
     const listener = (_e: unknown, p: Progress): void => handler(p)

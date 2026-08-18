@@ -9,6 +9,19 @@ interface Props {
   onSelectAll: (series: Series, selected: boolean) => void
 }
 
+/**
+ * Position of a study on the case timeline. The absolute date is deliberately not
+ * shown — it is removed by anonymisation and never uploaded; only the interval is.
+ */
+function describeInterval(days: number | null): string {
+  if (days === null) return 'date unknown'
+  if (days === 0) return 'baseline'
+  if (days < 31) return `${days} day${days === 1 ? '' : 's'} later`
+  if (days < 365) return `${Math.round(days / 30.44)} months later`
+  const years = days / 365.25
+  return `${years.toFixed(years < 10 ? 1 : 0)} years later`
+}
+
 const SPLIT_LABELS: Record<string, string> = {
   component: 'Split by image type',
   diffusion: 'Split by b-value',
@@ -33,8 +46,10 @@ export function ReviewStep({ studies, failures, onToggle, onKeepOnePhase, onSele
 
       {studies.map((study) => (
         <section key={study.id} style={{ marginBottom: 28 }}>
-          <h2>
-            {study.studyDescription ?? 'Study'} <span className="muted small">· {study.modality ?? '—'}</span>
+          <h2 style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            {study.studyDescription ?? 'Study'}
+            <span className="muted small">· {study.modality ?? '—'}</span>
+            {studies.length > 1 && <span className="badge">{describeInterval(study.intervalDays)}</span>}
           </h2>
 
           {study.series.map((series) => (

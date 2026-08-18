@@ -16,6 +16,10 @@ export interface InstanceMeta {
   seriesInstanceUid: string
   sopInstanceUid: string | null
   studyDescription: string | null
+  /** StudyDate as ISO yyyy-mm-dd. Blanked by the anonymiser, so read it here. */
+  studyDate: string | null
+  /** StudyTime as raw DICOM TM, used only to order studies acquired the same day. */
+  studyTime: string | null
   seriesDescription: string | null
   modality: string | null
   seriesNumber: number | null
@@ -143,6 +147,19 @@ function computeSliceLocation(ds: DataSet): number | null {
   return num(ds, 'x00201041')
 }
 
+/**
+ * DICOM DA is YYYYMMDD. Return ISO yyyy-mm-dd, or null when the element is
+ * absent or malformed.
+ */
+function readDate(ds: DataSet, ...tags: string[]): string | null {
+  for (const tag of tags) {
+    const raw = str(ds, tag)
+    const m = raw === null ? null : /^(\d{4})(\d{2})(\d{2})$/.exec(raw)
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`
+  }
+  return null
+}
+
 /** Parse one file. Throws if it is not a readable DICOM object. */
 export async function readInstance(filePath: string): Promise<InstanceMeta> {
   const buf = await fs.readFile(filePath)
@@ -163,6 +180,9 @@ export async function readInstance(filePath: string): Promise<InstanceMeta> {
     seriesInstanceUid,
     sopInstanceUid: str(ds, 'x00080018'),
     studyDescription: str(ds, 'x00081030'),
+    // SeriesDate and AcquisitionDate are the fallbacks when an exporter drops StudyDate.
+    studyDate: readDate(ds, 'x00080020', 'x00080021', 'x00080022'),
+    studyTime: str(ds, 'x00080030'),
     seriesDescription: str(ds, 'x0008103e'),
     modality: str(ds, 'x00080060'),
     seriesNumber: num(ds, 'x00200011'),

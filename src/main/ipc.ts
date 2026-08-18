@@ -2,12 +2,13 @@ import fs from 'node:fs/promises'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { AnonResult, IngestResult, Progress } from '@shared/types'
 import { anonymiseStacks, summariseWarnings } from './anon'
-import { RadiopaediaClient, type CaseDraft, type StudyDraft } from './api/client'
+import { RadiopaediaClient, type CaseDraft } from './api/client'
 import type { OAuthConfig } from './api/oauth'
 import { loadConfig, saveConfig } from './api/store'
 import { uploadStack } from './api/upload'
 import { ingest } from './ingest'
 import { session } from './session'
+import { defaultAnchorDate, planStudies, type StudyDraftInput } from './uploadPlan'
 
 let client: RadiopaediaClient | null = null
 
@@ -25,9 +26,10 @@ async function requireClient(): Promise<RadiopaediaClient> {
 
 export interface UploadRequest {
   caseDraft: CaseDraft
-  studyDraft: StudyDraft
-  /** Stack ids in upload order; each becomes one series on the case. */
-  stackIds: string[]
+  /** One entry per DICOM study; each becomes a study on the Radiopaedia case. */
+  studies: StudyDraftInput[]
+  /** ISO date for the earliest study. Later studies keep their real spacing. */
+  anchorDate: string
 }
 
 export function registerIpc(): void {
@@ -74,6 +76,8 @@ export function registerIpc(): void {
     return { ...result, summary: summariseWarnings(result.warnings) }
   })
 
+  ipcMain.handle('upload:defaultAnchorDate', () => defaultAnchorDate(session.ingest?.studies ?? []))
+
   ipcMain.handle('auth:configure', async (_e, config: OAuthConfig) => {
     const stored = await loadConfig()
     await saveConfig({ ...stored, oauth: config })
@@ -109,29 +113,39 @@ export function registerIpc(): void {
     const anon = session.anon
     if (!anon) throw new Error('Anonymise the selected series before uploading')
 
-    const stacks = session.selectedStacks()
-    const ordered = request.stackIds
-      .map((id) => stacks.find((s) => s.id === id))
-      .filter((s): s is NonNullable<typeof s> => s !== undefined)
-    if (ordered.length === 0) throw new Error('No stacks to upload')
+    const planned = planStudies(session.ingest?.studies ?? [], request.studies, request.anchorDate)
+    if (planned.length === 0) throw new Error('No studies to upload')
 
-    // Anonymised outputs are named "<stackIndex>-<sliceIndex>.dcm", which is how
-    // each file is matched back to the stack it came from.
+    const stacks = session.selectedStacks()
     const bySource = new Map(anon.files.map((f) => [f.sourcePath, f]))
 
     const caseId = await c.createCase(request.caseDraft)
-    const studyId = await c.createStudy(caseId, request.studyDraft)
 
-    let uploaded = 0
-    for (const stack of ordered) {
-      const files = stack.slices
-        .map((slice) => bySource.get(slice.path))
-        .filter((f): f is NonNullable<typeof f> => f !== undefined)
-      if (files.length === 0) continue
+    // Studies are created oldest first so the case timeline reads in order.
+    let seriesDone = 0
+    const seriesTotal = planned.reduce((n, p) => n + p.stackIds.length, 0)
 
-      await uploadStack(c, caseId, studyId, files, (p) =>
-        broadcast({ ...p, detail: `${stack.label} (${++uploaded}/${ordered.length})` })
-      )
+    for (const plan of planned) {
+      const studyId = await c.createStudy(caseId, {
+        modality: plan.modality,
+        findings: plan.findings,
+        studyDate: plan.studyDate
+      })
+
+      for (const stackId of plan.stackIds) {
+        const stack = stacks.find((s) => s.id === stackId)
+        if (!stack) continue
+
+        const files = stack.slices
+          .map((slice) => bySource.get(slice.path))
+          .filter((f): f is NonNullable<typeof f> => f !== undefined)
+        if (files.length === 0) continue
+
+        seriesDone++
+        await uploadStack(c, caseId, studyId, files, (p) =>
+          broadcast({ ...p, detail: `${stack.label} — series ${seriesDone}/${seriesTotal}` })
+        )
+      }
     }
 
     await c.markUploadFinished(caseId)

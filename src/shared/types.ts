@@ -54,6 +54,14 @@ export interface Study {
   studyInstanceUid: string
   studyDescription: string | null
   modality: string | null
+  /** ISO yyyy-mm-dd read from the originals; null when the exporter dropped it. */
+  studyDate: string | null
+  /**
+   * Whole days between this study and the earliest one in the import. 0 for the
+   * first study, null when either date is unknown. This is the interval a
+   * follow-up case needs to preserve.
+   */
+  intervalDays: number | null
   series: Series[]
 }
 

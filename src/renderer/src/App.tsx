@@ -20,8 +20,8 @@ const EMPTY_FORM: CaseForm = {
   age: '',
   gender: '',
   body: '',
-  modality: 'MRI',
-  findings: ''
+  anchorDate: new Date().toISOString().slice(0, 10),
+  studies: {}
 }
 
 export function App(): React.JSX.Element {
@@ -44,6 +44,15 @@ export function App(): React.JSX.Element {
     [ingest]
   )
   const selectedImageCount = selectedStacks.reduce((n, stack) => n + stack.slices.length, 0)
+
+  /** Studies with at least one selected stack, already oldest first from ingest. */
+  const studiesToUpload = useMemo(
+    () =>
+      (ingest?.studies ?? []).filter((study) =>
+        study.series.some((series) => series.stacks.some((stack) => stack.selected))
+      ),
+    [ingest]
+  )
 
   /** Rebuild the tree with one stack's selection changed. */
   const mutateStacks = (predicate: (stackId: string, series: Series) => boolean | null): void => {
@@ -95,6 +104,19 @@ export function App(): React.JSX.Element {
       if (res.errors.length > 0) {
         setError(`${res.errors.length} file(s) could not be anonymised and will not be uploaded.`)
       }
+
+      // Seed one form per study, keeping anything already typed.
+      const anchorDate = await window.api.defaultAnchorDate()
+      setForm((current) => ({
+        ...current,
+        anchorDate: current.studies && Object.keys(current.studies).length > 0 ? current.anchorDate : anchorDate,
+        studies: Object.fromEntries(
+          studiesToUpload.map((study) => [
+            study.id,
+            current.studies[study.id] ?? { modality: study.modality === 'CT' ? 'CT' : 'MRI', findings: '' }
+          ])
+        )
+      }))
       setStep('case')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -118,8 +140,15 @@ export function App(): React.JSX.Element {
           gender: form.gender || null,
           body: form.body || null
         },
-        studyDraft: { modality: form.modality, findings: form.findings },
-        stackIds: selectedStacks.map((s) => s.id)
+        anchorDate: form.anchorDate,
+        studies: studiesToUpload.map((study) => ({
+          studyId: study.id,
+          modality: form.studies[study.id]?.modality ?? 'MRI',
+          findings: form.studies[study.id]?.findings ?? '',
+          stackIds: study.series.flatMap((series) =>
+            series.stacks.filter((stack) => stack.selected).map((stack) => stack.id)
+          )
+        }))
       })
       setResult(res)
       setStep('done')
@@ -186,7 +215,9 @@ export function App(): React.JSX.Element {
           />
         )}
 
-        {step === 'case' && <CaseStep form={form} onChange={setForm} warnings={warnings} />}
+        {step === 'case' && (
+          <CaseStep form={form} onChange={setForm} studies={studiesToUpload} warnings={warnings} />
+        )}
 
         {step === 'done' && result && (
           <div className="card" style={{ textAlign: 'center', maxWidth: 480 }}>
@@ -225,6 +256,7 @@ export function App(): React.JSX.Element {
         {step === 'review' && (
           <>
             <span className="muted small">
+              {studiesToUpload.length > 1 ? `${studiesToUpload.length} studies · ` : ''}
               {selectedStacks.length} series · {selectedImageCount} images selected
             </span>
             <button onClick={startOver} disabled={busy}>
