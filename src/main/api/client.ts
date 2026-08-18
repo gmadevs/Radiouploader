@@ -177,6 +177,12 @@ export class RadiopaediaClient {
 
   /** Create a draft case and return its id. */
   async createCase(draft: CaseDraft): Promise<string> {
+    // system_id is required by the API. The picker enforces it too, but a case
+    // created without one is awkward to fix afterwards, so refuse here as well.
+    if (draft.systemId === null) {
+      throw new Error('Choose a system before uploading — Radiopaedia requires one on every case')
+    }
+
     const body = await this.postJson('cases', {
       title: draft.title,
       presentation: draft.presentation,
