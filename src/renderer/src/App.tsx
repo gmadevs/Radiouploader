@@ -1,0 +1,252 @@
+import { useEffect, useMemo, useState } from 'react'
+import type { IngestResult, Progress, Series } from '@shared/types'
+import { CaseStep, type CaseForm } from './components/CaseStep'
+import { ReviewStep } from './components/ReviewStep'
+import { SourceStep } from './components/SourceStep'
+import { clearPreviewCache } from './dicomPreview'
+
+type Step = 'source' | 'review' | 'case' | 'done'
+
+const STEPS: { key: Step; label: string }[] = [
+  { key: 'source', label: 'Source' },
+  { key: 'review', label: 'Series' },
+  { key: 'case', label: 'Case details' },
+  { key: 'done', label: 'Upload' }
+]
+
+const EMPTY_FORM: CaseForm = {
+  title: '',
+  presentation: '',
+  age: '',
+  gender: '',
+  body: '',
+  modality: 'MRI',
+  findings: ''
+}
+
+export function App(): React.JSX.Element {
+  const [step, setStep] = useState<Step>('source')
+  const [ingest, setIngest] = useState<IngestResult | null>(null)
+  const [progress, setProgress] = useState<Progress | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState<CaseForm>(EMPTY_FORM)
+  const [warnings, setWarnings] = useState<{ tag: string; text: string; level: number; count: number }[]>([])
+  const [result, setResult] = useState<{ caseId: string; url: string } | null>(null)
+
+  useEffect(() => window.api.onProgress(setProgress), [])
+
+  const selectedStacks = useMemo(
+    () =>
+      (ingest?.studies ?? []).flatMap((study) =>
+        study.series.flatMap((series) => series.stacks.filter((stack) => stack.selected))
+      ),
+    [ingest]
+  )
+  const selectedImageCount = selectedStacks.reduce((n, stack) => n + stack.slices.length, 0)
+
+  /** Rebuild the tree with one stack's selection changed. */
+  const mutateStacks = (predicate: (stackId: string, series: Series) => boolean | null): void => {
+    setIngest((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        studies: current.studies.map((study) => ({
+          ...study,
+          series: study.series.map((series) => ({
+            ...series,
+            stacks: series.stacks.map((stack) => {
+              const next = predicate(stack.id, series)
+              return next === null ? stack : { ...stack, selected: next }
+            })
+          }))
+        }))
+      }
+    })
+  }
+
+  const runIngest = async (sourcePath: string, kind: 'folder' | 'zip'): Promise<void> => {
+    setBusy(true)
+    setError(null)
+    clearPreviewCache()
+    try {
+      const res = await window.api.ingest(sourcePath, kind)
+      if (res.studies.length === 0) {
+        setError(`No readable DICOM files found (scanned ${res.scannedFileCount} files).`)
+        return
+      }
+      setIngest(res)
+      setStep('review')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+      setProgress(null)
+    }
+  }
+
+  const anonymiseAndContinue = async (): Promise<void> => {
+    setBusy(true)
+    setError(null)
+    try {
+      await window.api.setSelection(selectedStacks.map((s) => s.id))
+      const res = await window.api.anonymise()
+      setWarnings(res.summary)
+      if (res.errors.length > 0) {
+        setError(`${res.errors.length} file(s) could not be anonymised and will not be uploaded.`)
+      }
+      setStep('case')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+      setProgress(null)
+    }
+  }
+
+  const upload = async (): Promise<void> => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await window.api.upload({
+        caseDraft: {
+          title: form.title,
+          presentation: form.presentation,
+          systemId: null,
+          diagnosticCertaintyId: null,
+          age: form.age || null,
+          gender: form.gender || null,
+          body: form.body || null
+        },
+        studyDraft: { modality: form.modality, findings: form.findings },
+        stackIds: selectedStacks.map((s) => s.id)
+      })
+      setResult(res)
+      setStep('done')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+      setProgress(null)
+    }
+  }
+
+  const startOver = (): void => {
+    void window.api.resetIngest()
+    clearPreviewCache()
+    setIngest(null)
+    setResult(null)
+    setWarnings([])
+    setForm(EMPTY_FORM)
+    setError(null)
+    setStep('source')
+  }
+
+  const currentIndex = STEPS.findIndex((s) => s.key === step)
+
+  return (
+    <div className="app">
+      <div className="titlebar" />
+
+      <nav className="steps">
+        {STEPS.map((s, i) => (
+          <div key={s.key} className={`step ${s.key === step ? 'active' : ''} ${i < currentIndex ? 'done' : ''}`}>
+            <span className="n">{i < currentIndex ? '✓' : i + 1}</span>
+            {s.label}
+          </div>
+        ))}
+      </nav>
+
+      <main className={step === 'source' || step === 'done' ? 'content centred' : 'content'}>
+        {step === 'source' && (
+          <SourceStep
+            busy={busy}
+            onPick={(kind) => {
+              void window.api.pickSource(kind).then((path) => {
+                if (path) void runIngest(path, kind)
+              })
+            }}
+            onDropPath={(path) => void runIngest(path, path.toLowerCase().endsWith('.zip') ? 'zip' : 'folder')}
+          />
+        )}
+
+        {step === 'review' && ingest && (
+          <ReviewStep
+            studies={ingest.studies}
+            failures={ingest.failures}
+            onToggle={(id, selected) => mutateStacks((stackId) => (stackId === id ? selected : null))}
+            onSelectAll={(series, selected) =>
+              mutateStacks((stackId, s) => (s.id === series.id ? selected : null))
+            }
+            onKeepOnePhase={(series) => {
+              // Keep the earliest phase and drop the rest; the user can re-tick any.
+              const first = series.stacks.find((s) => s.selected)?.id ?? series.stacks[0]?.id
+              mutateStacks((stackId, s) => (s.id === series.id ? stackId === first : null))
+            }}
+          />
+        )}
+
+        {step === 'case' && <CaseStep form={form} onChange={setForm} warnings={warnings} />}
+
+        {step === 'done' && result && (
+          <div className="card" style={{ textAlign: 'center', maxWidth: 480 }}>
+            <h1>Case uploaded</h1>
+            <p className="muted">
+              The case was created as a draft. Open it on Radiopaedia to review the images and publish it.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16 }}>
+              <a href={result.url} target="_blank" rel="noreferrer">
+                <button className="primary">Open case {result.caseId}</button>
+              </a>
+              <button onClick={startOver}>Upload another</button>
+            </div>
+          </div>
+        )}
+      </main>
+
+      <footer className="footer">
+        {error && <span className="notice error">{error}</span>}
+
+        {progress && (
+          <div style={{ flex: '0 1 300px' }}>
+            <div className="small muted" style={{ marginBottom: 4 }}>
+              {progress.phase}
+              {progress.total > 0 ? ` ${progress.done}/${progress.total}` : ''}
+              {progress.detail ? ` — ${progress.detail}` : ''}
+            </div>
+            <div className="progress">
+              <div style={{ width: progress.total > 0 ? `${(progress.done / progress.total) * 100}%` : '100%' }} />
+            </div>
+          </div>
+        )}
+
+        <div className="spacer" />
+
+        {step === 'review' && (
+          <>
+            <span className="muted small">
+              {selectedStacks.length} series · {selectedImageCount} images selected
+            </span>
+            <button onClick={startOver} disabled={busy}>
+              Back
+            </button>
+            <button className="primary" disabled={busy || selectedStacks.length === 0} onClick={() => void anonymiseAndContinue()}>
+              Anonymise and continue
+            </button>
+          </>
+        )}
+
+        {step === 'case' && (
+          <>
+            <button onClick={() => setStep('review')} disabled={busy}>
+              Back
+            </button>
+            <button className="primary" disabled={busy || form.title.trim() === ''} onClick={() => void upload()}>
+              Upload to Radiopaedia
+            </button>
+          </>
+        )}
+      </footer>
+    </div>
+  )
+}

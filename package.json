@@ -1,0 +1,40 @@
+{
+  "name": "radiopaedia-uploader",
+  "version": "0.1.0",
+  "description": "Desktop uploader for Radiopaedia.org: DICOM ingest, anonymisation and case upload",
+  "license": "AGPL-3.0-only",
+  "main": "./out/main/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:win": "npm run build && electron-builder --win",
+    "smoke": "electron scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@cornerstonejs/core": "^5.8.2",
+    "@cornerstonejs/dicom-image-loader": "^5.8.2",
+    "dicom-parser": "^1.8.21",
+    "dicomanon": "github:radiopaedia/dicom-anonymiser",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@types/yauzl": "^3.4.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10"
+  }
+}

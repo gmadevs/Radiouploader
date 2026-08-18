@@ -1,0 +1,29 @@
+appId: org.radiopaedia.uploader
+productName: Radiopaedia Uploader
+directories:
+  output: release
+  buildResources: resources
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - resources/**
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  category: public.app-category.medical
+  # Renderer needs no camera/mic; hardened runtime is required for notarisation.
+  hardenedRuntime: true
+  gatekeeperAssess: false
+linux:
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64, arm64]
+  category: Science
+win:
+  target:
+    - target: nsis
+      arch: [x64]
