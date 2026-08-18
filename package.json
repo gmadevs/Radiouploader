@@ -18,8 +18,6 @@
   "dependencies": {
     "dicom-parser": "^1.8.21",
     "dicomanon": "github:radiopaedia/dicom-anonymiser",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
     "yauzl": "^3.4.0"
   },
   "devDependencies": {
@@ -31,6 +29,8 @@
     "electron": "^43.4.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
     "vitest": "^4.1.10"

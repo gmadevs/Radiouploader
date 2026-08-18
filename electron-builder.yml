@@ -6,6 +6,12 @@ directories:
 files:
   - out/**
   - package.json
+  # Runtime dependencies are packed automatically. Trim what they carry for
+  # development only — sources, sourcemaps, docs and test fixtures — which is
+  # most of their weight and none of their function.
+  - '!node_modules/**/*.{map,md,markdown}'
+  - '!node_modules/**/{src,spec,test,tests,__tests__,docs,doc,fixtures,example,examples,scripts}/**'
+  - '!node_modules/**/{Dockerfile,jest.config.js,.eslintrc.js,tsconfig.json,CLAUDE.md,.editorconfig}'
 asarUnpack:
   - resources/**
 mac:
