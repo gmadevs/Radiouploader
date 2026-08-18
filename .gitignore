@@ -7,3 +7,4 @@ release/
 .env
 smoke*.png
 *.tsbuildinfo
+.DS_Store
