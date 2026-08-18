@@ -41,6 +41,13 @@ export interface Stack {
   acquisitionTime: string | null
   slices: SliceRef[]
   selected: boolean
+  /**
+   * Inclusive index range of `slices` to keep, so the dead ends of a series —
+   * the localiser slices before the anatomy, the tail after it — can be dropped
+   * without deselecting the whole stack. Defaults to the full range.
+   */
+  trimStart: number
+  trimEnd: number
 }
 
 export interface Series {

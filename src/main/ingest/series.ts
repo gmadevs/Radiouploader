@@ -216,6 +216,7 @@ function makeStack(
   varying: Set<StackKind>
 ): Stack {
   const sorted = sortSlices(instances)
+  const slices = sorted.flatMap(toSliceRefs)
   return {
     id: `${seriesId}::stack-${index}`,
     kind: primaryKind(varying),
@@ -225,8 +226,10 @@ function makeStack(
     echoNumber: dims.echoNumber,
     phaseIndex,
     acquisitionTime: instances[0].acquisitionTime,
-    slices: sorted.flatMap(toSliceRefs),
-    selected: true
+    slices,
+    selected: true,
+    trimStart: 0,
+    trimEnd: slices.length - 1
   }
 }
 

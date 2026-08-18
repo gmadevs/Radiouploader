@@ -5,14 +5,19 @@ import { renderSlice } from '../dicomPreview'
 interface Props {
   stack: Stack
   onToggle: (id: string, selected: boolean) => void
+  onTrim: (id: string, trimStart: number, trimEnd: number) => void
 }
 
-/** One stack: a scrubable preview plus the include/exclude control. */
-export function StackCard({ stack, onToggle }: Props): React.JSX.Element {
+/** One stack: a scrubable preview, the trim range, and the include control. */
+export function StackCard({ stack, onToggle, onTrim }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  // Open on the middle slice — the ends of a volume are rarely informative.
+  // Open on the middle image — the ends of a volume are rarely informative.
   const [index, setIndex] = useState(() => Math.floor(stack.slices.length / 2))
   const [error, setError] = useState<string | null>(null)
+
+  const last = stack.slices.length - 1
+  const kept = stack.trimEnd - stack.trimStart + 1
+  const trimmed = kept < stack.slices.length
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -32,21 +37,79 @@ export function StackCard({ stack, onToggle }: Props): React.JSX.Element {
     }
   }, [stack.slices, index])
 
+  /** Moving a trim handle jumps the preview there, so the cut is visible. */
+  const setStart = (value: number): void => {
+    const start = Math.min(value, stack.trimEnd)
+    onTrim(stack.id, start, stack.trimEnd)
+    setIndex(start)
+  }
+  const setEnd = (value: number): void => {
+    const end = Math.max(value, stack.trimStart)
+    onTrim(stack.id, stack.trimStart, end)
+    setIndex(end)
+  }
+
+  const outsideTrim = index < stack.trimStart || index > stack.trimEnd
+
   return (
     <div className={stack.selected ? 'stack on' : 'stack'}>
       <div className="stack-preview">
-        {error ? <div className="placeholder">Preview unavailable<br />{error}</div> : <canvas ref={canvasRef} />}
+        {error ? (
+          <div className="placeholder">
+            Preview unavailable
+            <br />
+            {error}
+          </div>
+        ) : (
+          <canvas ref={canvasRef} className={outsideTrim ? 'dropped' : undefined} />
+        )}
+        {outsideTrim && <div className="dropped-tag">not uploaded</div>}
         {stack.slices.length > 1 && (
           <input
             type="range"
             min={0}
-            max={stack.slices.length - 1}
+            max={last}
             value={index}
             aria-label={`Image of ${stack.label}`}
             onChange={(e) => setIndex(Number(e.target.value))}
           />
         )}
       </div>
+
+      {stack.slices.length > 2 && (
+        <div className="trim">
+          <label>
+            <span>First</span>
+            <input
+              type="range"
+              min={0}
+              max={last}
+              value={stack.trimStart}
+              aria-label={`First image of ${stack.label}`}
+              onChange={(e) => setStart(Number(e.target.value))}
+            />
+            <span className="n">{stack.trimStart + 1}</span>
+          </label>
+          <label>
+            <span>Last</span>
+            <input
+              type="range"
+              min={0}
+              max={last}
+              value={stack.trimEnd}
+              aria-label={`Last image of ${stack.label}`}
+              onChange={(e) => setEnd(Number(e.target.value))}
+            />
+            <span className="n">{stack.trimEnd + 1}</span>
+          </label>
+          {trimmed && (
+            <button className="small ghost" onClick={() => onTrim(stack.id, 0, last)}>
+              Reset trim
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="stack-meta">
         <input
           type="checkbox"
@@ -57,7 +120,15 @@ export function StackCard({ stack, onToggle }: Props): React.JSX.Element {
         <label htmlFor={stack.id}>
           <h3>{stack.label}</h3>
           <div className="muted small">
-            {stack.slices.length} image{stack.slices.length === 1 ? '' : 's'}
+            {trimmed ? (
+              <>
+                {kept} of {stack.slices.length} images
+              </>
+            ) : (
+              <>
+                {stack.slices.length} image{stack.slices.length === 1 ? '' : 's'}
+              </>
+            )}
           </div>
         </label>
       </div>

@@ -173,3 +173,18 @@ label.field { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
   position: absolute; top: calc(100% + 10px); right: 0; width: 380px; z-index: 10;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
+
+.stack-preview canvas.dropped { opacity: 0.28; }
+.dropped-tag {
+  position: absolute; top: 8px; right: 8px;
+  font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--danger); border: 1px solid var(--danger); border-radius: 999px;
+  padding: 2px 7px; background: color-mix(in srgb, var(--bg) 70%, transparent);
+}
+
+.trim { display: grid; gap: 5px; padding: 9px 10px 3px; border-top: 1px solid var(--border); }
+.trim label { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.trim label > span:first-child { width: 30px; flex: none; }
+.trim label .n { width: 30px; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
+.trim input[type='range'] { flex: 1; padding: 0; border: none; background: transparent; accent-color: var(--accent); }
+.trim button { justify-self: start; margin-top: 2px; }

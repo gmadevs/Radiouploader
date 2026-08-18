@@ -23,20 +23,33 @@ class Session {
     return this.workDirPath
   }
 
-  /** Every stack the user has ticked, across all studies and series. */
+  /**
+   * Every stack the user has ticked, with the trim already applied — so
+   * anonymisation and upload only ever see the images that were kept.
+   */
   selectedStacks(): Stack[] {
     if (!this.ingest) return []
-    return this.ingest.studies.flatMap((study) =>
-      study.series.flatMap((series) => series.stacks.filter((stack) => stack.selected))
-    )
+    return this.ingest.studies
+      .flatMap((study) => study.series.flatMap((series) => series.stacks))
+      .filter((stack) => stack.selected)
+      .map((stack) => ({ ...stack, slices: stack.slices.slice(stack.trimStart, stack.trimEnd + 1) }))
+      .filter((stack) => stack.slices.length > 0)
   }
 
-  /** Apply the renderer's selection back onto the tree held here. */
-  applySelection(selectedIds: string[]): void {
-    const wanted = new Set(selectedIds)
+  /** Apply the renderer's selection and trim back onto the tree held here. */
+  applySelection(selection: { id: string; trimStart: number; trimEnd: number }[]): void {
+    const byId = new Map(selection.map((s) => [s.id, s]))
     for (const study of this.ingest?.studies ?? []) {
       for (const series of study.series) {
-        for (const stack of series.stacks) stack.selected = wanted.has(stack.id)
+        for (const stack of series.stacks) {
+          const chosen = byId.get(stack.id)
+          stack.selected = chosen !== undefined
+          if (!chosen) continue
+          // Clamp against the real length; the renderer's copy could be stale.
+          const last = stack.slices.length - 1
+          stack.trimStart = Math.min(Math.max(chosen.trimStart, 0), last)
+          stack.trimEnd = Math.min(Math.max(chosen.trimEnd, stack.trimStart), last)
+        }
       }
     }
   }

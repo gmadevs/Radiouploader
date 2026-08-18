@@ -6,6 +6,7 @@ interface Props {
   studies: Study[]
   failures: { path: string; reason: string }[]
   onToggle: (id: string, selected: boolean) => void
+  onTrim: (id: string, trimStart: number, trimEnd: number) => void
   onKeepOnePhase: (series: Series) => void
   onSelectAll: (series: Series, selected: boolean) => void
 }
@@ -17,7 +18,7 @@ const SPLIT_LABELS: Record<string, string> = {
   phase: 'Split by phase'
 }
 
-export function ReviewStep({ studies, failures, onToggle, onKeepOnePhase, onSelectAll }: Props): React.JSX.Element {
+export function ReviewStep({ studies, failures, onToggle, onTrim, onKeepOnePhase, onSelectAll }: Props): React.JSX.Element {
   return (
     <>
       <h1>Choose what to upload</h1>
@@ -77,7 +78,7 @@ export function ReviewStep({ studies, failures, onToggle, onKeepOnePhase, onSele
               </div>
               <div className="stacks">
                 {series.stacks.map((stack) => (
-                  <StackCard key={stack.id} stack={stack} onToggle={onToggle} />
+                  <StackCard key={stack.id} stack={stack} onToggle={onToggle} onTrim={onTrim} />
                 ))}
               </div>
             </div>

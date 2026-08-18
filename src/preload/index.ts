@@ -7,7 +7,8 @@ const api = {
   ingest: (sourcePath: string, kind: 'folder' | 'zip'): Promise<IngestResult> =>
     ipcRenderer.invoke('ingest:run', sourcePath, kind),
   resetIngest: (): Promise<void> => ipcRenderer.invoke('ingest:reset'),
-  setSelection: (stackIds: string[]): Promise<void> => ipcRenderer.invoke('selection:set', stackIds),
+  setSelection: (selection: { id: string; trimStart: number; trimEnd: number }[]): Promise<void> =>
+    ipcRenderer.invoke('selection:set', selection),
   readPreview: (filePath: string): Promise<ArrayBuffer> => ipcRenderer.invoke('preview:read', filePath),
   anonymise: (): Promise<AnonResult & { summary: { tag: string; text: string; level: number; count: number }[] }> =>
     ipcRenderer.invoke('anon:run'),

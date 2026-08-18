@@ -172,11 +172,15 @@ export async function readInstance(filePath: string): Promise<InstanceMeta> {
     throw new Error('Missing StudyInstanceUID or SeriesInstanceUID')
   }
 
-  // Presentation states, structured reports and key-object selections live
-  // alongside the images and parse fine, but they have no pixels and must not
-  // appear as series to upload.
+  // Presentation states, structured reports and raw-data objects live alongside
+  // the images and parse fine. Some even declare Rows and Columns — Philips Raw
+  // Data Storage (1.2.840.10008.5.1.4.1.1.66) does — so the absence of pixel
+  // data is what actually distinguishes them. They must not appear as series.
   if (ds.uint16('x00280010') === undefined || ds.uint16('x00280011') === undefined) {
     throw new Error('Not an image object (no Rows/Columns)')
+  }
+  if (!ds.elements['x7fe00010']) {
+    throw new Error('Not an image object (no pixel data)')
   }
 
   const imageType = multiValue(ds, 'x00080008')

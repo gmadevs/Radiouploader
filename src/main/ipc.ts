@@ -49,8 +49,8 @@ export function registerIpc(): void {
 
   ipcMain.handle('ingest:reset', async () => session.reset())
 
-  ipcMain.handle('selection:set', (_e, stackIds: string[]) => {
-    session.applySelection(stackIds)
+  ipcMain.handle('selection:set', (_e, selection: { id: string; trimStart: number; trimEnd: number }[]) => {
+    session.applySelection(selection)
   })
 
   // Preview data for the renderer. Only paths belonging to the current ingest

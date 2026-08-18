@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { IngestResult, Progress, Series } from '@shared/types'
+import type { IngestResult, Progress, Series, Stack } from '@shared/types'
 import { AccountBar } from './components/AccountBar'
 import { quotaExhausted, type AccountState } from './quota'
 import { describeInterval } from '@shared/interval'
@@ -61,7 +61,10 @@ export function App(): React.JSX.Element {
       ),
     [ingest]
   )
-  const selectedImageCount = selectedStacks.reduce((n, stack) => n + stack.slices.length, 0)
+  const selectedImageCount = selectedStacks.reduce(
+    (n, stack) => n + (stack.trimEnd - stack.trimStart + 1),
+    0
+  )
 
   /** Studies with at least one selected stack, already oldest first from ingest. */
   const studiesToUpload = useMemo(
@@ -72,8 +75,8 @@ export function App(): React.JSX.Element {
     [ingest]
   )
 
-  /** Rebuild the tree with one stack's selection changed. */
-  const mutateStacks = (predicate: (stackId: string, series: Series) => boolean | null): void => {
+  /** Rebuild the tree, applying `change` to each stack; null leaves it alone. */
+  const mutateStacks = (change: (stack: Stack, series: Series) => Partial<Stack> | null): void => {
     setIngest((current) => {
       if (!current) return current
       return {
@@ -83,8 +86,8 @@ export function App(): React.JSX.Element {
           series: study.series.map((series) => ({
             ...series,
             stacks: series.stacks.map((stack) => {
-              const next = predicate(stack.id, series)
-              return next === null ? stack : { ...stack, selected: next }
+              const patch = change(stack, series)
+              return patch === null ? stack : { ...stack, ...patch }
             })
           }))
         }))
@@ -116,7 +119,9 @@ export function App(): React.JSX.Element {
     setBusy(true)
     setError(null)
     try {
-      await window.api.setSelection(selectedStacks.map((s) => s.id))
+      await window.api.setSelection(
+        selectedStacks.map((s) => ({ id: s.id, trimStart: s.trimStart, trimEnd: s.trimEnd }))
+      )
       const res = await window.api.anonymise()
       setWarnings(res.summary)
       if (res.errors.length > 0) {
@@ -232,14 +237,17 @@ export function App(): React.JSX.Element {
           <ReviewStep
             studies={ingest.studies}
             failures={ingest.failures}
-            onToggle={(id, selected) => mutateStacks((stackId) => (stackId === id ? selected : null))}
+            onToggle={(id, selected) => mutateStacks((stack) => (stack.id === id ? { selected } : null))}
+            onTrim={(id, trimStart, trimEnd) =>
+              mutateStacks((stack) => (stack.id === id ? { trimStart, trimEnd } : null))
+            }
             onSelectAll={(series, selected) =>
-              mutateStacks((stackId, s) => (s.id === series.id ? selected : null))
+              mutateStacks((_stack, s) => (s.id === series.id ? { selected } : null))
             }
             onKeepOnePhase={(series) => {
               // Keep the earliest phase and drop the rest; the user can re-tick any.
               const first = series.stacks.find((s) => s.selected)?.id ?? series.stacks[0]?.id
-              mutateStacks((stackId, s) => (s.id === series.id ? stackId === first : null))
+              mutateStacks((stack, s) => (s.id === series.id ? { selected: stack.id === first } : null))
             }}
           />
         )}
