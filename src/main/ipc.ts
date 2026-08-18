@@ -91,13 +91,19 @@ export function registerIpc(): void {
       configured: Boolean(stored.oauth?.clientId),
       authenticated: client?.isAuthenticated ?? false,
       redirectUri: stored.oauth?.redirectUri ?? null,
+      usesOutOfBandFlow: client?.usesOutOfBandFlow ?? true,
       clientId: stored.oauth?.clientId ?? null
     }
   })
 
-  ipcMain.handle('auth:signIn', async () => {
+  ipcMain.handle('auth:beginSignIn', async () => {
     const c = await requireClient()
-    await c.signIn()
+    return c.beginSignIn()
+  })
+
+  ipcMain.handle('auth:completeSignIn', async (_e, code: string) => {
+    const c = await requireClient()
+    await c.completeSignIn(code)
     return c.currentUser()
   })
 

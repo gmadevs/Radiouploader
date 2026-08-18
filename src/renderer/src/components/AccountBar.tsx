@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 
+/** Doorkeeper's out-of-band redirect: the code is shown on screen to copy. */
+const OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
+
 export interface Quota {
   draftCaseCount: number
   allowedDraftCases: number
@@ -31,7 +34,11 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
-  const [redirectUri, setRedirectUri] = useState('http://127.0.0.1:8910/callback')
+  // Radiopaedia refuses non-https redirect URIs, so the out-of-band URN is the
+  // realistic default for a desktop app; their application form says as much.
+  const [redirectUri, setRedirectUri] = useState(OOB_REDIRECT_URI)
+  const [code, setCode] = useState('')
+  const [awaitingCode, setAwaitingCode] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -59,14 +66,33 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
 
   useEffect(load, [])
 
-  const signIn = (): void => {
+  const beginSignIn = (): void => {
     setBusy(true)
     setError(null)
     void window.api
       .configureAuth({ clientId, clientSecret: clientSecret || undefined, redirectUri })
-      .then(() => window.api.signIn())
+      .then(() => window.api.beginSignIn())
+      .then((res) => {
+        if (res.needsCode) {
+          // Out-of-band: Radiopaedia shows the code, the user brings it back.
+          setAwaitingCode(true)
+          return
+        }
+        return load()
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false))
+  }
+
+  const completeSignIn = (): void => {
+    setBusy(true)
+    setError(null)
+    void window.api
+      .completeSignIn(code)
       .then((user) => {
         onChange({ authenticated: true, username: user.username, quota: user.quota })
+        setAwaitingCode(false)
+        setCode('')
         setOpen(false)
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
@@ -97,28 +123,68 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
 
       {open && !account.authenticated && (
         <div className="account-panel card rows">
-          <p className="muted small" style={{ margin: 0 }}>
-            Create an application on Radiopaedia with scope <code>cases</code> and the redirect URI below, then paste
-            its credentials here.
-          </p>
-          <label className="field">
-            Application ID
-            <input value={clientId} onChange={(e) => setClientId(e.target.value)} />
-          </label>
-          <label className="field">
-            Client secret
-            <input type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} />
-          </label>
-          <label className="field">
-            Redirect URI (must match the application exactly)
-            <input value={redirectUri} onChange={(e) => setRedirectUri(e.target.value)} />
-          </label>
-          {error && <div className="notice error">{error}</div>}
-          <div>
-            <button className="primary" disabled={busy || !clientId || !redirectUri} onClick={signIn}>
-              {busy ? 'Waiting for your browser…' : 'Sign in'}
-            </button>
-          </div>
+          {!awaitingCode ? (
+            <>
+              <p className="muted small" style={{ margin: 0 }}>
+                Create an application on Radiopaedia with scope <code>cases</code>. Its Redirect URI must be an https
+                address or the out-of-band URN below — a plain <code>http://127.0.0.1</code> address is rejected by
+                their form.
+              </p>
+              <label className="field">
+                Application ID
+                <input value={clientId} onChange={(e) => setClientId(e.target.value)} />
+              </label>
+              <label className="field">
+                Client secret
+                <input type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} />
+              </label>
+              <label className="field">
+                Redirect URI (must match the application exactly)
+                <input value={redirectUri} onChange={(e) => setRedirectUri(e.target.value)} />
+              </label>
+              {error && <div className="notice error">{error}</div>}
+              <div>
+                <button className="primary" disabled={busy || !clientId || !redirectUri} onClick={beginSignIn}>
+                  {busy ? 'Opening your browser…' : 'Open Radiopaedia to authorise'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="muted small" style={{ margin: 0 }}>
+                Authorise the application in the browser window that just opened, then paste the code Radiopaedia
+                shows you.
+              </p>
+              <label className="field">
+                Authorization code
+                <input
+                  value={code}
+                  autoFocus
+                  spellCheck={false}
+                  onChange={(e) => setCode(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && code.trim() !== '') completeSignIn()
+                  }}
+                />
+              </label>
+              {error && <div className="notice error">{error}</div>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="primary" disabled={busy || code.trim() === ''} onClick={completeSignIn}>
+                  {busy ? 'Signing in…' : 'Complete sign in'}
+                </button>
+                <button
+                  className="ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    setAwaitingCode(false)
+                    setError(null)
+                  }}
+                >
+                  Back
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

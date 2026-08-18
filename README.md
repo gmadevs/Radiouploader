@@ -84,10 +84,19 @@ Create an application at <https://radiopaedia.org/api-documentation> → *Manage
 applications* → *New Application*:
 
 - **Scopes**: `cases`
-- **Redirect URI**: `http://127.0.0.1:8910/callback` (must match what you enter in the app)
+- **Redirect URI**: `urn:ietf:wg:oauth:2.0:oob`
 
-Then paste the Application ID and secret into the app's *Case details* step and sign in.
-Tokens are stored encrypted through the OS keychain (Keychain / libsecret / DPAPI).
+Radiopaedia's form requires an https redirect URI and rejects a plain
+`http://127.0.0.1:…` loopback, so the usual RFC 8252 native-app pattern is not available.
+Their form points at the out-of-band URN instead: the app opens the authorization page in
+your browser, Radiopaedia displays a code, and you paste it back into the app. PKCE is
+sent either way.
+
+If you do register an https redirect URI, the app detects it and uses the loopback
+listener automatically — no code to copy.
+
+Paste the Application ID and secret into the sign-in panel in the app header. Tokens are
+stored encrypted through the OS keychain (Keychain / libsecret / DPAPI).
 
 ## Development
 

@@ -1,4 +1,15 @@
-import { authorize, refresh, RADIOPAEDIA_ORIGIN, type OAuthConfig, type TokenSet } from './oauth'
+import {
+  authorizeViaLoopback,
+  buildAuthorization,
+  exchangeCode,
+  isOobRedirect,
+  openAuthorizationPage,
+  refresh,
+  RADIOPAEDIA_ORIGIN,
+  type OAuthConfig,
+  type PendingAuthorization,
+  type TokenSet
+} from './oauth'
 import { loadConfig, saveConfig } from './store'
 
 const API_BASE = `${RADIOPAEDIA_ORIGIN}/api/v1/`
@@ -37,8 +48,14 @@ export class RadiopaediaApiError extends Error {
 
 export class RadiopaediaClient {
   private tokens: TokenSet | null = null
+  /** Set between beginSignIn() and completeSignIn() in the out-of-band flow. */
+  private pending: PendingAuthorization | null = null
 
   constructor(private config: OAuthConfig) {}
+
+  get usesOutOfBandFlow(): boolean {
+    return isOobRedirect(this.config.redirectUri)
+  }
 
   static async fromStoredConfig(): Promise<RadiopaediaClient | null> {
     const stored = await loadConfig()
@@ -52,14 +69,40 @@ export class RadiopaediaClient {
     return this.tokens !== null
   }
 
-  /** Run the interactive sign-in and persist the resulting tokens. */
-  async signIn(): Promise<void> {
-    this.tokens = await authorize(this.config)
+  /**
+   * Open the authorization page.
+   *
+   * With an https redirect URI the code returns to a loopback listener and this
+   * completes the sign-in on its own. With the out-of-band URN there is nowhere
+   * for the code to land, so this only opens the browser and the caller must
+   * follow up with completeSignIn() once the user has pasted the code.
+   */
+  async beginSignIn(): Promise<{ needsCode: boolean }> {
+    if (!this.usesOutOfBandFlow) {
+      this.tokens = await authorizeViaLoopback(this.config)
+      await this.persist()
+      return { needsCode: false }
+    }
+
+    this.pending = buildAuthorization(this.config)
+    await openAuthorizationPage(this.pending)
+    return { needsCode: true }
+  }
+
+  /** Finish the out-of-band flow with the code Radiopaedia displayed. */
+  async completeSignIn(code: string): Promise<void> {
+    if (!this.pending) throw new Error('Start the sign-in before submitting a code')
+    const trimmed = code.trim()
+    if (trimmed === '') throw new Error('Paste the authorization code from Radiopaedia')
+
+    this.tokens = await exchangeCode(this.config, trimmed, this.pending.codeVerifier)
+    this.pending = null
     await this.persist()
   }
 
   async signOut(): Promise<void> {
     this.tokens = null
+    this.pending = null
     await this.persist()
   }
 

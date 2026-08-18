@@ -19,9 +19,14 @@ const api = {
     authenticated: boolean
     redirectUri: string | null
     clientId: string | null
+    usesOutOfBandFlow: boolean
   }> => ipcRenderer.invoke('auth:status'),
-  signIn: (): Promise<{ username: string | null; quota: { draftCaseCount: number; allowedDraftCases: number } | null }> =>
-    ipcRenderer.invoke('auth:signIn'),
+  /** Opens the authorization page. needsCode marks the out-of-band flow. */
+  beginSignIn: (): Promise<{ needsCode: boolean }> => ipcRenderer.invoke('auth:beginSignIn'),
+  completeSignIn: (
+    code: string
+  ): Promise<{ username: string | null; quota: { draftCaseCount: number; allowedDraftCases: number } | null }> =>
+    ipcRenderer.invoke('auth:completeSignIn', code),
   signOut: (): Promise<void> => ipcRenderer.invoke('auth:signOut'),
   currentUser: (): Promise<{
     username: string | null

@@ -10,6 +10,20 @@ const TOKEN_URL = `${RADIOPAEDIA_ORIGIN}/oauth/token`
 /** The only scope the uploader needs; it is what the application form asks for. */
 export const SCOPE = 'cases'
 
+/**
+ * Out-of-band redirect.
+ *
+ * Radiopaedia's Doorkeeper rejects any redirect URI that is not https — a plain
+ * `http://127.0.0.1/...` loopback, the usual native-app pattern from RFC 8252,
+ * is refused by the application form. Their form points at this URN instead:
+ * the authorization page displays the code and the user pastes it into the app.
+ */
+export const OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
+
+export function isOobRedirect(redirectUri: string): boolean {
+  return redirectUri === OOB_REDIRECT_URI
+}
+
 export interface OAuthConfig {
   clientId: string
   /** Doorkeeper confidential apps issue a secret; public apps use PKCE instead. */
@@ -53,16 +67,19 @@ async function postToken(params: Record<string, string>): Promise<TokenSet> {
   return toTokenSet(body)
 }
 
+export interface PendingAuthorization {
+  url: string
+  state: string
+  codeVerifier: string
+}
+
 /**
- * Run the authorization-code flow.
+ * Build the authorization URL and the PKCE material that goes with it.
  *
- * Following RFC 8252 for native apps: the authorization page opens in a real
- * browser window and the code comes back to a loopback listener bound to the
- * port in `redirectUri`. PKCE is always sent; Doorkeeper ignores it for
- * confidential apps and requires it for public ones, so this works either way.
+ * PKCE is always sent; Doorkeeper ignores it for confidential apps and requires
+ * it for public ones, so this works either way.
  */
-export async function authorize(config: OAuthConfig): Promise<TokenSet> {
-  const redirect = new URL(config.redirectUri)
+export function buildAuthorization(config: OAuthConfig): PendingAuthorization {
   const state = crypto.randomBytes(16).toString('hex')
   const codeVerifier = crypto.randomBytes(32).toString('base64url')
   const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url')
@@ -75,6 +92,38 @@ export async function authorize(config: OAuthConfig): Promise<TokenSet> {
   authUrl.searchParams.set('state', state)
   authUrl.searchParams.set('code_challenge', codeChallenge)
   authUrl.searchParams.set('code_challenge_method', 'S256')
+
+  return { url: authUrl.toString(), state, codeVerifier }
+}
+
+/** Exchange an authorization code for tokens. */
+export async function exchangeCode(config: OAuthConfig, code: string, codeVerifier: string): Promise<TokenSet> {
+  const params: Record<string, string> = {
+    client_id: config.clientId,
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: config.redirectUri,
+    code_verifier: codeVerifier
+  }
+  if (config.clientSecret) params.client_secret = config.clientSecret
+  return postToken(params)
+}
+
+/** Open the authorization page in the user's own browser. */
+export async function openAuthorizationPage(pending: PendingAuthorization): Promise<void> {
+  await shell.openExternal(pending.url)
+}
+
+/**
+ * Loopback flow, for an application registered with an https redirect URI.
+ *
+ * Kept for completeness — Radiopaedia's form refuses plain http loopback, so
+ * most users will go through the out-of-band flow instead.
+ */
+export async function authorizeViaLoopback(config: OAuthConfig): Promise<TokenSet> {
+  const redirect = new URL(config.redirectUri)
+  const pending = buildAuthorization(config)
+  const { state } = pending
 
   const code = await new Promise<string>((resolve, reject) => {
     const server = http.createServer((req, res) => {
@@ -112,7 +161,7 @@ export async function authorize(config: OAuthConfig): Promise<TokenSet> {
 
     server.on('error', reject)
     server.listen(Number(redirect.port || 80), '127.0.0.1', () => {
-      void shell.openExternal(authUrl.toString())
+      void openAuthorizationPage(pending)
     })
 
     // Give the user a bounded window to complete sign-in rather than leaking a listener.
@@ -122,15 +171,7 @@ export async function authorize(config: OAuthConfig): Promise<TokenSet> {
     }, 5 * 60_000).unref()
   })
 
-  const params: Record<string, string> = {
-    client_id: config.clientId,
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: config.redirectUri,
-    code_verifier: codeVerifier
-  }
-  if (config.clientSecret) params.client_secret = config.clientSecret
-  return postToken(params)
+  return exchangeCode(config, code, pending.codeVerifier)
 }
 
 /** Exchange a refresh token for a fresh access token. */
