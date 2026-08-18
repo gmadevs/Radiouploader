@@ -5,6 +5,10 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    resolve: {
+      alias: { '@shared': resolve(__dirname, 'src/shared') }
+    },
+
     build: {
       rollupOptions: {
         input: {
@@ -17,6 +21,10 @@ export default defineConfig({
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
+    resolve: {
+      alias: { '@shared': resolve(__dirname, 'src/shared') }
+    },
+
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/preload/index.ts') }

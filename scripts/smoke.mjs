@@ -9,6 +9,29 @@ import { app, BrowserWindow } from 'electron'
 import '../out/main/index.js'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
+
+/**
+ * Refuse to run against a stale bundle. A failed build leaves the previous out/
+ * in place, and testing that instead of the current source reports success for
+ * code that does not compile.
+ */
+async function newestMtime(dir) {
+  let newest = 0
+  for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) newest = Math.max(newest, await newestMtime(full))
+    else newest = Math.max(newest, (await fs.stat(full)).mtimeMs)
+  }
+  return newest
+}
+
+const srcMtime = await newestMtime(path.join(root, 'src'))
+const outMtime = await newestMtime(path.join(root, 'out')).catch(() => 0)
+if (outMtime < srcMtime) {
+  console.error('PROBLEMS: out/ is older than src/ — run `npm run build` first (did the build fail?)')
+  process.exit(1)
+}
 const outFile = process.env.SMOKE_SCREENSHOT ?? path.join(root, 'smoke.png')
 const problems = []
 
