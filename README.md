@@ -149,13 +149,14 @@ API reference. The system ids have gaps (5, 10, 13 and 14 are unused) because re
 systems keep their numbers, and modality is a closed enum: `DSA (angiography)`, not
 "Angiography", and there is no PET-CT value.
 
-**Cases and studies are created with a form-encoded body, not JSON.** With a JSON body the
-API accepts `system_id`, returns 200, and creates the case without a system — while
-`diagnostic_certainty_id` in the very same request is applied. Rails wraps JSON bodies under
-the model's name and keeps only the attributes the model recognises, which drops
-`system_id`; form-encoded bodies are not wrapped. Radiopaedia's own OsiriX plugin passes the
-parameters as a query string for the same effect, and a form body avoids the URL length
-limit a long case discussion would hit.
+**`system_id` is accepted but never applied.** It is sent exactly as the API reference
+specifies and the request returns 200, but the case is created with no system, while
+`diagnostic_certainty_id` in the very same request is applied. Sending the parameters
+form-encoded and as query-string parameters — the latter being what Radiopaedia's own
+OsiriX plugin does — changes nothing, so this is not an encoding problem. Neither the create
+response nor the listing endpoint returns a system field, and there is no `PUT`/`PATCH` on
+`/api/v1/cases/:id`, so a client can neither verify nor correct it. The app says so on the
+upload confirmation; set the System on the case page.
 
 **Plane and sequence type are not settable through the API.** The series payload accepts
 only `image_format`, `series.root_index` and `stack_upload.uploaded_data`. Tag those on the

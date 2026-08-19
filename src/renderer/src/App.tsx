@@ -260,6 +260,13 @@ export function App(): React.JSX.Element {
             <p className="muted">
               The case was created as a draft. Open it on Radiopaedia to review the images and publish it.
             </p>
+            {/* system_id is sent exactly as documented and accepted, but not
+                applied, while diagnostic_certainty_id in the same request is.
+                Say so rather than let it surprise on the case page. */}
+            <div className="notice warn" style={{ textAlign: 'left', marginTop: 14 }}>
+              Set the <strong>System</strong> on the case page. Radiopaedia's API accepts <code>system_id</code> but
+              does not apply it, so the case arrives without one.
+            </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16 }}>
               <a href={result.url} target="_blank" rel="noreferrer">
                 <button className="primary">Open case {result.caseId}</button>
