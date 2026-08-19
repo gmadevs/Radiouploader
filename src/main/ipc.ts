@@ -120,7 +120,10 @@ export function registerIpc(): void {
     if (planned.length === 0) throw new Error('No studies to upload')
 
     const stacks = session.selectedStacks()
-    const bySource = new Map(anon.files.map((f) => [f.sourcePath, f]))
+    // A multiframe instance yields one anonymised file per frame, so the match
+    // back to a slice is on the file *and* the frame, never the path alone.
+    const key = (sourcePath: string, frame: number): string => `${sourcePath}#${frame}`
+    const bySource = new Map(anon.files.map((f) => [key(f.sourcePath, f.frame), f]))
 
     // Re-check the quota against the server. The renderer's copy can be stale —
     // the user may have created drafts elsewhere since this session started —
@@ -135,6 +138,7 @@ export function registerIpc(): void {
     }
 
     const caseId = await c.createCase(request.caseDraft)
+    await c.debugReadBack(caseId)
 
     // Studies are created oldest first so the case timeline reads in order.
     let seriesDone = 0
@@ -152,12 +156,8 @@ export function registerIpc(): void {
         const stack = stacks.find((s) => s.id === stackId)
         if (!stack) continue
 
-        // Frames of a multiframe file share one path and one uploaded file;
-        // Radiopaedia expands the frames on its side.
-        const seen = new Set<string>()
         const files = stack.slices
-          .filter((slice) => !seen.has(slice.path) && seen.add(slice.path) !== undefined)
-          .map((slice) => bySource.get(slice.path))
+          .map((slice) => bySource.get(key(slice.path, slice.frame)))
           .filter((f): f is NonNullable<typeof f> => f !== undefined)
         if (files.length === 0) continue
 

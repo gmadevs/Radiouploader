@@ -3,6 +3,7 @@ import path from 'node:path'
 import { Worker } from 'node:worker_threads'
 import type { AnonResult, AnonWarning, Progress, Stack } from '@shared/types'
 import type { AnonJob, AnonMessage } from './anon.worker'
+import type { FrameTask } from './anonymise'
 
 /**
  * Anonymise every slice of the selected stacks into a fresh directory.
@@ -19,25 +20,29 @@ export async function anonymiseStacks(
   const outputDir = path.join(workDir, 'anonymised')
   await fs.mkdir(outputDir, { recursive: true })
 
-  // A multiframe file appears once per frame in the stack; anonymise it once.
-  const files: AnonJob['files'] = []
-  const seen = new Set<string>()
+  // Every slice becomes its own file, including each frame of a multiframe run.
+  // Tasks are grouped by source so a large cine is read once, not once per frame.
+  const bySource = new Map<string, FrameTask[]>()
+  let total = 0
   stacks.forEach((stack, stackIndex) => {
-    let sliceIndex = 0
-    stack.slices.forEach((slice) => {
-      if (seen.has(slice.path)) return
-      seen.add(slice.path)
-      const name = `${String(stackIndex).padStart(3, '0')}-${String(sliceIndex).padStart(4, '0')}.dcm`
-      sliceIndex++
-      files.push({ sourcePath: slice.path, outputName: name })
+    stack.slices.forEach((slice, sliceIndex) => {
+      const outputName = `${String(stackIndex).padStart(3, '0')}-${String(sliceIndex).padStart(4, '0')}.dcm`
+      const tasks = bySource.get(slice.path)
+      // InstanceNumber follows the position in the stack, so split frames keep
+      // the order the user saw even when they came from several files.
+      const task: FrameTask = { frame: slice.frame, outputName, instanceNumber: sliceIndex + 1 }
+      if (tasks) tasks.push(task)
+      else bySource.set(slice.path, [task])
+      total++
     })
   })
+  const sources: AnonJob['sources'] = [...bySource].map(([sourcePath, tasks]) => ({ sourcePath, tasks }))
 
   const result: AnonResult = { outputDir, files: [], warnings: [], errors: [] }
-  if (files.length === 0) return result
+  if (total === 0) return result
 
   const workerPath = path.join(import.meta.dirname, 'anon.worker.js')
-  const worker = new Worker(workerPath, { workerData: { outputDir, files } satisfies AnonJob })
+  const worker = new Worker(workerPath, { workerData: { outputDir, sources } satisfies AnonJob })
 
   await new Promise<void>((resolve, reject) => {
     worker.on('message', (msg: AnonMessage) => {

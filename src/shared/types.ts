@@ -91,6 +91,7 @@ export interface IngestResult {
 
 export interface AnonWarning {
   path: string
+  frame: number
   tag: string
   level: number
   text: string
@@ -98,7 +99,7 @@ export interface AnonWarning {
 
 export interface AnonResult {
   outputDir: string
-  files: { sourcePath: string; outputPath: string; sha256: string; byteLength: number }[]
+  files: { sourcePath: string; frame: number; outputPath: string; sha256: string; byteLength: number }[]
   warnings: AnonWarning[]
   errors: { path: string; reason: string }[]
 }
