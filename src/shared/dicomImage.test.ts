@@ -2,23 +2,29 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { UnsupportedTransferSyntaxError, decodeFrame, parseImage, type ParsedImage } from './dicomImage'
+import {
+  UnsupportedTransferSyntaxError,
+  decodeFrame,
+  downscale,
+  frameByteLength,
+  frameOffset,
+  parseHeader,
+  type ImageHeader
+} from './dicomImage'
 
 const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), '../main/anon/__fixtures__')
 
-function read(name: string): ArrayBuffer {
-  const buf = fs.readFileSync(path.join(fixtures, name))
-  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+function read(name: string): Uint8Array {
+  return new Uint8Array(fs.readFileSync(path.join(fixtures, name)))
 }
 
 /**
- * Build a ParsedImage over synthetic pixels.
+ * Build a header over synthetic pixels.
  *
  * The checked-in fixtures are tiny and uniformly bright, which cannot exercise
  * windowing, inversion or frame offsets — driving the decoder directly does.
  */
 function synthetic(options: {
-  values: number[]
   columns: number
   rows: number
   frames?: number
@@ -32,22 +38,12 @@ function synthetic(options: {
   samplesPerPixel?: number
   planarConfiguration?: number
   bigEndian?: boolean
-}): ParsedImage {
-  const bitsAllocated = options.bitsAllocated ?? 16
-  const bytes = bitsAllocated <= 8 ? 1 : 2
-  const byteArray = new Uint8Array(options.values.length * bytes)
-  const view = new DataView(byteArray.buffer)
-  options.values.forEach((v, i) => {
-    if (bytes === 1) byteArray[i] = v
-    else if (options.signed) view.setInt16(i * 2, v, !options.bigEndian)
-    else view.setUint16(i * 2, v, !options.bigEndian)
-  })
-
+}): ImageHeader {
   return {
     rows: options.rows,
     columns: options.columns,
     samplesPerPixel: options.samplesPerPixel ?? 1,
-    bitsAllocated,
+    bitsAllocated: options.bitsAllocated ?? 16,
     signed: options.signed ?? false,
     planarConfiguration: options.planarConfiguration ?? 0,
     photometric: options.photometric ?? 'MONOCHROME2',
@@ -57,9 +53,21 @@ function synthetic(options: {
     windowWidth: options.windowWidth ?? null,
     frames: options.frames ?? 1,
     bigEndian: options.bigEndian ?? false,
-    pixelDataOffset: 0,
-    byteArray
+    pixelDataOffset: 0
   }
+}
+
+/** Encode sample values the way the file would store them. */
+function bytesFor(header: ImageHeader, values: number[]): Uint8Array {
+  const wide = header.bitsAllocated > 8
+  const bytes = new Uint8Array(values.length * (wide ? 2 : 1))
+  const view = new DataView(bytes.buffer)
+  values.forEach((v, i) => {
+    if (!wide) bytes[i] = v
+    else if (header.signed) view.setInt16(i * 2, v, !header.bigEndian)
+    else view.setUint16(i * 2, v, !header.bigEndian)
+  })
+  return bytes
 }
 
 /** Grey level of pixel `i`. */
@@ -74,46 +82,68 @@ function expectMidGrey(value: number): void {
   expect(value).toBeLessThan(130)
 }
 
-describe('parseImage', () => {
-  it('reads the geometry and photometric interpretation', () => {
-    const image = parseImage(read('01_ras_physician.dcm'))
-    expect(image.rows).toBeGreaterThan(0)
-    expect(image.columns).toBeGreaterThan(0)
-    expect(image.frames).toBeGreaterThanOrEqual(1)
-    expect(image.photometric).toMatch(/MONOCHROME|RGB|PALETTE/)
+describe('parseHeader', () => {
+  it('reads geometry and photometric interpretation', () => {
+    const header = parseHeader(read('01_ras_physician.dcm'))
+    expect(header.rows).toBeGreaterThan(0)
+    expect(header.columns).toBeGreaterThan(0)
+    expect(header.frames).toBeGreaterThanOrEqual(1)
+    expect(header.photometric).toMatch(/MONOCHROME|RGB|PALETTE/)
+    expect(header.pixelDataOffset).toBeGreaterThan(0)
+  })
+
+  it('parses from a truncated read, so a 250 MB cine need not be loaded whole', () => {
+    const whole = read('01_ras_physician.dcm')
+    const full = parseHeader(whole)
+    // Everything up to and including the pixel data element header is enough.
+    const truncated = parseHeader(whole.subarray(0, full.pixelDataOffset + 2))
+    expect(truncated).toEqual(full)
   })
 
   it('refuses compressed pixel data by name instead of rendering nonsense', () => {
-    expect(() => parseImage(read('TestPattern_JPEG-Baseline_YBRFull.dcm'))).toThrow(UnsupportedTransferSyntaxError)
-    expect(() => parseImage(read('TestPattern_JPEG-Baseline_YBRFull.dcm'))).toThrow(/JPEG baseline/)
+    const jpeg = read('TestPattern_JPEG-Baseline_YBRFull.dcm')
+    expect(() => parseHeader(jpeg)).toThrow(UnsupportedTransferSyntaxError)
+    expect(() => parseHeader(jpeg)).toThrow(/JPEG baseline/)
+  })
+})
+
+describe('frame addressing', () => {
+  const header = synthetic({ columns: 4, rows: 2, frames: 3 })
+
+  it('sizes a frame from geometry and bit depth', () => {
+    expect(frameByteLength(header)).toBe(4 * 2 * 2)
+    expect(frameByteLength(synthetic({ columns: 4, rows: 2, bitsAllocated: 8 }))).toBe(8)
+    expect(frameByteLength(synthetic({ columns: 4, rows: 2, samplesPerPixel: 3, bitsAllocated: 8 }))).toBe(24)
+  })
+
+  it('steps one frame at a time from the pixel data offset', () => {
+    expect(frameOffset(header, 0)).toBe(0)
+    expect(frameOffset(header, 1)).toBe(16)
+    expect(frameOffset(header, 2)).toBe(32)
+  })
+
+  it('clamps a frame index outside the object rather than reading past the end', () => {
+    expect(frameOffset(header, 99)).toBe(32)
+    expect(frameOffset(header, -5)).toBe(0)
   })
 })
 
 describe('decodeFrame', () => {
   it('produces a fully opaque RGBA buffer of the right size', () => {
-    const image = parseImage(read('01_ras_physician.dcm'))
-    const frame = decodeFrame(image, 0)
+    const header = parseHeader(read('01_ras_physician.dcm'))
+    const whole = read('01_ras_physician.dcm')
+    const frame = decodeFrame(header, whole.subarray(header.pixelDataOffset))
 
-    expect(frame.width).toBe(image.columns)
-    expect(frame.height).toBe(image.rows)
-    expect(frame.rgba.length).toBe(image.rows * image.columns * 4)
-    for (let i = 3; i < frame.rgba.length; i += 4) {
-      expect(frame.rgba[i]).toBe(255)
-    }
-  })
-
-  it('renders greyscale, so the three colour channels agree', () => {
-    const frame = decodeFrame(parseImage(read('01_ras_physician.dcm')), 0)
-    for (let i = 0; i < frame.rgba.length; i += 4) {
-      expect(frame.rgba[i + 1]).toBe(frame.rgba[i])
-      expect(frame.rgba[i + 2]).toBe(frame.rgba[i])
-    }
+    expect(frame.width).toBe(header.columns)
+    expect(frame.height).toBe(header.rows)
+    expect(frame.rgba.length).toBe(header.rows * header.columns * 4)
+    for (let i = 3; i < frame.rgba.length; i += 4) expect(frame.rgba[i]).toBe(255)
   })
 
   it('maps the window onto the full display range', () => {
     // Window 100 wide centred on 150 spans 100..200.
-    const image = synthetic({ values: [100, 150, 200, 0], columns: 2, rows: 2, windowCentre: 150, windowWidth: 100 })
-    const frame = decodeFrame(image, 0)
+    const header = synthetic({ columns: 2, rows: 2, windowCentre: 150, windowWidth: 100 })
+    const frame = decodeFrame(header, bytesFor(header, [100, 150, 200, 0]))
     expect(grey(frame, 0)).toBe(0)
     expectMidGrey(grey(frame, 1))
     expect(grey(frame, 2)).toBe(255)
@@ -123,9 +153,10 @@ describe('decodeFrame', () => {
 
   it('inverts MONOCHROME1, where high values are dark', () => {
     const values = [100, 150, 200]
-    const opts = { values, columns: 3, rows: 1, windowCentre: 150, windowWidth: 100 }
-    const normal = decodeFrame(synthetic(opts), 0)
-    const inverted = decodeFrame(synthetic({ ...opts, photometric: 'MONOCHROME1' }), 0)
+    const base = { columns: 3, rows: 1, windowCentre: 150, windowWidth: 100 }
+    const normal = decodeFrame(synthetic(base), bytesFor(synthetic(base), values))
+    const flipped = synthetic({ ...base, photometric: 'MONOCHROME1' })
+    const inverted = decodeFrame(flipped, bytesFor(flipped, values))
 
     for (let i = 0; i < values.length; i++) {
       expect(grey(inverted, i)).toBe(255 - grey(normal, i))
@@ -134,8 +165,7 @@ describe('decodeFrame', () => {
 
   it('applies the modality rescale before windowing', () => {
     // Stored 0..100 with slope 2 intercept -50 becomes -50..150.
-    const image = synthetic({
-      values: [0, 50, 100],
+    const header = synthetic({
       columns: 3,
       rows: 1,
       slope: 2,
@@ -143,91 +173,73 @@ describe('decodeFrame', () => {
       windowCentre: 50,
       windowWidth: 200
     })
-    const frame = decodeFrame(image, 0)
+    const frame = decodeFrame(header, bytesFor(header, [0, 50, 100]))
     expect(grey(frame, 0)).toBe(0)
     expectMidGrey(grey(frame, 1))
     expect(grey(frame, 2)).toBe(255)
   })
 
   it('reads signed pixel data as negative, not as a huge positive', () => {
-    const image = synthetic({
-      values: [-1000, 0, 1000],
-      columns: 3,
-      rows: 1,
-      signed: true,
-      windowCentre: 0,
-      windowWidth: 2000
-    })
-    const frame = decodeFrame(image, 0)
+    const header = synthetic({ columns: 3, rows: 1, signed: true, windowCentre: 0, windowWidth: 2000 })
+    const frame = decodeFrame(header, bytesFor(header, [-1000, 0, 1000]))
     expect(grey(frame, 0)).toBe(0)
     expectMidGrey(grey(frame, 1))
     expect(grey(frame, 2)).toBe(255)
   })
 
   it('reads big-endian pixel data', () => {
-    const opts = { values: [100, 150, 200], columns: 3, rows: 1, windowCentre: 150, windowWidth: 100 }
-    const little = decodeFrame(synthetic(opts), 0)
-    const big = decodeFrame(synthetic({ ...opts, bigEndian: true }), 0)
+    const base = { columns: 3, rows: 1, windowCentre: 150, windowWidth: 100 }
+    const values = [100, 150, 200]
+    const little = decodeFrame(synthetic(base), bytesFor(synthetic(base), values))
+    const bigHeader = synthetic({ ...base, bigEndian: true })
+    const big = decodeFrame(bigHeader, bytesFor(bigHeader, values))
     for (let i = 0; i < 3; i++) expect(grey(big, i)).toBe(grey(little, i))
   })
 
-  it('picks the right frame out of a multiframe object', () => {
-    // Three 2x1 frames, each a flat value.
-    const image = synthetic({
-      values: [10, 10, 500, 500, 1000, 1000],
-      columns: 2,
-      rows: 1,
-      frames: 3,
-      windowCentre: 505,
-      windowWidth: 990
-    })
-    expect(grey(decodeFrame(image, 0), 0)).toBe(0)
-    expectMidGrey(grey(decodeFrame(image, 1), 0))
-    expect(grey(decodeFrame(image, 2), 0)).toBe(255)
-  })
-
   it('stretches the pixel range when the header carries no window', () => {
-    const frame = decodeFrame(synthetic({ values: [20, 60, 100], columns: 3, rows: 1 }), 0)
+    const header = synthetic({ columns: 3, rows: 1 })
+    const frame = decodeFrame(header, bytesFor(header, [20, 60, 100]))
     expect(grey(frame, 0)).toBe(0)
     expect(grey(frame, 2)).toBe(255)
   })
 
   it('reads interleaved and planar RGB the same way', () => {
-    const interleaved = synthetic({
-      values: [255, 0, 0, 0, 255, 0],
-      columns: 2,
-      rows: 1,
-      bitsAllocated: 8,
-      samplesPerPixel: 3,
-      photometric: 'RGB'
-    })
-    const planar = synthetic({
-      values: [255, 0, 0, 255, 0, 0],
-      columns: 2,
-      rows: 1,
-      bitsAllocated: 8,
-      samplesPerPixel: 3,
-      planarConfiguration: 1,
-      photometric: 'RGB'
-    })
-    for (const frame of [decodeFrame(interleaved, 0), decodeFrame(planar, 0)]) {
+    const shared = { columns: 2, rows: 1, bitsAllocated: 8, samplesPerPixel: 3, photometric: 'RGB' }
+    const interleaved = synthetic(shared)
+    const planar = synthetic({ ...shared, planarConfiguration: 1 })
+
+    const a = decodeFrame(interleaved, bytesFor(interleaved, [255, 0, 0, 0, 255, 0]))
+    const b = decodeFrame(planar, bytesFor(planar, [255, 0, 0, 255, 0, 0]))
+
+    for (const frame of [a, b]) {
       expect([...frame.rgba.slice(0, 4)]).toEqual([255, 0, 0, 255])
       expect([...frame.rgba.slice(4, 8)]).toEqual([0, 255, 0, 255])
     }
   })
 
-  it('reads 8-bit pixel data without byte pairing', () => {
-    const frame = decodeFrame(
-      synthetic({ values: [0, 128, 255], columns: 3, rows: 1, bitsAllocated: 8, windowCentre: 128, windowWidth: 255 }),
-      0
-    )
-    expect(grey(frame, 0)).toBeLessThan(10)
-    expect(grey(frame, 2)).toBeGreaterThan(245)
+  it('refuses a frame whose bytes are short rather than reading rubbish', () => {
+    const header = synthetic({ columns: 4, rows: 4 })
+    expect(() => decodeFrame(header, bytesFor(header, [1, 2, 3, 4]))).toThrow(/past the end/)
+  })
+})
+
+describe('downscale', () => {
+  const header = synthetic({ columns: 100, rows: 40, windowCentre: 128, windowWidth: 255 })
+  const frame = decodeFrame(header, bytesFor(header, Array.from({ length: 4000 }, (_, i) => i % 256)))
+
+  it('fits the longest edge to the limit and keeps the aspect ratio', () => {
+    const small = downscale(frame, 50)
+    expect(small.width).toBe(50)
+    expect(small.height).toBe(20)
+    expect(small.rgba.length).toBe(50 * 20 * 4)
   })
 
-  it('refuses a frame whose pixels run past the end of the buffer', () => {
-    // Claims four frames but only carries two.
-    const truncated = synthetic({ values: [1, 2, 3, 4], columns: 2, rows: 1, frames: 4 })
-    expect(() => decodeFrame(truncated, 3)).toThrow(/past the end/)
+  it('leaves a frame already within the limit untouched', () => {
+    expect(downscale(frame, 200)).toBe(frame)
+  })
+
+  it('keeps every pixel opaque', () => {
+    const small = downscale(frame, 30)
+    for (let i = 3; i < small.rgba.length; i += 4) expect(small.rgba[i]).toBe(255)
   })
 })

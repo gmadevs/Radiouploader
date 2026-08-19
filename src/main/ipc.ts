@@ -1,4 +1,3 @@
-import fs from 'node:fs/promises'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { AnonResult, IngestResult, Progress } from '@shared/types'
 import { anonymiseStacks, summariseWarnings } from './anon'
@@ -7,6 +6,7 @@ import type { OAuthConfig } from './api/oauth'
 import { loadConfig, saveConfig } from './api/store'
 import { uploadStack } from './api/upload'
 import { ingest } from './ingest'
+import { clearPreviewHeaders, readPreviewFrame } from './preview'
 import { session } from './session'
 import { planStudies, type StudyDraftInput } from './uploadPlan'
 
@@ -42,6 +42,7 @@ export function registerIpc(): void {
 
   ipcMain.handle('ingest:run', async (_e, paths: string[]): Promise<IngestResult> => {
     await session.reset()
+    clearPreviewHeaders()
     const result = await ingest(paths, broadcast)
     session.ingest = result
     return result
@@ -53,17 +54,16 @@ export function registerIpc(): void {
     session.applySelection(selection)
   })
 
-  // Preview data for the renderer. Only paths belonging to the current ingest
+  // Preview pixels for the renderer. Only paths belonging to the current ingest
   // are served, so the renderer cannot read arbitrary files through this bridge.
-  ipcMain.handle('preview:read', async (_e, filePath: string): Promise<ArrayBuffer> => {
+  ipcMain.handle('preview:frame', async (_e, filePath: string, frame: number) => {
     const known = new Set(
       (session.ingest?.studies ?? []).flatMap((study) =>
         study.series.flatMap((series) => series.stacks.flatMap((stack) => stack.slices.map((s) => s.path)))
       )
     )
     if (!known.has(filePath)) throw new Error('Refusing to read a file outside the current import')
-    const buf = await fs.readFile(filePath)
-    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+    return readPreviewFrame(filePath, frame)
   })
 
   ipcMain.handle('anon:run', async (): Promise<AnonResult & { summary: ReturnType<typeof summariseWarnings> }> => {

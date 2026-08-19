@@ -7,7 +7,6 @@ import { modalityFromDicom } from '@shared/radiopaedia'
 import { CaseStep, type CaseForm } from './components/CaseStep'
 import { ReviewStep } from './components/ReviewStep'
 import { SourceStep } from './components/SourceStep'
-import { clearPreviewCache } from './dicomPreview'
 
 type Step = 'source' | 'review' | 'case' | 'done'
 
@@ -98,7 +97,6 @@ export function App(): React.JSX.Element {
   const runIngest = async (paths: string[]): Promise<void> => {
     setBusy(true)
     setError(null)
-    clearPreviewCache()
     try {
       const res = await window.api.ingest(paths)
       if (res.studies.length === 0) {
@@ -194,7 +192,6 @@ export function App(): React.JSX.Element {
 
   const startOver = (): void => {
     void window.api.resetIngest()
-    clearPreviewCache()
     setIngest(null)
     setResult(null)
     setWarnings([])

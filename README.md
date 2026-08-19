@@ -181,7 +181,8 @@ src/renderer/       the wizard UI
 
 Patient data lives only in the main process. The renderer has no Node access and reaches
 the filesystem solely through the IPC bridge, which serves only files belonging to the
-current import. Originals and anonymised output are written to a session temp directory
+current import — and serves decoded, preview-sized frames rather than files, because a cine
+run is routinely 250 MB and moving one across the bridge costs three copies of it. Originals and anonymised output are written to a session temp directory
 that is removed on reset and on quit.
 
 ### Packaging

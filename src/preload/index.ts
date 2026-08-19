@@ -14,7 +14,12 @@ const api = {
   resetIngest: (): Promise<void> => ipcRenderer.invoke('ingest:reset'),
   setSelection: (selection: { id: string; trimStart: number; trimEnd: number }[]): Promise<void> =>
     ipcRenderer.invoke('selection:set', selection),
-  readPreview: (filePath: string): Promise<ArrayBuffer> => ipcRenderer.invoke('preview:read', filePath),
+  /** One decoded, preview-sized frame. Whole files never cross this bridge. */
+  readPreviewFrame: (
+    filePath: string,
+    frame: number
+  ): Promise<{ width: number; height: number; rgba: Uint8ClampedArray }> =>
+    ipcRenderer.invoke('preview:frame', filePath, frame),
   anonymise: (): Promise<AnonResult & { summary: { tag: string; text: string; level: number; count: number }[] }> =>
     ipcRenderer.invoke('anon:run'),
 
