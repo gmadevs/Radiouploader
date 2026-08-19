@@ -9,6 +9,8 @@ interface Props {
   onTrim: (id: string, trimStart: number, trimEnd: number) => void
   onKeepOnePhase: (series: Series) => void
   onSelectAll: (series: Series, selected: boolean) => void
+  /** Select or clear every stack in the import at once. */
+  onSelectEverything: (selected: boolean) => void
 }
 
 const SPLIT_LABELS: Record<string, string> = {
@@ -18,14 +20,40 @@ const SPLIT_LABELS: Record<string, string> = {
   phase: 'Split by phase'
 }
 
-export function ReviewStep({ studies, failures, onToggle, onTrim, onKeepOnePhase, onSelectAll }: Props): React.JSX.Element {
+export function ReviewStep({
+  studies,
+  failures,
+  onToggle,
+  onTrim,
+  onKeepOnePhase,
+  onSelectAll,
+  onSelectEverything
+}: Props): React.JSX.Element {
+  const stacks = studies.flatMap((study) => study.series.flatMap((series) => series.stacks))
+  const selectedCount = stacks.filter((stack) => stack.selected).length
+  // One button that does the useful thing: with a big export the first move is
+  // to clear everything and tick back the few series that matter.
+  const clearing = selectedCount > 0
+
   return (
     <>
-      <h1>Choose what to upload</h1>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Series that contain more than one acquisition have been split apart. Check the images before you continue —
-        anonymisation cannot remove identifying text burnt into the pixels.
-      </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+        <div style={{ flex: 1 }}>
+          <h1>Choose what to upload</h1>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Series that contain more than one acquisition have been split apart. Check the images before you continue —
+            anonymisation cannot remove identifying text burnt into the pixels.
+          </p>
+        </div>
+        <div style={{ flex: 'none', textAlign: 'right', display: 'grid', gap: 6, justifyItems: 'end' }}>
+          <button onClick={() => onSelectEverything(!clearing)}>
+            {clearing ? 'Deselect all' : 'Select all'}
+          </button>
+          <span className="muted small">
+            {selectedCount} of {stacks.length} selected
+          </span>
+        </div>
+      </div>
 
       {failures.length > 0 && (
         <div className="notice warn" style={{ marginBottom: 16 }}>

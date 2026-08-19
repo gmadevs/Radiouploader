@@ -241,6 +241,7 @@ export function App(): React.JSX.Element {
             onSelectAll={(series, selected) =>
               mutateStacks((_stack, s) => (s.id === series.id ? { selected } : null))
             }
+            onSelectEverything={(selected) => mutateStacks(() => ({ selected }))}
             onKeepOnePhase={(series) => {
               // Keep the earliest phase and drop the rest; the user can re-tick any.
               const first = series.stacks.find((s) => s.selected)?.id ?? series.stacks[0]?.id
