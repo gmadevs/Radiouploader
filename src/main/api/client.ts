@@ -150,9 +150,8 @@ export class RadiopaediaClient {
   /**
    * POST a JSON body, exactly as the API reference specifies.
    *
-   * Form-encoded bodies and query-string parameters were both tried while
-   * chasing `system_id` being ignored, and neither made any difference — so
-   * this stays on the documented contract.
+   * A form-encoded body was tried while chasing `system_id` being ignored and
+   * made no difference, so this stays on the documented contract.
    */
   private async postJson(path: string, payload: unknown): Promise<Record<string, unknown>> {
     const res = await this.request(path, {
@@ -199,7 +198,12 @@ export class RadiopaediaClient {
       gender: draft.gender,
       body: draft.body
     }
-    const body = await this.postJson('cases', payload)
+    // `system_id` also goes in the query string, which is the one delivery the
+    // API has not been seen to ignore: Radiopaedia's own OsiriX plugin sends
+    // every case parameter that way. It is duplicated rather than moved, so the
+    // documented JSON body is unchanged, and only this one short value is in the
+    // URL — putting a long case discussion there would risk the length limit.
+    const body = await this.postJson(`cases?system_id=${encodeURIComponent(String(draft.systemId))}`, payload)
     const id = body.id
     if (id === undefined || id === null) throw new Error('Radiopaedia did not return a case id')
     return String(id)

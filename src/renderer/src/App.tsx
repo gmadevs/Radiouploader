@@ -264,8 +264,13 @@ export function App(): React.JSX.Element {
                 applied, while diagnostic_certainty_id in the same request is.
                 Say so rather than let it surprise on the case page. */}
             <div className="notice warn" style={{ textAlign: 'left', marginTop: 14 }}>
-              Set the <strong>System</strong> on the case page. Radiopaedia's API accepts <code>system_id</code> but
-              does not apply it, so the case arrives without one.
+              Check the <strong>System</strong> on the case page — the API has been accepting <code>system_id</code>
+              without applying it.
+              <div style={{ marginTop: 10 }}>
+                <a href={`${result.url}/edit`} target="_blank" rel="noreferrer">
+                  <button className="small">Open case for editing</button>
+                </a>
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16 }}>
               <a href={result.url} target="_blank" rel="noreferrer">

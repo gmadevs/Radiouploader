@@ -151,9 +151,10 @@ systems keep their numbers, and modality is a closed enum: `DSA (angiography)`, 
 
 **`system_id` is accepted but never applied.** It is sent exactly as the API reference
 specifies and the request returns 200, but the case is created with no system, while
-`diagnostic_certainty_id` in the very same request is applied. Sending the parameters
-form-encoded and as query-string parameters — the latter being what Radiopaedia's own
-OsiriX plugin does — changes nothing, so this is not an encoding problem. Neither the create
+`diagnostic_certainty_id` in the very same request is applied. A form-encoded body changes nothing.
+`system_id` is therefore also duplicated into the query string, which is how Radiopaedia's
+own OsiriX plugin sends every case parameter — the JSON body stays exactly as documented,
+and only that one short value goes in the URL. Neither the create
 response nor the listing endpoint returns a system field, and there is no `PUT`/`PATCH` on
 `/api/v1/cases/:id`, so a client can neither verify nor correct it. The app says so on the
 upload confirmation; set the System on the case page.
