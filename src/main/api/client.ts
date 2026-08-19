@@ -42,6 +42,19 @@ export interface UserQuota {
   allowedDraftCases: number | null
 }
 
+/**
+ * Encode parameters as an application/x-www-form-urlencoded body, dropping
+ * anything empty rather than sending it as null.
+ */
+export function encodeForm(payload: Record<string, string | number | null | undefined>): string {
+  const form = new URLSearchParams()
+  for (const [name, value] of Object.entries(payload)) {
+    if (value === null || value === undefined || value === '') continue
+    form.set(name, String(value))
+  }
+  return form.toString()
+}
+
 /** Thrown for non-2xx API responses, carrying the status so callers can react to 429. */
 export class RadiopaediaApiError extends Error {
   constructor(readonly status: number, message: string, readonly body: string) {
@@ -147,11 +160,29 @@ export class RadiopaediaClient {
     return res
   }
 
-  private async postJson(path: string, payload: unknown): Promise<Record<string, unknown>> {
+  /**
+   * POST form-encoded rather than JSON.
+   *
+   * Rails applies `wrap_parameters` to JSON bodies, nesting them under the
+   * model's name and keeping only the attributes the model recognises. That is
+   * why a JSON `system_id` is accepted and then silently dropped while
+   * `diagnostic_certainty_id` in the very same request is applied. Form-encoded
+   * bodies are not wrapped, so every parameter survives.
+   *
+   * Radiopaedia's own OsiriX plugin does the same thing, passing the parameters
+   * as a query string; a form body has the same effect without the URL length
+   * limit, which a long case discussion would otherwise hit.
+   *
+   * Empty values are omitted rather than sent as null, again matching the plugin.
+   */
+  private async postForm(
+    path: string,
+    payload: Record<string, string | number | null | undefined>
+  ): Promise<Record<string, unknown>> {
     const res = await this.request(path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: encodeForm(payload)
     })
     return (await res.json()) as Record<string, unknown>
   }
@@ -192,7 +223,7 @@ export class RadiopaediaClient {
       gender: draft.gender,
       body: draft.body
     }
-    const body = await this.postJson('cases', payload)
+    const body = await this.postForm('cases', payload)
     const id = body.id
     if (id === undefined || id === null) throw new Error('Radiopaedia did not return a case id')
     return String(id)
@@ -200,7 +231,8 @@ export class RadiopaediaClient {
 
   /** Add a study to a case and return its id. */
   async createStudy(caseId: string, draft: StudyDraft): Promise<string> {
-    const body = await this.postJson(`cases/${caseId}/studies`, {
+    // Same encoding as the case, for the same reason.
+    const body = await this.postForm(`cases/${caseId}/studies`, {
       modality: draft.modality,
       findings: draft.findings,
       position: draft.position,
