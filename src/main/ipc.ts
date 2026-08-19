@@ -138,7 +138,6 @@ export function registerIpc(): void {
     }
 
     const caseId = await c.createCase(request.caseDraft)
-    await c.debugReadBack(caseId)
 
     // Studies are created oldest first so the case timeline reads in order.
     let seriesDone = 0

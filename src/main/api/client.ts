@@ -192,12 +192,7 @@ export class RadiopaediaClient {
       gender: draft.gender,
       body: draft.body
     }
-    // DIAGNOSTIC: cases have been arriving without a system despite system_id
-    // being sent. Print what goes out and what comes back, to find out which
-    // side is dropping it. Remove once answered.
-    console.log('[createCase] payload ->', JSON.stringify(payload))
     const body = await this.postJson('cases', payload)
-    console.log('[createCase] response <-', JSON.stringify(body))
     const id = body.id
     if (id === undefined || id === null) throw new Error('Radiopaedia did not return a case id')
     return String(id)
@@ -214,22 +209,6 @@ export class RadiopaediaClient {
     const id = body.id
     if (id === undefined || id === null) throw new Error('Radiopaedia did not return a study id')
     return String(id)
-  }
-
-  /**
-   * DIAGNOSTIC: read the case back off the listing endpoint, which is the only
-   * way to see what the server actually stored — there is no GET for a single
-   * case. Never allowed to fail an upload.
-   */
-  async debugReadBack(caseId: string): Promise<void> {
-    try {
-      const res = await this.request('cases?per_page=5')
-      const cases = (await res.json()) as Record<string, unknown>[]
-      const found = cases.find((c) => String(c.id) === caseId) ?? cases[0]
-      console.log('[readBack] stored case <-', JSON.stringify(found))
-    } catch (err) {
-      console.log('[readBack] failed:', err instanceof Error ? err.message : String(err))
-    }
   }
 
   /** Move the case out of "uploading" once every series has been attached. */
