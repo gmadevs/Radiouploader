@@ -150,8 +150,10 @@ export class RadiopaediaClient {
   /**
    * POST a JSON body, exactly as the API reference specifies.
    *
-   * A form-encoded body was tried while chasing `system_id` being ignored and
-   * made no difference, so this stays on the documented contract.
+   * All three deliveries were tried while chasing `system_id` being ignored — a
+   * JSON body, a form-encoded body, and query-string parameters as Radiopaedia's
+   * own OsiriX plugin sends them. The result is identical every time, so the
+   * encoding is not the variable and this stays on the documented contract.
    */
   private async postJson(path: string, payload: unknown): Promise<Record<string, unknown>> {
     const res = await this.request(path, {
@@ -183,8 +185,9 @@ export class RadiopaediaClient {
 
   /** Create a draft case and return its id. */
   async createCase(draft: CaseDraft): Promise<string> {
-    // system_id is required by the API. The picker enforces it too, but a case
-    // created without one is awkward to fix afterwards, so refuse here as well.
+    // The reference calls system_id required and the picker enforces it, so it
+    // is refused here too — even though the server currently ignores the value
+    // and the system has to be set on the website.
     if (draft.systemId === null) {
       throw new Error('Choose a system before uploading — Radiopaedia requires one on every case')
     }
@@ -198,12 +201,7 @@ export class RadiopaediaClient {
       gender: draft.gender,
       body: draft.body
     }
-    // `system_id` also goes in the query string, which is the one delivery the
-    // API has not been seen to ignore: Radiopaedia's own OsiriX plugin sends
-    // every case parameter that way. It is duplicated rather than moved, so the
-    // documented JSON body is unchanged, and only this one short value is in the
-    // URL — putting a long case discussion there would risk the length limit.
-    const body = await this.postJson(`cases?system_id=${encodeURIComponent(String(draft.systemId))}`, payload)
+    const body = await this.postJson('cases', payload)
     const id = body.id
     if (id === undefined || id === null) throw new Error('Radiopaedia did not return a case id')
     return String(id)
