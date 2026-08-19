@@ -149,6 +149,13 @@ API reference. The system ids have gaps (5, 10, 13 and 14 are unused) because re
 systems keep their numbers, and modality is a closed enum: `DSA (angiography)`, not
 "Angiography", and there is no PET-CT value.
 
+**`system_id` is accepted but not applied.** It is sent on every case in the documented
+form, and the API returns 200 — but the case arrives with no system. In the same request
+`diagnostic_certainty_id` is applied correctly, so the mechanism works and this is specific
+to that one parameter. Neither the create response nor the listing endpoint returns a
+system field, so it cannot be checked from the client. The app says so on the upload
+confirmation; set the System on the case page until this is fixed upstream.
+
 **Plane and sequence type are not settable through the API.** The series payload accepts
 only `image_format`, `series.root_index` and `stack_upload.uploaded_data`. Tag those on the
 website after uploading.
