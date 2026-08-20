@@ -2,13 +2,16 @@ import path from 'node:path'
 import { app, BrowserWindow, shell } from 'electron'
 import { registerIpc } from './ipc'
 import { session } from './session'
+import { MINIMUM, openingBounds, rememberWindow } from './windowState'
 
 function createWindow(): BrowserWindow {
+  // Where the user left it last time, fitted to the screen available now.
+  const { bounds, maximised } = openingBounds()
+
   const win = new BrowserWindow({
-    width: 1280,
-    height: 860,
-    minWidth: 960,
-    minHeight: 640,
+    ...bounds,
+    minWidth: MINIMUM.width,
+    minHeight: MINIMUM.height,
     show: false,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     backgroundColor: '#111418',
@@ -22,7 +25,12 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    if (maximised) win.maximize()
+    win.show()
+  })
+
+  rememberWindow(win)
 
   // External links open in the user's browser, never inside the app shell.
   win.webContents.setWindowOpenHandler(({ url }) => {
