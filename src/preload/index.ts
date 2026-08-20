@@ -1,8 +1,10 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { AnonResult, IngestResult, PreviewFrame, Progress, StackSelection } from '@shared/types'
+import type { AnonResult, AppInfo, IngestResult, PreviewFrame, Progress, StackSelection } from '@shared/types'
 
 /** The only surface the renderer has onto the filesystem and the network. */
 const api = {
+  /** Version, OS and architecture, for the home screen and bug reports. */
+  appInfo: (): Promise<AppInfo> => ipcRenderer.invoke('app:info'),
   pickSource: (kind: 'folder' | 'zip'): Promise<string[] | null> => ipcRenderer.invoke('source:pick', kind),
   /**
    * Resolve a dropped File to its path. Electron 32 removed the non-standard

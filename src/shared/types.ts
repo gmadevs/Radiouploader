@@ -99,6 +99,15 @@ export type PreviewFrame =
     }
   | { kind: 'colour'; width: number; height: number; rgba: Uint8ClampedArray }
 
+/** Which build this is, for the home screen and for bug reports. */
+export interface AppInfo {
+  version: string
+  /** Ready to display: "macOS 15.6", "Windows 10.0.22631", "Linux 6.8.0". */
+  os: string
+  arch: string
+  electron: string
+}
+
 /** What the renderer sends back about one stack it wants uploaded. */
 export interface StackSelection {
   id: string

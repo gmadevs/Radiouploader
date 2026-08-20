@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { IngestResult, Progress, Series, Stack } from '@shared/types'
+import type { AppInfo, IngestResult, Progress, Series, Stack } from '@shared/types'
 import { AccountBar } from './components/AccountBar'
 import { quotaExhausted, type AccountState } from './quota'
 import { describeInterval } from '@shared/interval'
 import { modalityFromDicom } from '@shared/radiopaedia'
 import { CaseStep, type CaseForm } from './components/CaseStep'
+import { InfoDialog } from './components/InfoDialog'
 import { ReviewStep } from './components/ReviewStep'
 import { SeriesViewer } from './components/SeriesViewer'
 import { SourceStep } from './components/SourceStep'
@@ -41,6 +42,8 @@ export function App(): React.JSX.Element {
   const [account, setAccount] = useState<AccountState>({ authenticated: false, username: null, quota: null })
   /** The stack open in the viewer, by id so it follows the edits made to it. */
   const [viewing, setViewing] = useState<{ stackId: string; heading: string } | null>(null)
+  const [info, setInfo] = useState<AppInfo | null>(null)
+  const [showInfo, setShowInfo] = useState(false)
 
   /**
    * Reasons the account cannot take a case right now. Checked before importing
@@ -55,6 +58,9 @@ export function App(): React.JSX.Element {
       : null
 
   useEffect(() => window.api.onProgress(setProgress), [])
+  useEffect(() => {
+    void window.api.appInfo().then(setInfo).catch(() => setInfo(null))
+  }, [])
 
   const selectedStacks = useMemo(
     () =>
@@ -232,6 +238,9 @@ export function App(): React.JSX.Element {
           </div>
         ))}
         <AccountBar account={account} onChange={setAccount} />
+        <button className="small ghost" title="About, and how to report a problem" onClick={() => setShowInfo(true)}>
+          Info
+        </button>
       </nav>
 
       <main className={step === 'source' || step === 'done' ? 'content centred' : 'content'}>
@@ -245,6 +254,7 @@ export function App(): React.JSX.Element {
               })
             }}
             onDropPaths={(paths) => void runIngest(paths)}
+            info={info}
           />
         )}
 
@@ -300,6 +310,8 @@ export function App(): React.JSX.Element {
           </div>
         )}
       </main>
+
+      {showInfo && <InfoDialog info={info} onClose={() => setShowInfo(false)} />}
 
       {viewing && viewedStack && (
         <SeriesViewer

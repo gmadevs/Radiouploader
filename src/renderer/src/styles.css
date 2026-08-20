@@ -244,3 +244,30 @@ label.field { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
 .viewer-slider input[type='range'] { flex: 1; padding: 0; border: none; background: transparent; accent-color: var(--accent); }
 .viewer-actions { display: flex; align-items: center; gap: 8px; }
 .viewer-actions .spacer { flex: 1; }
+
+/* The home screen names the app before it asks for anything. */
+.home { display: grid; justify-items: center; gap: 22px; }
+.home-title { text-align: center; display: grid; gap: 2px; }
+.home-title h1 { font-size: 26px; margin: 0; letter-spacing: -0.01em; }
+.home-title p { margin: 0; }
+
+.steps > button { flex: none; margin-left: 10px; }
+
+.info {
+  display: flex; flex-direction: column;
+  width: min(680px, 100%); max-height: 100%;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+.info-body { padding: 16px; display: grid; gap: 14px; overflow-y: auto; }
+.info-foot {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px; border-top: 1px solid var(--border); background: var(--panel-2);
+}
+.info-foot .spacer { flex: 1; }
+
+.tutorial { margin: 0; padding-left: 22px; display: grid; gap: 12px; }
+.tutorial li::marker { color: var(--accent); font-weight: 700; }
+.tutorial h3 { margin-bottom: 2px; }
+.tutorial p { margin: 0; }

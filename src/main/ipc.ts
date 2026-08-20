@@ -1,5 +1,9 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
-import type { AnonResult, IngestResult, Progress, StackSelection } from '@shared/types'
+// Inlined at build time. app.getVersion() reports Electron's own version
+// whenever the app is started without its package.json beside it, which is
+// exactly the case when the app is driven by a script.
+import { version } from '../../package.json'
+import type { AppInfo, AnonResult, IngestResult, Progress, StackSelection } from '@shared/types'
 import { anonymiseStacks, summariseWarnings } from './anon'
 import { RadiopaediaClient, type CaseDraft } from './api/client'
 import type { OAuthConfig } from './api/oauth'
@@ -30,7 +34,17 @@ export interface UploadRequest {
   studies: StudyDraftInput[]
 }
 
+/** Platform names as people say them, rather than as Node reports them. */
+const OS_NAMES: Record<string, string> = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' }
+
 export function registerIpc(): void {
+  ipcMain.handle('app:info', (): AppInfo => ({
+    version,
+    os: `${OS_NAMES[process.platform] ?? process.platform} ${process.getSystemVersion()}`,
+    arch: process.arch,
+    electron: process.versions.electron
+  }))
+
   ipcMain.handle('source:pick', async (_e, kind: 'folder' | 'zip') => {
     const result = await dialog.showOpenDialog({
       title: kind === 'folder' ? 'Choose a DICOM folder' : 'Choose a DICOM zip',
