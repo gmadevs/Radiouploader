@@ -158,7 +158,8 @@ query-string parameters as Radiopaedia's own OsiriX plugin sends them. The encod
 the variable, so the client stays on the documented JSON contract. Neither the create
 response nor the listing endpoint returns a system field, and there is no `PUT`/`PATCH` on
 `/api/v1/cases/:id`, so a client can neither verify nor correct it. The upload confirmation says so and
-links straight to the case editor.
+links straight to the case editor. The full investigation is in
+[`docs/system-id-not-applied.md`](docs/system-id-not-applied.md).
 
 **Plane and sequence type are not settable through the API.** The series payload accepts
 only `image_format`, `series.root_index` and `stack_upload.uploaded_data`. Tag those on the
