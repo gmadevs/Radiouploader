@@ -12,6 +12,19 @@ export async function loadFrame(filePath: string, frame: number, maxEdge?: numbe
   return window.api.readPreviewFrame(filePath, frame, maxEdge)
 }
 
+/**
+ * The readable half of a failed preview.
+ *
+ * An error raised in the main process reaches the renderer wrapped by Electron:
+ * "Error invoking remote method 'preview:frame': UnsupportedTransferSyntaxError:
+ * JPEG baseline is not supported for preview yet". Only the last clause says
+ * anything to whoever is looking at the missing image.
+ */
+export function previewErrorText(err: unknown): string {
+  const text = err instanceof Error ? err.message : String(err)
+  return text.replace(/^Error invoking remote method '[^']*':\s*/, '').replace(/^\w*Error:\s*/, '')
+}
+
 export interface PaintOptions {
   /** Overrides the window the file asks for; ignored on colour images. */
   window?: WindowLevel | null

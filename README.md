@@ -99,6 +99,22 @@ Erasing needs decodable pixels, so it is offered only where the preview works: a
 image shows the reason instead of the eraser, and a mask on one is refused at anonymisation
 rather than painted over the compressed bitstream.
 
+### The check before anonymising
+
+**Anonymise and continue** stops on a dialog first, because anonymisation is where a mask
+stops being an overlay and becomes pixels: after it, going back means redoing the run.
+
+It is deliberately not a "have you checked?" tick box — one of those is a reflex by the
+third import. The app records which stacks were opened full size, and the dialog lists the
+selected ones that never were, with a thumbnail each that opens straight into the viewer.
+So the dialog says something the user does not already know, and shrinks as the list is
+worked through. When there is nothing left on it, it says so and still asks: opening a
+stack is not the same as having read every image in it.
+
+What it never does is call a selection clean. Nothing here looks at the pixels, so a
+silence would be an absence of evidence dressed up as a result — and in an anonymisation
+tool that is worse than no check at all, because it stops people looking.
+
 ---
 
 ## Multi-study cases
@@ -267,7 +283,11 @@ Neither platform is signed on CI:
 - **Burnt-in text is not detected.** Nothing looks for it: the anonymiser works on tags, so
   finding text in the pixels is your job. Review the images in the picker before uploading
   and blank anything identifying with **Open for review** — that is why the app shows
-  previews at all.
+  previews at all. The dialog before anonymisation tracks only what you *opened*, which is
+  a proxy for having looked and no more than that; it cannot tell a blank corner from an
+  unread one. Detecting text would mean either an OCR pass or a cheaper heuristic — a
+  saturated, high-gradient region that is identical on every frame is almost always an
+  overlay — and both need decoded pixels, which is the same blocker as below.
 - **Previews decode uncompressed DICOM only.** Explicit and implicit VR little endian and
   explicit VR big endian all render; JPEG, JPEG-LS, JPEG 2000, HTJ2K and RLE are named in
   the placeholder instead of being mis-rendered. A single-frame compressed object still

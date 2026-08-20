@@ -4,6 +4,8 @@ import { AccountBar } from './components/AccountBar'
 import { quotaExhausted, type AccountState } from './quota'
 import { describeInterval } from '@shared/interval'
 import { modalityFromDicom } from '@shared/radiopaedia'
+import { splitByReview, type StackEntry } from './burnIn'
+import { BurnInCheck } from './components/BurnInCheck'
 import { CaseStep, type CaseForm } from './components/CaseStep'
 import { InfoDialog } from './components/InfoDialog'
 import { ReviewStep } from './components/ReviewStep'
@@ -42,6 +44,10 @@ export function App(): React.JSX.Element {
   const [account, setAccount] = useState<AccountState>({ authenticated: false, username: null, quota: null })
   /** The stack open in the viewer, by id so it follows the edits made to it. */
   const [viewing, setViewing] = useState<{ stackId: string; heading: string } | null>(null)
+  /** Stacks opened full size, so the burnt-in check knows what went unlooked at. */
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set())
+  /** The burnt-in check, which stands between the review step and anonymisation. */
+  const [confirming, setConfirming] = useState(false)
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [showInfo, setShowInfo] = useState(false)
 
@@ -62,13 +68,28 @@ export function App(): React.JSX.Element {
     void window.api.appInfo().then(setInfo).catch(() => setInfo(null))
   }, [])
 
-  const selectedStacks = useMemo(
+  /** The selection, flattened, with the labels the check and the viewer need. */
+  const selectedEntries = useMemo<StackEntry[]>(
     () =>
       (ingest?.studies ?? []).flatMap((study) =>
-        study.series.flatMap((series) => series.stacks.filter((stack) => stack.selected))
+        study.series.flatMap((series) =>
+          series.stacks
+            .filter((stack) => stack.selected)
+            .map((stack) => {
+              const name = series.description ?? 'Unnamed series'
+              return {
+                stack,
+                label: series.stacks.length > 1 ? `${name} · ${stack.label}` : name,
+                modality: series.modality,
+                heading: `${study.studyDescription ?? 'Study'} · ${name}`
+              }
+            })
+        )
       ),
     [ingest]
   )
+  const selectedStacks = useMemo(() => selectedEntries.map((entry) => entry.stack), [selectedEntries])
+  const { seen, unseen } = useMemo(() => splitByReview(selectedEntries, opened), [selectedEntries, opened])
   const selectedImageCount = selectedStacks.reduce(
     (n, stack) => n + (stack.trimEnd - stack.trimStart + 1),
     0
@@ -111,6 +132,12 @@ export function App(): React.JSX.Element {
     })
   }
 
+  /** Opening a stack is what the burnt-in check counts as having looked at it. */
+  const openViewer = (stackId: string, heading: string): void => {
+    setViewing({ stackId, heading })
+    setOpened((current) => new Set(current).add(stackId))
+  }
+
   const runIngest = async (paths: string[]): Promise<void> => {
     setBusy(true)
     setError(null)
@@ -131,6 +158,7 @@ export function App(): React.JSX.Element {
   }
 
   const anonymiseAndContinue = async (): Promise<void> => {
+    setConfirming(false)
     setBusy(true)
     setError(null)
     try {
@@ -216,6 +244,8 @@ export function App(): React.JSX.Element {
   const startOver = (): void => {
     void window.api.resetIngest()
     setViewing(null)
+    setOpened(new Set())
+    setConfirming(false)
     setIngest(null)
     setResult(null)
     setWarnings([])
@@ -271,10 +301,7 @@ export function App(): React.JSX.Element {
             }
             onSelectEverything={(selected) => mutateStacks(() => ({ selected }))}
             onOpen={(stack, series, study) =>
-              setViewing({
-                stackId: stack.id,
-                heading: `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`
-              })
+              openViewer(stack.id, `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`)
             }
             onKeepOnePhase={(series) => {
               // Keep the earliest phase and drop the rest; the user can re-tick any.
@@ -313,6 +340,19 @@ export function App(): React.JSX.Element {
 
       {showInfo && <InfoDialog info={info} onClose={() => setShowInfo(false)} />}
 
+      {/* Hidden while the viewer is up rather than stacked behind it, so one
+          Escape closes one thing and the list is re-read on the way back. */}
+      {confirming && !viewing && (
+        <BurnInCheck
+          seenCount={seen.length}
+          unseen={unseen}
+          busy={busy}
+          onOpen={(entry) => openViewer(entry.stack.id, entry.heading)}
+          onBack={() => setConfirming(false)}
+          onConfirm={() => void anonymiseAndContinue()}
+        />
+      )}
+
       {viewing && viewedStack && (
         <SeriesViewer
           stack={viewedStack}
@@ -349,7 +389,11 @@ export function App(): React.JSX.Element {
             <button onClick={startOver} disabled={busy}>
               Back
             </button>
-            <button className="primary" disabled={busy || selectedStacks.length === 0} onClick={() => void anonymiseAndContinue()}>
+            <button
+              className="primary"
+              disabled={busy || selectedStacks.length === 0}
+              onClick={() => setConfirming(true)}
+            >
               Anonymise and continue
             </button>
           </>

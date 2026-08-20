@@ -29,6 +29,11 @@ const STEPS: { title: string; body: string }[] = [
       'Opens a series full size. Erase drags a black box over burnt-in text — a patient banner, an annotation — and it is painted into the pixels of every image in that series before upload. Contrast sets the window the images are read at. Anonymisation cleans the tags; the pixels are your job.'
   },
   {
+    title: 'One last look',
+    body:
+      'Anonymise and continue stops to list the selected series you never opened full size, each one a click away from the viewer. Nothing looks for burnt-in text on your behalf, so the list is what went unchecked, not what is dirty.'
+  },
+  {
     title: 'Case details, then upload',
     body:
       'One study per DICOM study, oldest first, with the interval between them preserved in the caption. The case arrives on Radiopaedia as a draft, so nothing is published until you say so there.'

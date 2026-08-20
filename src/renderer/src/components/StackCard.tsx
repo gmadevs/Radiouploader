@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PreviewFrame, Stack } from '@shared/types'
-import { loadFrame, paintFrame } from '../dicomPreview'
+import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
 
 interface Props {
   stack: Stack
@@ -38,7 +38,7 @@ export function StackCard({ stack, onToggle, onTrim, onOpen }: Props): React.JSX
       .catch((err: unknown) => {
         if (cancelled) return
         setFrame(null)
-        setError(err instanceof Error ? err.message : String(err))
+        setError(previewErrorText(err))
       })
     return () => {
       cancelled = true

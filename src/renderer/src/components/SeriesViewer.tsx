@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MaskRect, PreviewFrame, Stack, WindowLevel } from '@shared/types'
-import { loadFrame, paintFrame } from '../dicomPreview'
+import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
 
 interface Props {
   stack: Stack
@@ -73,7 +73,7 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
       .catch((err: unknown) => {
         if (cancelled) return
         setFrame(null)
-        setError(err instanceof Error ? err.message : String(err))
+        setError(previewErrorText(err))
       })
     return () => {
       cancelled = true
