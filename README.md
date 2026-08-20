@@ -1,5 +1,18 @@
 # Radiouploader
 
+[![Licence: AGPL-3.0-only](https://img.shields.io/badge/licence-AGPL--3.0--only-blue?style=flat-square)](LICENSE)
+[![Platform: macOS, Linux, Windows](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square)](#packaging)
+[![Status: alpha](https://img.shields.io/badge/status-alpha-orange?style=flat-square)](#known-limitations)
+[![Electron](https://img.shields.io/badge/Electron-43-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+
+<!-- The build badge only renders once this repository is public: GitHub fetches
+     README images through a proxy that carries no credentials, so on a private
+     repository it shows as broken rather than as a status. Uncomment it then.
+[![Build](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml/badge.svg)](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml)
+-->
+
 A desktop app for preparing and uploading cases to [Radiopaedia.org](https://radiopaedia.org).
 
 Point it at a folder, a zip or a handful of DICOM files. It reads the study, splits the
