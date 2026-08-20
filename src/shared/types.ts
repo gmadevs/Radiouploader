@@ -28,6 +28,24 @@ export interface SliceRef {
   sopInstanceUid: string | null
 }
 
+/**
+ * A rectangle to blank out of every image in a stack, in fractions of the
+ * image (0–1, origin top-left) so it survives the preview downscale and applies
+ * at full resolution.
+ */
+export interface MaskRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** Window centre and width, in the rescaled units the pixels are read in. */
+export interface WindowLevel {
+  centre: number
+  width: number
+}
+
 export interface Stack {
   id: string
   kind: StackKind
@@ -48,6 +66,47 @@ export interface Stack {
    */
   trimStart: number
   trimEnd: number
+  /**
+   * Regions painted out in the viewer, applied to every slice of the stack —
+   * burnt-in text sits in the same place on all of them. Written into the pixel
+   * data at anonymisation, so what is uploaded really is redacted.
+   */
+  masks: MaskRect[]
+  /**
+   * Window chosen in the viewer, written to WindowCenter/WindowWidth on upload.
+   * Null leaves the exporter's own window in place.
+   */
+  window: WindowLevel | null
+}
+
+/**
+ * One decoded frame, as it crosses the bridge.
+ *
+ * Greyscale frames travel unwindowed so the viewer can rewindow them on a mouse
+ * drag without asking for the frame again; a colour frame has no window to
+ * choose, so it travels as finished pixels.
+ */
+export type PreviewFrame =
+  | {
+      kind: 'grey'
+      width: number
+      height: number
+      /** One rescaled value per pixel. */
+      values: Float32Array
+      /** The window the file asks for, or the frame's own range. */
+      window: WindowLevel
+      invert: boolean
+    }
+  | { kind: 'colour'; width: number; height: number; rgba: Uint8ClampedArray }
+
+/** What the renderer sends back about one stack it wants uploaded. */
+export interface StackSelection {
+  id: string
+  trimStart: number
+  trimEnd: number
+  /** Absent from an older renderer, or from a stack nobody opened. */
+  masks?: MaskRect[]
+  window?: WindowLevel | null
 }
 
 export interface Series {

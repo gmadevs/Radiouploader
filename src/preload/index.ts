@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { AnonResult, IngestResult, Progress } from '@shared/types'
+import type { AnonResult, IngestResult, PreviewFrame, Progress, StackSelection } from '@shared/types'
 
 /** The only surface the renderer has onto the filesystem and the network. */
 const api = {
@@ -12,14 +12,14 @@ const api = {
   getPathForFile: (file: File): string => webUtils.getPathForFile(file),
   ingest: (paths: string[]): Promise<IngestResult> => ipcRenderer.invoke('ingest:run', paths),
   resetIngest: (): Promise<void> => ipcRenderer.invoke('ingest:reset'),
-  setSelection: (selection: { id: string; trimStart: number; trimEnd: number }[]): Promise<void> =>
-    ipcRenderer.invoke('selection:set', selection),
-  /** One decoded, preview-sized frame. Whole files never cross this bridge. */
-  readPreviewFrame: (
-    filePath: string,
-    frame: number
-  ): Promise<{ width: number; height: number; rgba: Uint8ClampedArray }> =>
-    ipcRenderer.invoke('preview:frame', filePath, frame),
+  setSelection: (selection: StackSelection[]): Promise<void> => ipcRenderer.invoke('selection:set', selection),
+  /**
+   * One decoded frame, no larger than `maxEdge`. Whole files never cross this
+   * bridge — the card asks for a thumbnail, the viewer for something it can
+   * draw a mask on.
+   */
+  readPreviewFrame: (filePath: string, frame: number, maxEdge?: number): Promise<PreviewFrame> =>
+    ipcRenderer.invoke('preview:frame', filePath, frame, maxEdge),
   anonymise: (): Promise<AnonResult & { summary: { tag: string; text: string; level: number; count: number }[] }> =>
     ipcRenderer.invoke('anon:run'),
 

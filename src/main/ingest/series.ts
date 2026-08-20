@@ -229,7 +229,9 @@ function makeStack(
     slices,
     selected: true,
     trimStart: 0,
-    trimEnd: slices.length - 1
+    trimEnd: slices.length - 1,
+    masks: [],
+    window: null
   }
 }
 

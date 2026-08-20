@@ -1,4 +1,5 @@
 import dicomParser from 'dicom-parser'
+import type { MaskRect, WindowLevel } from './types'
 
 /**
  * Preview decoder for uncompressed DICOM.
@@ -40,21 +41,25 @@ export class UnsupportedTransferSyntaxError extends Error {
   }
 }
 
-/** Everything needed to locate and interpret a frame, without holding pixels. */
-export interface ImageHeader {
+/** How the samples of a frame are laid out in the file. */
+export interface PixelGeometry {
   rows: number
   columns: number
   samplesPerPixel: number
   bitsAllocated: number
   signed: boolean
   planarConfiguration: number
+  bigEndian: boolean
+}
+
+/** Everything needed to locate and interpret a frame, without holding pixels. */
+export interface ImageHeader extends PixelGeometry {
   photometric: string
   slope: number
   intercept: number
   windowCentre: number | null
   windowWidth: number | null
   frames: number
-  bigEndian: boolean
   /** Byte offset of the first frame's pixel data within the file. */
   pixelDataOffset: number
 }
@@ -64,6 +69,24 @@ export interface DecodedFrame {
   height: number
   /** RGBA, ready for ImageData. Backed by a plain ArrayBuffer. */
   rgba: Uint8ClampedArray<ArrayBuffer>
+}
+
+/**
+ * A greyscale frame before any window is applied.
+ *
+ * Kept separate from DecodedFrame so the viewer can rewindow an image without
+ * going back to the file: the values here are already rescaled, and turning
+ * them into pixels is a single pass the renderer can afford on every drag.
+ */
+export interface GreyFrame {
+  width: number
+  height: number
+  /** One rescaled value per pixel (slope and intercept already applied). */
+  values: Float32Array
+  /** The window the file asks for, or the frame's own range as a fallback. */
+  window: WindowLevel
+  /** MONOCHROME1: low values are white. */
+  invert: boolean
 }
 
 function firstNumber(value: string | undefined): number | null {
@@ -111,9 +134,9 @@ export function parseHeader(bytes: Uint8Array): ImageHeader {
 }
 
 /** Bytes one frame occupies. */
-export function frameByteLength(header: ImageHeader): number {
-  const bytesPerSample = header.bitsAllocated <= 8 ? 1 : 2
-  return header.rows * header.columns * header.samplesPerPixel * bytesPerSample
+export function frameByteLength(geometry: PixelGeometry): number {
+  const bytesPerSample = geometry.bitsAllocated <= 8 ? 1 : 2
+  return geometry.rows * geometry.columns * geometry.samplesPerPixel * bytesPerSample
 }
 
 /** Where a frame's pixels start in the file, clamped to the frames that exist. */
@@ -123,58 +146,96 @@ export function frameOffset(header: ImageHeader, frame: number): number {
 }
 
 /** Read one frame's samples out of its own bytes. */
-function samplesOf(header: ImageHeader, frameBytes: Uint8Array): Int16Array | Uint16Array | Uint8Array {
-  const count = header.rows * header.columns * header.samplesPerPixel
-  const bytesPerSample = header.bitsAllocated <= 8 ? 1 : 2
+export function frameSamples(
+  geometry: PixelGeometry,
+  frameBytes: Uint8Array
+): Int16Array | Uint16Array | Uint8Array {
+  const count = geometry.rows * geometry.columns * geometry.samplesPerPixel
+  const bytesPerSample = geometry.bitsAllocated <= 8 ? 1 : 2
 
   if (frameBytes.length < count * bytesPerSample) {
     throw new Error('Frame data runs past the end of the pixel data')
   }
   if (bytesPerSample === 1) return frameBytes.subarray(0, count)
 
-  const out = header.signed ? new Int16Array(count) : new Uint16Array(count)
+  const out = geometry.signed ? new Int16Array(count) : new Uint16Array(count)
   for (let i = 0; i < count; i++) {
     const o = i * 2
     // DICOM is little-endian except under Explicit VR Big Endian.
-    const raw = header.bigEndian
+    const raw = geometry.bigEndian
       ? (frameBytes[o] << 8) | frameBytes[o + 1]
       : frameBytes[o] | (frameBytes[o + 1] << 8)
-    out[i] = header.signed ? (raw << 16) >> 16 : raw
+    out[i] = geometry.signed ? (raw << 16) >> 16 : raw
   }
   return out
 }
 
 /** Window from the header, falling back to the actual range of this frame. */
-function windowFor(header: ImageHeader, pixels: ArrayLike<number>): { low: number; scale: number } {
-  let centre = header.windowCentre
-  let width = header.windowWidth
+function windowFor(header: ImageHeader, values: ArrayLike<number>): WindowLevel {
+  const centre = header.windowCentre
+  const width = header.windowWidth
+  if (centre !== null && width !== null && width > 0) return { centre, width }
 
-  if (centre === null || width === null || width <= 0) {
-    let min = Infinity
-    let max = -Infinity
-    for (let i = 0; i < pixels.length; i++) {
-      const v = pixels[i] * header.slope + header.intercept
-      if (v < min) min = v
-      if (v > max) max = v
-    }
-    if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-      min = 0
-      max = 255
-    }
-    centre = (min + max) / 2
-    width = Math.max(max - min, 1)
+  let min = Infinity
+  let max = -Infinity
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i]
+    if (v < min) min = v
+    if (v > max) max = v
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+    min = 0
+    max = 255
+  }
+  return { centre: (min + max) / 2, width: Math.max(max - min, 1) }
+}
+
+/**
+ * Decode one greyscale frame to rescaled values, without choosing a window.
+ *
+ * The viewer needs this: rewindowing an image on a mouse drag has to be a pass
+ * over values already in the renderer, not a round trip to the file.
+ */
+export function decodeGreyFrame(header: ImageHeader, frameBytes: Uint8Array): GreyFrame {
+  if (header.samplesPerPixel !== 1) throw new Error('This image is colour, not greyscale')
+
+  const pixels = frameSamples(header, frameBytes)
+  const pixelCount = header.rows * header.columns
+  const values = new Float32Array(new ArrayBuffer(pixelCount * 4))
+  for (let i = 0; i < pixelCount; i++) values[i] = pixels[i] * header.slope + header.intercept
+
+  return {
+    width: header.columns,
+    height: header.rows,
+    values,
+    window: windowFor(header, values),
+    invert: header.photometric === 'MONOCHROME1'
+  }
+}
+
+/** Paint rescaled values through a window. */
+export function applyWindow(frame: GreyFrame, window: WindowLevel): DecodedFrame {
+  const low = window.centre - window.width / 2
+  const scale = 255 / (window.width > 0 ? window.width : 1)
+  const rgba = new Uint8ClampedArray(new ArrayBuffer(frame.values.length * 4))
+
+  for (let i = 0; i < frame.values.length; i++) {
+    let grey = (frame.values[i] - low) * scale
+    if (frame.invert) grey = 255 - grey
+    const o = i * 4
+    rgba[o] = rgba[o + 1] = rgba[o + 2] = grey
+    rgba[o + 3] = 255
   }
 
-  return { low: centre - width / 2, scale: 255 / width }
+  return { width: frame.width, height: frame.height, rgba }
 }
 
 /** Decode one frame's bytes to RGBA, applying rescale, window and inversion. */
 export function decodeFrame(header: ImageHeader, frameBytes: Uint8Array): DecodedFrame {
-  const pixels = samplesOf(header, frameBytes)
-  const pixelCount = header.rows * header.columns
-  const rgba = new Uint8ClampedArray(new ArrayBuffer(pixelCount * 4))
-
   if (header.samplesPerPixel === 3) {
+    const pixels = frameSamples(header, frameBytes)
+    const pixelCount = header.rows * header.columns
+    const rgba = new Uint8ClampedArray(new ArrayBuffer(pixelCount * 4))
     // Planar configuration 1 stores all reds, then all greens, then all blues.
     const planar = header.planarConfiguration === 1
     for (let i = 0; i < pixelCount; i++) {
@@ -193,19 +254,106 @@ export function decodeFrame(header: ImageHeader, frameBytes: Uint8Array): Decode
     return { width: header.columns, height: header.rows, rgba }
   }
 
-  const { low, scale } = windowFor(header, pixels)
-  const invert = header.photometric === 'MONOCHROME1'
+  const frame = decodeGreyFrame(header, frameBytes)
+  return applyWindow(frame, frame.window)
+}
 
-  for (let i = 0; i < pixelCount; i++) {
-    const value = pixels[i] * header.slope + header.intercept
-    let grey = (value - low) * scale
-    if (invert) grey = 255 - grey
-    const o = i * 4
-    rgba[o] = rgba[o + 1] = rgba[o + 2] = grey
-    rgba[o + 3] = 255
+/** Clamp a fraction of the image to a whole-pixel column or row. */
+function edge(fraction: number, size: number): number {
+  return Math.min(Math.max(Math.round(fraction * size), 0), size)
+}
+
+/**
+ * The stored sample values that read as black on this image.
+ *
+ * Zero is not black in general: on a CT it is soft tissue, and on MONOCHROME1
+ * it is white. What reads as black is the dark end of the window the image is
+ * displayed with, taken back through the rescale to a stored value — so a
+ * redaction stays black whatever window the viewer ends up using. With no
+ * window to go on, the darkest value present in the frame is the safe answer.
+ */
+export function blackSamples(
+  header: Pick<ImageHeader, 'photometric' | 'samplesPerPixel' | 'bitsAllocated' | 'signed' | 'slope' | 'intercept'>,
+  window: WindowLevel | null,
+  pixels?: ArrayLike<number>
+): number[] {
+  if (header.samplesPerPixel > 1) {
+    // YBR stores black as luminance 0 with both chroma channels centred; zero
+    // in all three would come out bright green.
+    return header.photometric.startsWith('YBR') ? [0, 128, 128] : [0, 0, 0]
   }
 
-  return { width: header.columns, height: header.rows, rgba }
+  const max = header.bitsAllocated <= 8 ? 255 : header.signed ? 32767 : 65535
+  const min = header.bitsAllocated <= 8 ? 0 : header.signed ? -32768 : 0
+  const invert = header.photometric === 'MONOCHROME1'
+  const clamp = (v: number): number => Math.min(Math.max(Math.round(v), min), max)
+
+  if (window && window.width > 0) {
+    const dark = invert ? window.centre + window.width / 2 : window.centre - window.width / 2
+    const slope = header.slope === 0 ? 1 : header.slope
+    return [clamp((dark - header.intercept) / slope)]
+  }
+
+  if (pixels && pixels.length > 0) {
+    let lowest = pixels[0]
+    let highest = pixels[0]
+    for (let i = 1; i < pixels.length; i++) {
+      if (pixels[i] < lowest) lowest = pixels[i]
+      if (pixels[i] > highest) highest = pixels[i]
+    }
+    // A negative slope flips which end of the stored range is the dark one.
+    const darkIsLow = invert === header.slope < 0
+    return [clamp(darkIsLow ? lowest : highest)]
+  }
+
+  return [invert ? max : 0]
+}
+
+/**
+ * Blank out rectangles of a frame, in place.
+ *
+ * `frameBytes` is the raw pixel data as stored, so this is the last chance to
+ * remove burnt-in text before the file is written: what it overwrites is gone
+ * from the bytes that get uploaded, not merely hidden by the viewer.
+ */
+export function fillMasks(
+  frameBytes: Uint8Array,
+  geometry: PixelGeometry,
+  masks: MaskRect[],
+  fill: number[]
+): void {
+  if (masks.length === 0 || fill.length === 0) return
+
+  const { rows, columns, samplesPerPixel, bitsAllocated, signed, bigEndian } = geometry
+  const wide = bitsAllocated > 8
+  const bytesPerSample = wide ? 2 : 1
+  const planar = samplesPerPixel > 1 && geometry.planarConfiguration === 1
+  const plane = rows * columns
+  const view = new DataView(frameBytes.buffer, frameBytes.byteOffset, frameBytes.byteLength)
+
+  const write = (index: number, value: number): void => {
+    const o = index * bytesPerSample
+    if (o + bytesPerSample > frameBytes.length) return
+    if (!wide) frameBytes[o] = value & 0xff
+    else if (signed) view.setInt16(o, value, !bigEndian)
+    else view.setUint16(o, value, !bigEndian)
+  }
+
+  for (const mask of masks) {
+    const x0 = edge(mask.x, columns)
+    const x1 = edge(mask.x + mask.width, columns)
+    const y0 = edge(mask.y, rows)
+    const y1 = edge(mask.y + mask.height, rows)
+
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        for (let s = 0; s < samplesPerPixel; s++) {
+          const index = planar ? s * plane + y * columns + x : (y * columns + x) * samplesPerPixel + s
+          write(index, fill[Math.min(s, fill.length - 1)])
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -237,4 +385,24 @@ export function downscale(frame: DecodedFrame, maxEdge: number): DecodedFrame {
   }
 
   return { width, height, rgba }
+}
+
+/** The same sampling as `downscale`, for values that are not pixels yet. */
+export function downscaleGrey(frame: GreyFrame, maxEdge: number): GreyFrame {
+  const longest = Math.max(frame.width, frame.height)
+  if (longest <= maxEdge) return frame
+
+  const factor = longest / maxEdge
+  const width = Math.max(1, Math.round(frame.width / factor))
+  const height = Math.max(1, Math.round(frame.height / factor))
+  const values = new Float32Array(new ArrayBuffer(width * height * 4))
+
+  for (let y = 0; y < height; y++) {
+    const sourceRow = Math.min(frame.height - 1, Math.floor(y * factor)) * frame.width
+    for (let x = 0; x < width; x++) {
+      values[y * width + x] = frame.values[sourceRow + Math.min(frame.width - 1, Math.floor(x * factor))]
+    }
+  }
+
+  return { width, height, values, window: frame.window, invert: frame.invert }
 }

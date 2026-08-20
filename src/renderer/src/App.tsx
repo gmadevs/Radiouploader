@@ -6,6 +6,7 @@ import { describeInterval } from '@shared/interval'
 import { modalityFromDicom } from '@shared/radiopaedia'
 import { CaseStep, type CaseForm } from './components/CaseStep'
 import { ReviewStep } from './components/ReviewStep'
+import { SeriesViewer } from './components/SeriesViewer'
 import { SourceStep } from './components/SourceStep'
 
 type Step = 'source' | 'review' | 'case' | 'done'
@@ -38,6 +39,8 @@ export function App(): React.JSX.Element {
   const [warnings, setWarnings] = useState<{ tag: string; text: string; level: number; count: number }[]>([])
   const [result, setResult] = useState<{ caseId: string; url: string } | null>(null)
   const [account, setAccount] = useState<AccountState>({ authenticated: false, username: null, quota: null })
+  /** The stack open in the viewer, by id so it follows the edits made to it. */
+  const [viewing, setViewing] = useState<{ stackId: string; heading: string } | null>(null)
 
   /**
    * Reasons the account cannot take a case right now. Checked before importing
@@ -63,6 +66,14 @@ export function App(): React.JSX.Element {
   const selectedImageCount = selectedStacks.reduce(
     (n, stack) => n + (stack.trimEnd - stack.trimStart + 1),
     0
+  )
+
+  const viewedStack = useMemo(
+    () =>
+      (ingest?.studies ?? [])
+        .flatMap((study) => study.series.flatMap((series) => series.stacks))
+        .find((stack) => stack.id === viewing?.stackId) ?? null,
+    [ingest, viewing]
   )
 
   /** Studies with at least one selected stack, already oldest first from ingest. */
@@ -118,7 +129,13 @@ export function App(): React.JSX.Element {
     setError(null)
     try {
       await window.api.setSelection(
-        selectedStacks.map((s) => ({ id: s.id, trimStart: s.trimStart, trimEnd: s.trimEnd }))
+        selectedStacks.map((s) => ({
+          id: s.id,
+          trimStart: s.trimStart,
+          trimEnd: s.trimEnd,
+          masks: s.masks ?? [],
+          window: s.window ?? null
+        }))
       )
       const res = await window.api.anonymise()
       setWarnings(res.summary)
@@ -192,6 +209,7 @@ export function App(): React.JSX.Element {
 
   const startOver = (): void => {
     void window.api.resetIngest()
+    setViewing(null)
     setIngest(null)
     setResult(null)
     setWarnings([])
@@ -242,6 +260,12 @@ export function App(): React.JSX.Element {
               mutateStacks((_stack, s) => (s.id === series.id ? { selected } : null))
             }
             onSelectEverything={(selected) => mutateStacks(() => ({ selected }))}
+            onOpen={(stack, series, study) =>
+              setViewing({
+                stackId: stack.id,
+                heading: `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`
+              })
+            }
             onKeepOnePhase={(series) => {
               // Keep the earliest phase and drop the rest; the user can re-tick any.
               const first = series.stacks.find((s) => s.selected)?.id ?? series.stacks[0]?.id
@@ -276,6 +300,15 @@ export function App(): React.JSX.Element {
           </div>
         )}
       </main>
+
+      {viewing && viewedStack && (
+        <SeriesViewer
+          stack={viewedStack}
+          heading={viewing.heading}
+          onChange={(patch) => mutateStacks((stack) => (stack.id === viewedStack.id ? patch : null))}
+          onClose={() => setViewing(null)}
+        />
+      )}
 
       <footer className="footer">
         {error && <span className="notice error">{error}</span>}

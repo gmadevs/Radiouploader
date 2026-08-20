@@ -132,3 +132,97 @@ describe('anonymiseFile — multiframe', () => {
     expect(results.map((r) => r.sourcePath)).toEqual(Array(4).fill(source()))
   })
 })
+
+describe('anonymiseFile — redaction and window', () => {
+  const source = () => path.join(fixtures, '01_ras_physician.dcm')
+  /** The left half of the image, which is where these tests put the text. */
+  const leftHalf = [{ x: 0, y: 0, width: 0.5, height: 1 }]
+
+  /** Stored samples of an 8x8 fixture, little-endian as written. */
+  async function pixelsOf(file: string): Promise<number[]> {
+    const ds = await tagsOf(file)
+    const element = ds.elements['x7fe00010']
+    return Array.from({ length: element.length / 2 }, (_, i) => ds.uint16('x7fe00010', i) ?? 0)
+  }
+
+  it('blanks the masked columns with the dark end of the window in force', async () => {
+    const [result] = await anonymiseFile(source(), outDir, [
+      { frame: 0, outputName: 'masked.dcm', instanceNumber: 1, masks: leftHalf }
+    ])
+    const pixels = await pixelsOf(result.outputPath)
+    const original = await pixelsOf(source())
+
+    for (let row = 0; row < 8; row++) {
+      for (let column = 0; column < 8; column++) {
+        const i = row * 8 + column
+        // The fixture is MONOCHROME1 with C 8192 / W 9638, so black is the top
+        // of the window — filling with zero would have painted the text white.
+        if (column < 4) expect(pixels[i]).toBe(8192 + 9638 / 2)
+        else expect(pixels[i]).toBe(original[i])
+      }
+    }
+  })
+
+  it('fills with the dark end of a window chosen in the viewer', async () => {
+    const [result] = await anonymiseFile(source(), outDir, [
+      {
+        frame: 0,
+        outputName: 'masked-window.dcm',
+        instanceNumber: 1,
+        masks: leftHalf,
+        window: { centre: 600, width: 1200 }
+      }
+    ])
+    expect((await pixelsOf(result.outputPath))[0]).toBe(1200)
+  })
+
+  it('writes the chosen window, so Radiopaedia shows the contrast that was set', async () => {
+    const [result] = await anonymiseFile(source(), outDir, [
+      { frame: 0, outputName: 'window.dcm', instanceNumber: 1, window: { centre: 600, width: 1200 } }
+    ])
+    const ds = await tagsOf(result.outputPath)
+    expect(ds.string('x00281050')).toBe('600')
+    expect(ds.string('x00281051')).toBe('1200')
+  })
+
+  it('leaves the file its own window when none was chosen', async () => {
+    // Both tasks come from one call, which is what happens when the same file
+    // belongs to two stacks: the second must not inherit the first's window.
+    const [, second] = await anonymiseFile(source(), outDir, [
+      { frame: 0, outputName: 'w-a.dcm', instanceNumber: 1, window: { centre: 600, width: 1200 } },
+      { frame: 0, outputName: 'w-b.dcm', instanceNumber: 1 }
+    ])
+    const ds = await tagsOf(second.outputPath)
+    expect(ds.string('x00281050')).toBe('8192')
+    expect(ds.string('x00281051')).toBe('9638')
+  })
+
+  it('does not leak a mask into another task from the same file', async () => {
+    const [, second] = await anonymiseFile(source(), outDir, [
+      { frame: 0, outputName: 'm-a.dcm', instanceNumber: 1, masks: leftHalf },
+      { frame: 0, outputName: 'm-b.dcm', instanceNumber: 1 }
+    ])
+    expect(await pixelsOf(second.outputPath)).toEqual(await pixelsOf(source()))
+  })
+
+  it('masks every frame of a multiframe run that is split', async () => {
+    const results = await anonymiseFile(path.join(fixtures, 'multiframe_4.dcm'), outDir, [
+      { frame: 0, outputName: 'mf-0.dcm', instanceNumber: 1, masks: leftHalf },
+      { frame: 1, outputName: 'mf-1.dcm', instanceNumber: 2, masks: leftHalf }
+    ])
+    for (const result of results) {
+      const pixels = await pixelsOf(result.outputPath)
+      expect(pixels[0]).toBe(8192 + 9638 / 2)
+      // The frame's own constant survives outside the mask: 1000 * (frame + 1).
+      expect(pixels[7]).toBe(1000 * (result.frame + 1))
+    }
+  })
+
+  it('refuses to paint over compressed pixel data rather than corrupting it', async () => {
+    await expect(
+      anonymiseFile(path.join(fixtures, 'TestPattern_JPEG-Baseline_YBRFull.dcm'), outDir, [
+        { frame: 0, outputName: 'jpeg.dcm', instanceNumber: 1, masks: leftHalf }
+      ])
+    ).rejects.toThrow(/compressed/)
+  })
+})

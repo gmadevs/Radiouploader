@@ -30,7 +30,15 @@ export async function anonymiseStacks(
       const tasks = bySource.get(slice.path)
       // InstanceNumber follows the position in the stack, so split frames keep
       // the order the user saw even when they came from several files.
-      const task: FrameTask = { frame: slice.frame, outputName, instanceNumber: sliceIndex + 1 }
+      const task: FrameTask = {
+        frame: slice.frame,
+        outputName,
+        instanceNumber: sliceIndex + 1,
+        // Masks and window belong to the stack, so every one of its slices
+        // carries the same pair through to the file that gets written.
+        masks: stack.masks,
+        window: stack.window
+      }
       if (tasks) tasks.push(task)
       else bySource.set(slice.path, [task])
       total++

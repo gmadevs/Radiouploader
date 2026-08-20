@@ -1,4 +1,4 @@
-import type { Series, Study } from '@shared/types'
+import type { Series, Stack, Study } from '@shared/types'
 import { describeInterval } from '@shared/interval'
 import { StackCard } from './StackCard'
 
@@ -8,6 +8,8 @@ interface Props {
   onToggle: (id: string, selected: boolean) => void
   onTrim: (id: string, trimStart: number, trimEnd: number) => void
   onKeepOnePhase: (series: Series) => void
+  /** Open one stack full size, to blank burnt-in text or set the contrast. */
+  onOpen: (stack: Stack, series: Series, study: Study) => void
   onSelectAll: (series: Series, selected: boolean) => void
   /** Select or clear every stack in the import at once. */
   onSelectEverything: (selected: boolean) => void
@@ -26,6 +28,7 @@ export function ReviewStep({
   onToggle,
   onTrim,
   onKeepOnePhase,
+  onOpen,
   onSelectAll,
   onSelectEverything
 }: Props): React.JSX.Element {
@@ -42,7 +45,7 @@ export function ReviewStep({
           <h1>Choose what to upload</h1>
           <p className="muted" style={{ marginTop: 0 }}>
             Series that contain more than one acquisition have been split apart. Check the images before you continue —
-            anonymisation cannot remove identifying text burnt into the pixels.
+            anonymisation cannot remove identifying text burnt into the pixels — open a series to blank it out.
           </p>
         </div>
         <div style={{ flex: 'none', textAlign: 'right', display: 'grid', gap: 6, justifyItems: 'end' }}>
@@ -106,7 +109,13 @@ export function ReviewStep({
               </div>
               <div className="stacks">
                 {series.stacks.map((stack) => (
-                  <StackCard key={stack.id} stack={stack} onToggle={onToggle} onTrim={onTrim} />
+                  <StackCard
+                    key={stack.id}
+                    stack={stack}
+                    onToggle={onToggle}
+                    onTrim={onTrim}
+                    onOpen={() => onOpen(stack, series, study)}
+                  />
                 ))}
               </div>
             </div>

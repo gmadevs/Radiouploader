@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as dcmio from 'dicomanon'
-import type { AnonWarning } from '@shared/types'
+import { blackSamples, fillMasks, frameSamples, type PixelGeometry } from '@shared/dicomImage'
+import type { AnonWarning, MaskRect, WindowLevel } from '@shared/types'
 
 export interface AnonymisedFile {
   sourcePath: string
@@ -20,7 +21,24 @@ export interface FrameTask {
   outputName: string
   /** InstanceNumber to write, so a split run keeps the order it was shown in. */
   instanceNumber: number
+  /** Regions to blank out of the pixel data, in fractions of the image. */
+  masks?: MaskRect[]
+  /** Window to write to WindowCenter/WindowWidth; null leaves the file's own. */
+  window?: WindowLevel | null
 }
+
+/** Tags rewritten when the user picks a window in the viewer. */
+const WINDOW_TAGS = ['00281050', '00281051', '00281055', '00283010']
+
+const EXPLICIT_VR_BIG_ENDIAN = '1.2.840.10008.1.2.2'
+
+/**
+ * Transfer syntaxes whose pixel data is plain samples. Painting a mask into
+ * anything else would write over a compressed bitstream and corrupt the image,
+ * so a redaction on one of those is refused rather than attempted. The viewer
+ * cannot show a compressed image either, so it never offers the eraser for one.
+ */
+const UNCOMPRESSED_SYNTAXES = new Set(['1.2.840.10008.1.2', '1.2.840.10008.1.2.1', EXPLICIT_VR_BIG_ENDIAN])
 
 /** Warning levels below this are noise for a case uploader. */
 const WARNING_LEVEL_FLOOR = 3
@@ -39,6 +57,20 @@ function numberOf(dict: Dict, tag: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback
 }
 
+/** First value of a DS tag, which may carry several backslash-separated ones. */
+function decimalOf(dict: Dict, tag: string, fallback: number): number {
+  const raw = firstValue(dict, tag)
+  if (raw === undefined) return fallback
+  const n = Number.parseFloat(raw.split('\\')[0])
+  return Number.isFinite(n) ? n : fallback
+}
+
+/** A DS value has to fit in 16 characters, so long floats are trimmed. */
+function decimalString(value: number): string {
+  const text = String(Math.round(value * 100) / 100)
+  return text.length <= 16 ? text : value.toPrecision(9)
+}
+
 function collectWarnings(dict: Dict, sourcePath: string, frame: number): AnonWarning[] {
   const warnings: AnonWarning[] = []
   const report = dcmio.Validator(dict as never) as Record<string, { level: number; text: string }[]>
@@ -50,6 +82,21 @@ function collectWarnings(dict: Dict, sourcePath: string, frame: number): AnonWar
     }
   }
   return warnings
+}
+
+/** The window the file itself asks for, if it asks for one at all. */
+function windowOf(dict: Dict): WindowLevel | null {
+  const centre = dict['00281050'] === undefined ? null : decimalOf(dict, '00281050', Number.NaN)
+  const width = dict['00281051'] === undefined ? null : decimalOf(dict, '00281051', Number.NaN)
+  if (centre === null || width === null || !Number.isFinite(centre) || !Number.isFinite(width) || width <= 0) {
+    return null
+  }
+  return { centre, width }
+}
+
+/** Pixel data is stored as written, so masks need the file's byte order. */
+function transferSyntaxOf(message: { meta?: Dict }): string | undefined {
+  return message.meta === undefined ? undefined : firstValue(message.meta, '00020010')
 }
 
 /**
@@ -66,6 +113,11 @@ function collectWarnings(dict: Dict, sourcePath: string, frame: number): AnonWar
  * and Radiopaedia's re-run of it is a no-op — it rejects a file if any tag would
  * change.
  *
+ * Masks and the chosen window are applied here too, and for the same reason:
+ * both have to be in place before `Anonymize` runs, so the bytes written are
+ * final. A mask is painted into the stored samples — after this the burnt-in
+ * text is gone from the file, not merely hidden by a viewer.
+ *
  * The source is read and parsed once however many frames are wanted from it.
  */
 export async function anonymiseFile(
@@ -79,6 +131,7 @@ export async function anonymiseFile(
   const message = dcmio.Message.readFile(arrayBuffer)
   const dict = message.dict as unknown as Dict
 
+  const transferSyntax = transferSyntaxOf(message)
   const totalFrames = numberOf(dict, '00280008', 1)
   const pixelElement = dict['7FE00010']
   const allPixels = pixelElement?.Value?.[0] as ArrayBuffer | undefined
@@ -90,9 +143,31 @@ export async function anonymiseFile(
   const bitsAllocated = numberOf(dict, '00280100', 16)
   const frameLength = rows * columns * samples * (bitsAllocated <= 8 ? 1 : 2)
 
+  const geometry: PixelGeometry = {
+    rows,
+    columns,
+    samplesPerPixel: samples,
+    bitsAllocated,
+    signed: numberOf(dict, '00280103', 0) === 1,
+    planarConfiguration: numberOf(dict, '00280006', 0),
+    bigEndian: transferSyntax === EXPLICIT_VR_BIG_ENDIAN
+  }
+  const photometric = firstValue(dict, '00280004') ?? 'MONOCHROME2'
+  const rescale = { slope: decimalOf(dict, '00281053', 1), intercept: decimalOf(dict, '00281052', 0) }
+  const fileWindow = windowOf(dict)
+
+  // The window tags are rewritten per task, so their originals are kept to put
+  // back for a task that asked for no window of its own.
+  const originalWindow = WINDOW_TAGS.map((tag) => [tag, dict[tag]] as const)
+
   const results: AnonymisedFile[] = []
 
   for (const task of tasks) {
+    const masks = task.masks ?? []
+    if (masks.length > 0 && !UNCOMPRESSED_SYNTAXES.has(transferSyntax ?? '1.2.840.10008.1.2')) {
+      throw new Error(`Cannot redact ${path.basename(sourcePath)}: its pixel data is compressed`)
+    }
+
     if (totalFrames > 1) {
       if (!allPixels || frameLength === 0) {
         throw new Error(`Cannot split frames of ${path.basename(sourcePath)}: pixel data is not addressable`)
@@ -104,6 +179,38 @@ export async function anonymiseFile(
       pixelElement.Value = [allPixels.slice(start, start + frameLength)]
       dict['00280008'] = { vr: 'IS', Value: ['1'] }
       dict['00200013'] = { vr: 'IS', Value: [String(task.instanceNumber)] }
+    } else if (allPixels) {
+      if (masks.length > 0 && frameLength === 0) {
+        throw new Error(`Cannot redact ${path.basename(sourcePath)}: pixel data is not addressable`)
+      }
+      // Masking works on a copy, and every task re-points at one — otherwise a
+      // second task from the same file would inherit the first one's redaction.
+      pixelElement.Value = [masks.length > 0 ? allPixels.slice(0) : allPixels]
+    }
+
+    if (masks.length > 0) {
+      const bytes = new Uint8Array(pixelElement.Value[0] as ArrayBuffer)
+      const window = task.window ?? fileWindow
+      const fill = blackSamples(
+        { photometric, samplesPerPixel: samples, bitsAllocated, signed: geometry.signed, ...rescale },
+        window,
+        // Only worth a scan when nothing says which end of the range is dark.
+        window === null && samples === 1 ? frameSamples(geometry, bytes) : undefined
+      )
+      fillMasks(bytes, geometry, masks, fill)
+    }
+
+    for (const [tag, original] of originalWindow) {
+      if (original === undefined) delete dict[tag]
+      else dict[tag] = original
+    }
+    if (task.window) {
+      dict['00281050'] = { vr: 'DS', Value: [decimalString(task.window.centre)] }
+      dict['00281051'] = { vr: 'DS', Value: [decimalString(task.window.width)] }
+      // An explanation or a VOI LUT left behind would contradict, or override,
+      // the window just chosen.
+      delete dict['00281055']
+      delete dict['00283010']
     }
 
     const anonymised = dcmio.Anonymize(dict as never) as unknown as Dict

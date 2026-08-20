@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Stack } from '@shared/types'
-import { renderSlice } from '../dicomPreview'
+import type { PreviewFrame, Stack } from '@shared/types'
+import { loadFrame, paintFrame } from '../dicomPreview'
 
 interface Props {
   stack: Stack
   onToggle: (id: string, selected: boolean) => void
   onTrim: (id: string, trimStart: number, trimEnd: number) => void
+  /** Open the full-size viewer, where text can be blanked and contrast set. */
+  onOpen: (stack: Stack) => void
 }
 
 /** One stack: a scrubable preview, the trim range, and the include control. */
-export function StackCard({ stack, onToggle, onTrim }: Props): React.JSX.Element {
+export function StackCard({ stack, onToggle, onTrim, onOpen }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [frame, setFrame] = useState<PreviewFrame | null>(null)
   // Open on the middle image — the ends of a volume are rarely informative.
   const [index, setIndex] = useState(() => Math.floor(stack.slices.length / 2))
   const [error, setError] = useState<string | null>(null)
@@ -22,22 +25,32 @@ export function StackCard({ stack, onToggle, onTrim }: Props): React.JSX.Element
   const trimmed = kept < stack.slices.length
 
   useEffect(() => {
-    const canvas = canvasRef.current
     const slice = stack.slices[index]
-    if (!canvas || !slice) return
+    if (!slice) return
 
     let cancelled = false
-    renderSlice(slice.path, slice.frame, canvas)
-      .then(() => {
-        if (!cancelled) setError(null)
+    loadFrame(slice.path, slice.frame)
+      .then((loaded) => {
+        if (cancelled) return
+        setFrame(loaded)
+        setError(null)
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+        if (cancelled) return
+        setFrame(null)
+        setError(err instanceof Error ? err.message : String(err))
       })
     return () => {
       cancelled = true
     }
   }, [stack.slices, index])
+
+  // The card shows the stack as it will be uploaded, masks and window included.
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !frame) return
+    paintFrame(canvas, frame, { window: stack.window, masks: stack.masks })
+  }, [frame, stack.window, stack.masks])
 
   /** Moving a trim handle jumps the preview there, so the cut is visible. */
   const setStart = (value: number): void => {
@@ -52,6 +65,7 @@ export function StackCard({ stack, onToggle, onTrim }: Props): React.JSX.Element
   }
 
   const outsideTrim = index < stack.trimStart || index > stack.trimEnd
+  const maskCount = stack.masks?.length ?? 0
 
   return (
     <div className={stack.selected ? 'stack on' : 'stack'}>
@@ -66,6 +80,15 @@ export function StackCard({ stack, onToggle, onTrim }: Props): React.JSX.Element
           <canvas ref={canvasRef} className={outsideTrim ? 'dropped' : undefined} />
         )}
         {outsideTrim && <div className="dropped-tag">not uploaded</div>}
+        {!error && (
+          <button
+            className="small open-viewer"
+            title="Open for review — blank out burnt-in text and set the contrast"
+            onClick={() => onOpen(stack)}
+          >
+            Open for review
+          </button>
+        )}
         {stack.slices.length > 1 && (
           <input
             type="range"
@@ -136,6 +159,8 @@ export function StackCard({ stack, onToggle, onTrim }: Props): React.JSX.Element
                 {stack.slices.length} image{stack.slices.length === 1 ? '' : 's'}
               </>
             )}
+            {maskCount > 0 && <> · {maskCount} blanked</>}
+            {stack.window && <> · contrast set</>}
           </div>
         </label>
         {stack.slices.length > 2 && !showTrim && (

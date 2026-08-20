@@ -4,8 +4,13 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   UnsupportedTransferSyntaxError,
+  applyWindow,
+  blackSamples,
   decodeFrame,
+  decodeGreyFrame,
   downscale,
+  downscaleGrey,
+  fillMasks,
   frameByteLength,
   frameOffset,
   parseHeader,
@@ -241,5 +246,147 @@ describe('downscale', () => {
   it('keeps every pixel opaque', () => {
     const small = downscale(frame, 30)
     for (let i = 3; i < small.rgba.length; i += 4) expect(small.rgba[i]).toBe(255)
+  })
+})
+
+describe('fillMasks', () => {
+  /** A 4x2 frame numbered 1..8, so a blanked pixel is obvious. */
+  const counted = (header: ImageHeader): Uint8Array =>
+    bytesFor(header, Array.from({ length: 8 }, (_, i) => i + 1))
+
+  it('blanks only the pixels the rectangle covers', () => {
+    const header = synthetic({ columns: 4, rows: 2 })
+    const bytes = counted(header)
+    // The left half of the top row.
+    fillMasks(bytes, header, [{ x: 0, y: 0, width: 0.5, height: 0.5 }], [0])
+
+    const view = new DataView(bytes.buffer)
+    const values = Array.from({ length: 8 }, (_, i) => view.getUint16(i * 2, true))
+    expect(values).toEqual([0, 0, 3, 4, 5, 6, 7, 8])
+  })
+
+  it('writes the fill in the file’s byte order', () => {
+    const header = synthetic({ columns: 4, rows: 2, bigEndian: true })
+    const bytes = counted(header)
+    fillMasks(bytes, header, [{ x: 0, y: 0, width: 0.25, height: 0.5 }], [0x0102])
+    expect([bytes[0], bytes[1]]).toEqual([0x01, 0x02])
+  })
+
+  it('clamps a rectangle dragged past the edge of the image', () => {
+    const header = synthetic({ columns: 4, rows: 2 })
+    const bytes = counted(header)
+    fillMasks(bytes, header, [{ x: 0.5, y: 0.5, width: 4, height: 4 }], [0])
+
+    const view = new DataView(bytes.buffer)
+    const values = Array.from({ length: 8 }, (_, i) => view.getUint16(i * 2, true))
+    expect(values).toEqual([1, 2, 3, 4, 5, 6, 0, 0])
+  })
+
+  it('blanks all three samples of a colour image, however they are stored', () => {
+    const interleaved = synthetic({ columns: 2, rows: 1, bitsAllocated: 8, samplesPerPixel: 3 })
+    const bytes = bytesFor(interleaved, [10, 20, 30, 40, 50, 60])
+    fillMasks(bytes, interleaved, [{ x: 0, y: 0, width: 0.5, height: 1 }], [0, 128, 128])
+    expect(Array.from(bytes)).toEqual([0, 128, 128, 40, 50, 60])
+
+    const planar = synthetic({
+      columns: 2,
+      rows: 1,
+      bitsAllocated: 8,
+      samplesPerPixel: 3,
+      planarConfiguration: 1
+    })
+    const planes = bytesFor(planar, [10, 40, 20, 50, 30, 60])
+    fillMasks(planes, planar, [{ x: 0, y: 0, width: 0.5, height: 1 }], [0, 128, 128])
+    expect(Array.from(planes)).toEqual([0, 40, 128, 50, 128, 60])
+  })
+
+  it('leaves the frame alone when there is nothing to blank', () => {
+    const header = synthetic({ columns: 4, rows: 2 })
+    const bytes = counted(header)
+    fillMasks(bytes, header, [], [0])
+    fillMasks(bytes, header, [{ x: 0.5, y: 0.5, width: 0, height: 0 }], [0])
+    expect(Array.from(bytes)).toEqual(Array.from(counted(header)))
+  })
+})
+
+describe('blackSamples', () => {
+  const ct = { photometric: 'MONOCHROME2', samplesPerPixel: 1, bitsAllocated: 16, signed: false, slope: 1, intercept: -1024 }
+
+  it('takes the dark end of the window back through the rescale', () => {
+    // A soft-tissue window on a CT: black is -160 HU, stored as 864.
+    expect(blackSamples(ct, { centre: 40, width: 400 })).toEqual([864])
+  })
+
+  it('uses the bright end on MONOCHROME1, where low values are white', () => {
+    expect(blackSamples({ ...ct, photometric: 'MONOCHROME1', intercept: 0 }, { centre: 8192, width: 9638 })).toEqual([
+      13011
+    ])
+  })
+
+  it('falls back to the darkest value in the frame when no window is given', () => {
+    expect(blackSamples({ ...ct, intercept: 0 }, null, [700, 120, 3000])).toEqual([120])
+    expect(blackSamples({ ...ct, photometric: 'MONOCHROME1', intercept: 0 }, null, [700, 120, 3000])).toEqual([3000])
+  })
+
+  it('keeps chroma centred on YBR, where three zeroes are bright green', () => {
+    expect(blackSamples({ ...ct, photometric: 'YBR_FULL', samplesPerPixel: 3 }, null)).toEqual([0, 128, 128])
+    expect(blackSamples({ ...ct, photometric: 'RGB', samplesPerPixel: 3 }, null)).toEqual([0, 0, 0])
+  })
+
+  it('stays inside the range the pixels can hold', () => {
+    // A window wider than the data: both ends fall outside what a byte holds.
+    const eightBit = { ...ct, bitsAllocated: 8, intercept: 0 }
+    expect(blackSamples(eightBit, { centre: 200, width: 600 })[0]).toBe(0)
+    expect(blackSamples({ ...eightBit, photometric: 'MONOCHROME1' }, { centre: 200, width: 600 })[0]).toBe(255)
+  })
+})
+
+describe('decodeGreyFrame and applyWindow', () => {
+  const header = synthetic({ columns: 4, rows: 1, windowCentre: 500, windowWidth: 1000, intercept: -100 })
+  const bytes = bytesFor(header, [0, 500, 1000, 1100])
+
+  it('reports rescaled values and the window the file asks for', () => {
+    const frame = decodeGreyFrame(header, bytes)
+    expect(Array.from(frame.values)).toEqual([-100, 400, 900, 1000])
+    expect(frame.window).toEqual({ centre: 500, width: 1000 })
+    expect(frame.invert).toBe(false)
+  })
+
+  it('paints the same pixels the one-shot decoder does', () => {
+    const frame = decodeGreyFrame(header, bytes)
+    expect(Array.from(applyWindow(frame, frame.window).rgba)).toEqual(Array.from(decodeFrame(header, bytes).rgba))
+  })
+
+  it('rewindows without going back to the file', () => {
+    const frame = decodeGreyFrame(header, bytes)
+    // Narrowing the window around 900 drives the third pixel to white and the
+    // ones below it to black.
+    const narrow = applyWindow(frame, { centre: 900, width: 100 })
+    expect(grey(narrow, 0)).toBe(0)
+    expect(grey(narrow, 1)).toBe(0)
+    expectMidGrey(grey(narrow, 2))
+    expect(grey(narrow, 3)).toBe(255)
+  })
+
+  it('refuses a colour frame, which has no window to apply', () => {
+    const colour = synthetic({ columns: 2, rows: 1, bitsAllocated: 8, samplesPerPixel: 3 })
+    expect(() => decodeGreyFrame(colour, bytesFor(colour, [1, 2, 3, 4, 5, 6]))).toThrow(/colour/)
+  })
+})
+
+describe('downscaleGrey', () => {
+  const header = synthetic({ columns: 4, rows: 4, windowCentre: 8, windowWidth: 16 })
+  const frame = decodeGreyFrame(header, bytesFor(header, Array.from({ length: 16 }, (_, i) => i)))
+
+  it('samples down and keeps the window and inversion', () => {
+    const small = downscaleGrey(frame, 2)
+    expect([small.width, small.height]).toEqual([2, 2])
+    expect(Array.from(small.values)).toEqual([0, 2, 8, 10])
+    expect(small.window).toEqual(frame.window)
+    expect(small.invert).toBe(frame.invert)
+  })
+
+  it('leaves a frame that already fits untouched', () => {
+    expect(downscaleGrey(frame, 8)).toBe(frame)
   })
 })

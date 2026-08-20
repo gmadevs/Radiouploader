@@ -1,12 +1,15 @@
 import fs from 'node:fs/promises'
 import {
   decodeFrame,
+  decodeGreyFrame,
   downscale,
+  downscaleGrey,
   frameByteLength,
   frameOffset,
   parseHeader,
   type ImageHeader
 } from '@shared/dicomImage'
+import type { PreviewFrame } from '@shared/types'
 
 /**
  * Frame previews, decoded here rather than in the renderer.
@@ -22,7 +25,10 @@ import {
 const HEADER_PROBE_SIZES = [64 * 1024, 1024 * 1024, 16 * 1024 * 1024]
 
 /** The preview card is a couple of hundred pixels wide even at 2x. */
-const MAX_PREVIEW_EDGE = 512
+export const MAX_PREVIEW_EDGE = 512
+
+/** As large as the viewer is ever shown, so a mask can be placed precisely. */
+export const MAX_VIEWER_EDGE = 1024
 
 /** Headers are small, so caching them costs little and saves a read per frame. */
 const headers = new Map<string, ImageHeader>()
@@ -63,14 +69,12 @@ async function headerFor(filePath: string): Promise<ImageHeader> {
   throw lastError instanceof Error ? lastError : new Error('Could not read the DICOM header')
 }
 
-export interface PreviewFrame {
-  width: number
-  height: number
-  rgba: Uint8ClampedArray
-}
-
-/** Decode one frame of one file, shrunk to preview size. */
-export async function readPreviewFrame(filePath: string, frame: number): Promise<PreviewFrame> {
+/** Decode one frame of one file, shrunk to fit `maxEdge`. */
+export async function readPreviewFrame(
+  filePath: string,
+  frame: number,
+  maxEdge: number = MAX_PREVIEW_EDGE
+): Promise<PreviewFrame> {
   const header = await headerFor(filePath)
   const length = frameByteLength(header)
   const offset = frameOffset(header, frame)
@@ -79,8 +83,12 @@ export async function readPreviewFrame(filePath: string, frame: number): Promise
   try {
     const buffer = Buffer.alloc(length)
     const { bytesRead } = await handle.read(buffer, 0, length, offset)
-    const decoded = decodeFrame(header, new Uint8Array(buffer.subarray(0, bytesRead)))
-    return downscale(decoded, MAX_PREVIEW_EDGE)
+    const bytes = new Uint8Array(buffer.subarray(0, bytesRead))
+
+    if (header.samplesPerPixel > 1) {
+      return { kind: 'colour', ...downscale(decodeFrame(header, bytes), maxEdge) }
+    }
+    return { kind: 'grey', ...downscaleGrey(decodeGreyFrame(header, bytes), maxEdge) }
   } finally {
     await handle.close()
   }

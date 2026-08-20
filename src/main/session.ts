@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
-import type { AnonResult, IngestResult, Stack } from '@shared/types'
+import type { AnonResult, IngestResult, MaskRect, Stack, StackSelection, WindowLevel } from '@shared/types'
 import { cleanupTempDir } from './ingest'
 
 /**
@@ -11,6 +11,25 @@ import { cleanupTempDir } from './ingest'
  * removed when the run is reset or the app quits, so identifiable data never
  * outlives the session.
  */
+/** Keep masks inside the image and drop any that cover nothing. */
+function sanitiseMasks(masks: MaskRect[] | undefined): MaskRect[] {
+  const unit = (v: number): number => (Number.isFinite(v) ? Math.min(Math.max(v, 0), 1) : 0)
+  return (masks ?? [])
+    .map((mask) => {
+      const x = unit(mask.x)
+      const y = unit(mask.y)
+      return { x, y, width: Math.min(unit(mask.width), 1 - x), height: Math.min(unit(mask.height), 1 - y) }
+    })
+    .filter((mask) => mask.width > 0 && mask.height > 0)
+}
+
+function sanitiseWindow(window: WindowLevel | null | undefined): WindowLevel | null {
+  if (!window) return null
+  const { centre, width } = window
+  if (!Number.isFinite(centre) || !Number.isFinite(width) || width <= 0) return null
+  return { centre, width }
+}
+
 class Session {
   ingest: IngestResult | null = null
   anon: AnonResult | null = null
@@ -36,8 +55,13 @@ class Session {
       .filter((stack) => stack.slices.length > 0)
   }
 
-  /** Apply the renderer's selection and trim back onto the tree held here. */
-  applySelection(selection: { id: string; trimStart: number; trimEnd: number }[]): void {
+  /**
+   * Apply the renderer's selection, trim, masks and window back onto the tree
+   * held here. Everything is re-checked rather than trusted: these values reach
+   * the anonymiser, and a mask that lands outside the image would silently
+   * leave burnt-in text on the upload.
+   */
+  applySelection(selection: StackSelection[]): void {
     const byId = new Map(selection.map((s) => [s.id, s]))
     for (const study of this.ingest?.studies ?? []) {
       for (const series of study.series) {
@@ -49,6 +73,8 @@ class Session {
           const last = stack.slices.length - 1
           stack.trimStart = Math.min(Math.max(chosen.trimStart, 0), last)
           stack.trimEnd = Math.min(Math.max(chosen.trimEnd, stack.trimStart), last)
+          stack.masks = sanitiseMasks(chosen.masks)
+          stack.window = sanitiseWindow(chosen.window)
         }
       }
     }

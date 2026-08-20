@@ -59,6 +59,33 @@ dead ends of a series can be dropped without deselecting it. Moving either handl
 the preview to that image, and anything outside the range is dimmed and tagged. Trimmed
 images are never decoded, written out or uploaded.
 
+### Open for review: erasing burnt-in text, and contrast
+
+**Open for review** on a stack shows it full size, with a scrubber for checking every
+image. Two things can be changed there, and both are properties of the stack rather than of
+the image on screen — burnt-in text sits in the same corner of every frame of an ultrasound
+or a reconstruction, and a window that suits one slice suits the rest:
+
+- **Erase** — drag a rectangle over anything that should not be uploaded: patient banners
+  on ultrasound, annotations on reconstructions, scale text. The rectangle is drawn on
+  every image of the stack, and it is **painted into the pixel data** during anonymisation,
+  so what is uploaded really is blank. Whatever the fill needs to be is worked out per
+  image: black is the dark end of the window in force, taken back through the rescale, so a
+  redaction stays black on a CT (where 0 is soft tissue) and on MONOCHROME1 (where 0 is
+  white); on YBR colour it is luminance 0 with the chroma channels centred.
+- **Contrast** — drag on the image, or use the Level and Window sliders. The chosen window
+  is written to `WindowCenter` / `WindowWidth` (0028,1050 / 0028,1051), and any
+  `WindowCenterWidthExplanation` or `VOILUTSequence` that would contradict it is dropped.
+  The pixels themselves are untouched, so the upload keeps its original values.
+
+Both are set before `Anonymize` runs, so the bytes written are final and Radiopaedia's
+re-run of the anonymiser stays a no-op. The stack card shows what has been changed, and
+previews it the way it will be uploaded.
+
+Erasing needs decodable pixels, so it is offered only where the preview works: a compressed
+image shows the reason instead of the eraser, and a mask on one is refused at anonymisation
+rather than painted over the compressed bitstream.
+
 ---
 
 ## Multi-study cases
@@ -224,14 +251,18 @@ Neither platform is signed on CI:
 
 ## Known limitations
 
-- **Burnt-in text is not detected.** The anonymiser cannot touch pixel data, so review the
-  images in the picker before uploading. That is why the app shows previews at all.
+- **Burnt-in text is not detected.** Nothing looks for it: the anonymiser works on tags, so
+  finding text in the pixels is your job. Review the images in the picker before uploading
+  and blank anything identifying with **Open for review** — that is why the app shows
+  previews at all.
 - **Previews decode uncompressed DICOM only.** Explicit and implicit VR little endian and
   explicit VR big endian all render; JPEG, JPEG-LS, JPEG 2000, HTJ2K and RLE are named in
   the placeholder instead of being mis-rendered. Upload is unaffected — compressed files
   are still anonymised and sent, only the preview is blank. Adding them means pulling in
   the standalone `@cornerstonejs/codec-*` WASM packages, which unlike
-  `@cornerstonejs/dicom-image-loader` do not depend on `@cornerstonejs/core`.
+  `@cornerstonejs/dicom-image-loader` do not depend on `@cornerstonejs/core`. Erasing
+  burnt-in text needs the same decoder, so it is unavailable on those images too — which
+  matters most for ultrasound, where JPEG is common and burnt-in banners are the norm.
 - **Multiframe dynamic series are not split into phases.** The per-frame functional groups
   that carry the time axis are not unpacked yet.
 
