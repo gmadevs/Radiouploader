@@ -149,8 +149,10 @@ API reference. The system ids have gaps (5, 10, 13 and 14 are unused) because re
 systems keep their numbers, and modality is a closed enum: `DSA (angiography)`, not
 "Angiography", and there is no PET-CT value.
 
-**`system_id` is accepted but never applied.** It is sent exactly as the API reference
-specifies and the request returns 200, but the case is created with no system, while
+**`system_id` is accepted but never applied — and not only here.** A case uploaded through
+Radiopaedia's own OsiriX/Horos plugin arrives without a system too, so this is server-side
+rather than any client's doing. It is sent exactly as the API reference specifies and the
+request returns 200, but the case is created with no system, while
 `diagnostic_certainty_id` in the very same request is applied. All three deliveries behave identically: a JSON body, a form-encoded body, and
 query-string parameters as Radiopaedia's own OsiriX plugin sends them. The encoding is not
 the variable, so the client stays on the documented JSON contract. Neither the create
