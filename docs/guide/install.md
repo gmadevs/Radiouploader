@@ -1,5 +1,12 @@
 # Install and sign in
 
+::: danger These are alpha builds
+Every release so far is a pre-release. The app has been run on its author's machine and
+nowhere else — not on another computer, not on another operating system version, not
+against anybody else's studies. Read [known limitations](/limitations) before you point it
+at a study you care about.
+:::
+
 Radiouploader runs on macOS, Linux and Windows. Installers for all three are attached to
 each [release](https://github.com/gmadevs/Radiouploader/releases); nothing is signed yet, so
 the first launch needs one extra step:

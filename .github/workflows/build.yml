@@ -85,9 +85,34 @@ jobs:
           path: artifacts
 
       # Drafted rather than published, so the installers can be checked before
-      # anyone can download them.
+      # anyone can download them, and flagged as a pre-release so that whoever
+      # does download one is told what they are getting before they open it.
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
+          prerelease: true
           files: artifacts/**/*
           generate_release_notes: true
+          body: |
+            > ### Alpha — work in progress
+            >
+            > This build has been run on the author's machine and nowhere else. It
+            > has never been tested on another computer, on another operating system
+            > version, or against anybody else's studies. Expect it to break.
+
+            **Nothing here is signed**, so the first launch needs one extra step per
+            platform — right-click → Open on macOS, More info → Run anyway on Windows,
+            `chmod +x` on the AppImage. See
+            [Install and sign in](https://gmadevs.github.io/Radiouploader/guide/install).
+
+            **The app never tells you your images are clean.** No part of it looks at
+            pixels for burnt-in text: it reports what it did not check, never that a
+            study is safe. Look at every frame yourself before uploading, and read
+            [Known limitations](https://gmadevs.github.io/Radiouploader/limitations)
+            first — compressed multiframe runs, in particular, are known to fail.
+
+            Uploads land as **draft** cases on Radiopaedia, so nothing goes public
+            without you publishing it. Please report anything that breaks in
+            [Issues](https://github.com/gmadevs/Radiouploader/issues).
+
+            ---
