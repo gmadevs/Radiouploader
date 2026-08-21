@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { crc32 } from 'node:zlib'
 import { afterEach, describe, expect, it } from 'vitest'
 import { readInstance } from './dicom'
 import { cleanupTempDir, createTempDir, extractZip, scanFolder } from './scan'
@@ -42,18 +43,57 @@ describe('scanFolder', () => {
 })
 
 describe('extractZip', () => {
-  async function makeZip(entries: [string, Buffer][]): Promise<string> {
-    // Build the archive with the system zip so the test exercises a real file.
-    const staging = await tempDir()
+  // The archive is assembled here, byte by byte, rather than by shelling out to
+  // `zip`: Windows runners have no such binary, and the entry name is the whole
+  // point of the traversal test below, so it has to be writable directly.
+  function storedZip(entries: [string, Buffer][]): Buffer {
+    const locals: Buffer[] = []
+    const central: Buffer[] = []
+    let offset = 0
+
     for (const [name, data] of entries) {
-      const target = path.join(staging, name)
-      await fs.mkdir(path.dirname(target), { recursive: true })
-      await fs.writeFile(target, data)
+      const nameBytes = Buffer.from(name, 'utf8')
+      const crc = crc32(data)
+
+      const local = Buffer.alloc(30)
+      local.writeUInt32LE(0x04034b50, 0)
+      local.writeUInt16LE(20, 4) // version needed
+      local.writeUInt16LE(0, 8) // stored, not deflated
+      local.writeUInt32LE(crc, 14)
+      local.writeUInt32LE(data.length, 18)
+      local.writeUInt32LE(data.length, 22)
+      local.writeUInt16LE(nameBytes.length, 26)
+      locals.push(local, nameBytes, data)
+
+      const entry = Buffer.alloc(46)
+      entry.writeUInt32LE(0x02014b50, 0)
+      entry.writeUInt16LE(20, 4) // version made by
+      entry.writeUInt16LE(20, 6) // version needed
+      entry.writeUInt16LE(0, 10) // stored
+      entry.writeUInt32LE(crc, 16)
+      entry.writeUInt32LE(data.length, 20)
+      entry.writeUInt32LE(data.length, 24)
+      entry.writeUInt16LE(nameBytes.length, 28)
+      entry.writeUInt32LE(offset, 42)
+      central.push(entry, nameBytes)
+
+      offset += 30 + nameBytes.length + data.length
     }
+
+    const directory = Buffer.concat(central)
+    const end = Buffer.alloc(22)
+    end.writeUInt32LE(0x06054b50, 0)
+    end.writeUInt16LE(entries.length, 8)
+    end.writeUInt16LE(entries.length, 10)
+    end.writeUInt32LE(directory.length, 12)
+    end.writeUInt32LE(offset, 16)
+
+    return Buffer.concat([...locals, directory, end])
+  }
+
+  async function makeZip(entries: [string, Buffer][]): Promise<string> {
     const zipPath = path.join(await tempDir(), 'archive.zip')
-    const { execFile } = await import('node:child_process')
-    const { promisify } = await import('node:util')
-    await promisify(execFile)('zip', ['-r', '-q', zipPath, '.'], { cwd: staging })
+    await fs.writeFile(zipPath, storedZip(entries))
     return zipPath
   }
 
@@ -72,17 +112,9 @@ describe('extractZip', () => {
 
   it('refuses entries that would escape the destination directory', async () => {
     const dest = await tempDir()
-    // Craft a zip whose entry name walks out of the destination.
-    const staging = await tempDir()
-    await fs.writeFile(path.join(staging, 'payload'), Buffer.alloc(512))
-    const zipPath = path.join(await tempDir(), 'evil.zip')
-    const { execFile } = await import('node:child_process')
-    const { promisify } = await import('node:util')
-    await promisify(execFile)('zip', ['-q', zipPath, 'payload'], { cwd: staging })
-    // Rewrite the stored name to a traversal path of the same length.
-    const raw = await fs.readFile(zipPath)
-    const patched = Buffer.from(raw.toString('latin1').replaceAll('payload', '../evil'), 'latin1')
-    await fs.writeFile(zipPath, patched)
+    // An entry name that walks out of the destination. No archiver would write
+    // one, which is why it is written here instead.
+    const zipPath = await makeZip([['../evil', Buffer.alloc(512)]])
 
     // yauzl rejects traversal names itself; the guard in extractZip is the
     // second layer. Either one refusing is the behaviour we need.

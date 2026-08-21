@@ -40,6 +40,13 @@ signing identity that is not there and fails instead of producing an unsigned dm
 
 `GH_TOKEN` is deliberately **not** set: electron-builder would then publish a release
 itself rather than leaving the files as artifacts for the release job to attach to a draft.
+Withholding the token is not enough on its own, though — on CI with a tag present
+electron-builder tries to publish anyway and fails asking for it, after the installers have
+already been built. Each `dist:*` script therefore ends in `--publish never`.
+
+The deb carries a **maintainer** address, set in `electron-builder.yml`, because fpm refuses
+to build without one and falls back to the author's email. It is the same address the app
+shows in its problem-report dialog.
 
 ## Documentation
 

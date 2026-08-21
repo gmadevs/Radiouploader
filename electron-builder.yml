@@ -23,6 +23,10 @@ mac:
   hardenedRuntime: true
   gatekeeperAssess: false
 linux:
+  # fpm refuses to build a deb without a maintainer, and takes it from the
+  # author's email otherwise. This is the address the app already shows in its
+  # problem-report dialog; a deb published to strangers is no place for another.
+  maintainer: Giorgio Maria Agazzi <gmadeveloping+radiouploader@gmail.com>
   target:
     - target: AppImage
       arch: [x64, arm64]
