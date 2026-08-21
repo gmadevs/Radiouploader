@@ -4,8 +4,23 @@
     {
       "name": "uploader",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["electron-vite", "dev"],
+      "runtimeArgs": [
+        "electron-vite",
+        "dev"
+      ],
       "port": 5173
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vitepress",
+        "dev",
+        "docs",
+        "--port",
+        "5174"
+      ],
+      "port": 5174
     }
   ]
 }

@@ -13,7 +13,12 @@
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:win": "npm run build && electron-builder --win",
-    "smoke": "electron scripts/smoke.mjs"
+    "smoke": "electron scripts/smoke.mjs",
+    "shots": "npm run build && electron scripts/shots.mjs",
+    "sample": "node scripts/sampleStudy.mjs .sample-study",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "dicom-parser": "^1.8.21",
@@ -29,10 +34,13 @@
     "electron": "^43.4.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "mermaid": "^11.17.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17",
     "vitest": "^4.1.10"
   },
   "author": "Giorgio Maria Agazzi",

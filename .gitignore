@@ -8,3 +8,9 @@ release/
 smoke*.png
 *.tsbuildinfo
 .DS_Store
+
+# Generated for the documentation screenshots.
+.sample-study/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+docs/.vitepress/.temp/
