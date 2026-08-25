@@ -7,12 +7,17 @@ interface Props {
   label: string
   frame: PreviewFrame | null
   window: WindowLevel | null
-  /** Where the other two planes cut this one, as fractions of the image. */
-  lines?: { u: number; v: number }
+  /**
+   * Where the other two planes cut this one: the crossing point as fractions of
+   * the image, and the angle they run at once the axes have been turned.
+   */
+  lines?: { u: number; v: number; angle: number }
   /** Moving the crosshair: fractions of the image, from a click or a drag. */
   onPick?: (u: number, v: number) => void
   /** Windowing: the travel of a drag in canvas pixels. */
   onWindow?: (dx: number, dy: number, first: boolean) => void
+  /** Turning the axes: how far the arm has swept since the last move, in radians. */
+  onRotate?: (radians: number) => void
   /** The wheel over a pane moves the plane that pane shows, as at a workstation. */
   onScroll?: (steps: number) => void
   /** What the pointer does here, since it is not the same in every pane. */
@@ -36,6 +41,7 @@ export function ReformatPanel({
   lines,
   onPick,
   onWindow,
+  onRotate,
   onScroll,
   title,
   result
@@ -57,22 +63,29 @@ export function ReformatPanel({
 
       const ctx = canvas.getContext('2d')
       if (!ctx) return
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(fit.x, fit.y, fit.width, fit.height)
+      ctx.clip()
       ctx.strokeStyle = 'rgba(76, 154, 255, 0.7)'
       ctx.lineWidth = Math.max(1, canvas.width / 400)
       const x = fit.x + lines.u * fit.width
       const y = fit.y + lines.v * fit.height
-      // Broken across the middle, so the crosshair does not cover what it points at.
+      // Broken across the middle, so the crosshair does not cover what it points
+      // at, and drawn at the angle the axes have been turned to.
       const gap = Math.min(fit.width, fit.height) * 0.04
+      const reach = Math.hypot(fit.width, fit.height)
       ctx.beginPath()
-      ctx.moveTo(x, fit.y)
-      ctx.lineTo(x, y - gap)
-      ctx.moveTo(x, y + gap)
-      ctx.lineTo(x, fit.y + fit.height)
-      ctx.moveTo(fit.x, y)
-      ctx.lineTo(x - gap, y)
-      ctx.moveTo(x + gap, y)
-      ctx.lineTo(fit.x + fit.width, y)
+      for (const angle of [lines.angle, lines.angle + Math.PI / 2]) {
+        const dx = Math.cos(angle)
+        const dy = Math.sin(angle)
+        ctx.moveTo(x + dx * gap, y + dy * gap)
+        ctx.lineTo(x + dx * reach, y + dy * reach)
+        ctx.moveTo(x - dx * gap, y - dy * gap)
+        ctx.lineTo(x - dx * reach, y - dy * reach)
+      }
       ctx.stroke()
+      ctx.restore()
     }
 
     draw()
@@ -81,20 +94,52 @@ export function ReformatPanel({
     return () => observer.disconnect()
   }, [frame, window, lines])
 
-  const pick = (event: React.PointerEvent<HTMLCanvasElement>): void => {
-    const fit = fitRef.current
+  /** The pointer in canvas pixels, which is what everything here is measured in. */
+  const pointAt = (event: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } | null => {
     const canvas = canvasRef.current
-    if (!fit || !canvas || !onPick) return
+    if (!canvas) return null
     const box = canvas.getBoundingClientRect()
     const ratio = canvas.width / box.width
-    const x = (event.clientX - box.left) * ratio
-    const y = (event.clientY - box.top) * ratio
+    return { x: (event.clientX - box.left) * ratio, y: (event.clientY - box.top) * ratio }
+  }
+
+  const pick = (event: React.PointerEvent<HTMLCanvasElement>): void => {
+    const fit = fitRef.current
+    const at = pointAt(event)
+    if (!fit || !at || !onPick) return
     onPick(
-      Math.min(Math.max((x - fit.x) / fit.width, 0), 1),
-      Math.min(Math.max((y - fit.y) / fit.height, 0), 1)
+      Math.min(Math.max((at.x - fit.x) / fit.width, 0), 1),
+      Math.min(Math.max((at.y - fit.y) / fit.height, 0), 1)
     )
   }
 
+  /**
+   * Is the pointer on an arm of the crosshair rather than near its middle?
+   *
+   * The middle moves the planes and the arms turn them, which is how a
+   * workstation does it: dragging anywhere else would make it impossible to
+   * move the crosshair far without also spinning the axes.
+   */
+  const onArm = (at: { x: number; y: number }): boolean => {
+    const fit = fitRef.current
+    if (!fit || !lines || !onRotate) return false
+    const dx = at.x - (fit.x + lines.u * fit.width)
+    const dy = at.y - (fit.y + lines.v * fit.height)
+    const reach = Math.min(fit.width, fit.height)
+    if (Math.hypot(dx, dy) < reach * 0.15) return false
+    const grab = Math.max(6, reach * 0.02)
+    return [lines.angle, lines.angle + Math.PI / 2].some(
+      (angle) => Math.abs(dx * Math.sin(angle) - dy * Math.cos(angle)) < grab
+    )
+  }
+
+  const angleAt = (at: { x: number; y: number }): number => {
+    const fit = fitRef.current
+    if (!fit || !lines) return 0
+    return Math.atan2(at.y - (fit.y + lines.v * fit.height), at.x - (fit.x + lines.u * fit.width))
+  }
+
+  const turning = useRef<number | null>(null)
   const start = useRef<{ x: number; y: number } | null>(null)
   const scroll = useRef(onScroll)
   scroll.current = onScroll
@@ -108,11 +153,28 @@ export function ReformatPanel({
           event.currentTarget.setPointerCapture(event.pointerId)
           dragging.current = true
           start.current = { x: event.clientX, y: event.clientY }
+          const at = pointAt(event)
+          if (at && onRotate && onArm(at)) {
+            turning.current = angleAt(at)
+            return
+          }
+          turning.current = null
           if (onPick) pick(event)
           if (onWindow) onWindow(0, 0, true)
         }}
         onPointerMove={(event) => {
-          if (!dragging.current) return
+          const at = pointAt(event)
+          if (!dragging.current) {
+            // Say which of the two the pointer would do before it does it.
+            if (at && onRotate) event.currentTarget.style.cursor = onArm(at) ? 'grab' : 'crosshair'
+            return
+          }
+          if (turning.current !== null && at && onRotate) {
+            const angle = angleAt(at)
+            onRotate(angle - turning.current)
+            turning.current = angle
+            return
+          }
           if (onPick) pick(event)
           if (onWindow && start.current) {
             onWindow(event.clientX - start.current.x, event.clientY - start.current.y, false)
@@ -120,9 +182,11 @@ export function ReformatPanel({
         }}
         onPointerUp={() => {
           dragging.current = false
+          turning.current = null
         }}
         onPointerCancel={() => {
           dragging.current = false
+          turning.current = null
         }}
       />
       <span className="tag">{label}</span>

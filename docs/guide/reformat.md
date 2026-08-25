@@ -6,9 +6,18 @@ it into projections.
 ![A coronal MIP of the chest CT](/shots/09-reformat.png)
 
 Three panes are navigators — axial, coronal and sagittal — and the fourth is the image that
-will actually be added. **Drag the crosshair** in any navigator and the other two follow it:
-the question this view exists to answer is not what the reformat looks like but where it is
-being taken from. The wheel steps through whichever pane it is over.
+will actually be added. **Drag the middle of the crosshair** in any navigator and the other
+two follow it: the question this view exists to answer is not what the reformat looks like
+but where it is being taken from. The wheel steps through whichever pane it is over.
+
+**Drag an arm of the crosshair** and the axes turn. All three planes turn together, because
+they are one set of axes and not three separate views — that is what a crosshair at a
+workstation does, and it is how you line a plane up with something that is not lying square
+in the scanner. The pointer says which of the two it is about to do: a cross moves, a hand
+turns. **Straighten** puts the axes back on the acquisition's own.
+
+Once they are turned, the series is called **Oblique** — in the dialog and in its own
+description — because it is no longer the coronal or the sagittal that a reader means.
 
 The result pane is the one you window: **drag on it**, right to widen and down to raise the
 centre. All four panes share that window, since they are four views of one volume.
@@ -57,10 +66,11 @@ per image would make every step through the stack a different picture.
 
 ## What the planes mean
 
-They are the **acquisition's own axes**, not the patient's. On an axial study coronal and
-sagittal mean what they say. On an oblique acquisition — a tilted gantry, an angled
-shoulder — they mean "across the acquisition", which may be nothing a reader would call
-coronal. The dialog shows the result before it can be added for exactly this reason.
+Before you turn anything, they are the **acquisition's own axes**, not the patient's. On an
+axial study coronal and sagittal mean what they say. On an oblique acquisition — a tilted
+gantry, an angled shoulder — they mean "across the acquisition", which may be nothing a
+reader would call coronal. The dialog shows the result before it can be added for exactly
+this reason, and turning the axes is how you fix it.
 
 Images are built from the last slice down, so the end of the stack ends up at the top of a
 coronal or sagittal image. On a study acquired feet-first that is upside down; look before
@@ -79,6 +89,11 @@ A projection is taken at the **image planes inside the slab**, not at even steps
 maximum of interpolated samples is not a maximum of the data — a step straddling the
 brightest voxel returns the average of it and its neighbour, and a vessel comes out half as
 bright as it is.
+
+A turned plane has no image planes to read, so it is stepped at half the finest spacing
+instead: as close to the same thing as sampling can get. A turned image is also **wider than
+a straight one**, because a tilted direction crosses the volume diagonally and the picture
+has to be big enough to hold what it crosses.
 
 ## When it refuses
 

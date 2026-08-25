@@ -140,9 +140,14 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
 
   const perSlice = header.rows * header.columns
   const masks = stack.masks ?? []
+  // The lowest sample there is: air, background, whatever this modality calls
+  // nothing. An oblique plane leaves the volume halfway across the picture and
+  // this is what it finds out there.
+  let low = Infinity
   const firstSlice = first.samples.slice(0, perSlice)
   blank(firstSlice, header, masks, stack.window)
   samples.set(firstSlice, 0)
+  for (const value of firstSlice) if (value < low) low = value
 
   for (let i = 1; i < slices.length; i++) {
     const { header: other, samples: read } = await readStoredSamples(slices[i].path, slices[i].frame)
@@ -155,10 +160,18 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
       throw new VolumeError('The images in this stack are not all in the same units, so a projection of them would not be either')
     }
     samples.set(frame, i * perSlice)
+    for (const value of frame) if (value < low) low = value
   }
 
   return {
-    volume: { samples, columns: header.columns, rows: header.rows, depth: slices.length, spacing },
+    volume: {
+      samples,
+      columns: header.columns,
+      rows: header.rows,
+      depth: slices.length,
+      spacing,
+      low: Number.isFinite(low) ? low : 0
+    },
     sourcePath: slices[0].path,
     sourceFrame: slices[0].frame,
     header

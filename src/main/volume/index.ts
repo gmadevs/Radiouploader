@@ -59,14 +59,13 @@ export async function openVolume(stackId: string): Promise<VolumeInfo> {
   const built = await buildVolume(stack)
   open = { stackId, built, parent }
 
-  const size = extent(built.volume)
   return {
     columns: built.volume.columns,
     rows: built.volume.rows,
     depth: built.volume.depth,
     spacing: built.volume.spacing,
-    extent: { axial: size.z, coronal: size.y, sagittal: size.x },
-    finestSpacing: Math.min(built.volume.spacing.x, built.volume.spacing.y)
+    size: extent(built.volume),
+    finestSpacing: pixelSpacingOf(built)
   }
 }
 
@@ -105,7 +104,7 @@ export function previewReformat(request: ReformatRequestMessage, maxEdge: number
 /** How many images a plan would produce, which is what the dialog counts. */
 export function planCount(plan: ReformatPlan): number {
   if (open === null) return 0
-  return slabOffsets(open.built.volume, plan.plane, plan.spacing).length
+  return slabOffsets(open.built.volume, plan.frame, plan.spacing).length
 }
 
 /**

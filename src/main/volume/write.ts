@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as dcmio from 'dicomanon'
-import type { Plane, Projection, ReformatPlan, Series, SliceRef, WindowLevel } from '@shared/types'
+import { describePlane, type Vec3 } from '@shared/geometry'
+import type { Projection, ReformatPlan, Series, SliceRef, WindowLevel } from '@shared/types'
 import { pixelSpacingOf, type BuiltVolume } from './build'
-import { extent, reformatSlice, slabOffsets } from './reformat'
+import { imageOrigin, reformatSlice, slabOffsets } from './reformat'
 
 /**
  * Writing a reformat back out as DICOM.
@@ -29,17 +30,11 @@ const PROJECTION_WORDS: Record<Projection, string> = {
   mean: 'Mean'
 }
 
-const PLANE_WORDS: Record<Plane, string> = {
-  axial: 'Axial',
-  coronal: 'Coronal',
-  sagittal: 'Sagittal'
-}
-
 /** What the derived series is called, in the words a reader would use. */
 export function describePlan(plan: ReformatPlan): string {
   const projection = PROJECTION_WORDS[plan.projection]
   const thickness = plan.projection === 'slice' ? '' : ` ${round(plan.thickness)} mm`
-  return `${PLANE_WORDS[plan.plane]} ${projection}${thickness}`
+  return `${describePlane(plan.frame.n)} ${projection}${thickness}`
 }
 
 function round(value: number): string {
@@ -53,14 +48,21 @@ function cross(a: number[], b: number[]): number[] {
   return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 }
 
-function add(point: number[], direction: number[], distance: number): number[] {
-  return [point[0] + direction[0] * distance, point[1] + direction[1] * distance, point[2] + direction[2] * distance]
-}
-
-const decimals = (values: number[]): string => values.map((value) => String(Math.round(value * 1e6) / 1e6)).join('\\')
+/**
+ * DS values, one per element of the array rather than one string with
+ * backslashes in it. A DS value is sixteen characters at most, and an
+ * orientation written as a single string is six values long and refused.
+ */
+const decimals = (values: number[]): string[] => values.map((value) => String(Math.round(value * 1e6) / 1e6))
 
 /**
  * Where a reformatted image sits in the patient, and which way it runs.
+ *
+ * The volume's own axes are the parent's row direction, its column direction
+ * and the normal to them, so a direction in the volume's millimetre space
+ * becomes a direction in the patient's by taking it as weights on those three.
+ * That holds for any frame, which is why an oblique reformat needs no special
+ * case here.
  *
  * Without this the derived series would be a set of pictures with no geometry,
  * and anything that reads them back — this app included, on a second import —
@@ -68,7 +70,7 @@ const decimals = (values: number[]): string => values.map((value) => String(Math
  */
 function geometryFor(
   built: BuiltVolume,
-  plane: Plane,
+  plan: ReformatPlan,
   offset: number
 ): { orientation: number[]; position: number[] } | null {
   const origin = built.header.imagePosition
@@ -78,23 +80,19 @@ function geometryFor(
   const row = cosines.slice(0, 3)
   const column = cosines.slice(3, 6)
   const normal = cross(row, column)
-  const depth = extent(built.volume).z
 
-  switch (plane) {
-    case 'axial':
-      return { orientation: [...row, ...column], position: add(origin, normal, offset) }
-    // The reformat is built from the last slice down, so the image runs against
-    // the stack: its column direction is the normal reversed.
-    case 'coronal':
-      return {
-        orientation: [...row, -normal[0], -normal[1], -normal[2]],
-        position: add(add(origin, column, offset), normal, depth)
-      }
-    case 'sagittal':
-      return {
-        orientation: [...column, -normal[0], -normal[1], -normal[2]],
-        position: add(add(origin, row, offset), normal, depth)
-      }
+  /** A direction in the volume's axes, said in the patient's. */
+  const toPatient = (direction: Vec3): number[] => [
+    row[0] * direction[0] + column[0] * direction[1] + normal[0] * direction[2],
+    row[1] * direction[0] + column[1] * direction[1] + normal[1] * direction[2],
+    row[2] * direction[0] + column[2] * direction[1] + normal[2] * direction[2]
+  ]
+
+  const corner = imageOrigin(built.volume, plan.frame, offset)
+  const inPatient = toPatient(corner)
+  return {
+    orientation: [...toPatient(plan.frame.u), ...toPatient(plan.frame.v)],
+    position: [origin[0] + inPatient[0], origin[1] + inPatient[1], origin[2] + inPatient[2]]
   }
 }
 
@@ -114,7 +112,7 @@ export async function writeReformatted(
 
   const source = await fs.readFile(built.sourcePath)
   const seriesUid = uid()
-  const offsets = slabOffsets(built.volume, plan.plane, plan.spacing)
+  const offsets = slabOffsets(built.volume, plan.frame, plan.spacing)
   const label = describePlan(plan)
 
   const wide = built.header.bitsAllocated > 8
@@ -150,16 +148,16 @@ export async function writeReformatted(
     dict['7FE00010'] = { vr: wide ? 'OW' : 'OB', Value: [stored.buffer as ArrayBuffer] }
     dict['00280010'] = { vr: 'US', Value: [image.height] }
     dict['00280011'] = { vr: 'US', Value: [image.width] }
-    dict['00280030'] = { vr: 'DS', Value: [decimals([image.spacing, image.spacing])] }
+    dict['00280030'] = { vr: 'DS', Value: decimals([image.spacing, image.spacing]) }
     delete dict['00280008']
 
     dict['00180050'] = { vr: 'DS', Value: [round(plan.projection === 'slice' ? plan.spacing : plan.thickness)] }
     dict['00180088'] = { vr: 'DS', Value: [round(plan.spacing)] }
 
-    const geometry = geometryFor(built, plan.plane, offset)
+    const geometry = geometryFor(built, plan, offset)
     if (geometry) {
-      dict['00200037'] = { vr: 'DS', Value: [decimals(geometry.orientation)] }
-      dict['00200032'] = { vr: 'DS', Value: [decimals(geometry.position)] }
+      dict['00200037'] = { vr: 'DS', Value: decimals(geometry.orientation) }
+      dict['00200032'] = { vr: 'DS', Value: decimals(geometry.position) }
     } else {
       delete dict['00200037']
       delete dict['00200032']

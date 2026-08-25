@@ -6,7 +6,7 @@ import type { Volume } from './reformat'
 function brain(): Volume {
   const samples = new Float32Array(4096)
   for (let i = 0; i < samples.length; i++) samples[i] = i < 1000 ? 0 : Math.round(((i - 1000) / 3096) * 1000)
-  return { samples, columns: 16, rows: 16, depth: 16, spacing: { x: 1, y: 1, z: 1 } }
+  return { samples, columns: 16, rows: 16, depth: 16, spacing: { x: 1, y: 1, z: 1 }, low: 0 }
 }
 
 const plain = { slope: 1, intercept: 0 }
@@ -40,14 +40,14 @@ describe('defaultWindow', () => {
     // A CT stores Hounsfield units through a rescale; a window is in those units
     // and has to be compared against rescaled values, not stored ones.
     const air = new Float32Array(4096).fill(0)
-    const volume: Volume = { samples: air, columns: 16, rows: 16, depth: 16, spacing: { x: 1, y: 1, z: 1 } }
+    const volume: Volume = { samples: air, columns: 16, rows: 16, depth: 16, spacing: { x: 1, y: 1, z: 1 }, low: 0 }
     const window = defaultWindow(volume, { slope: 1, intercept: -1024, windowCentre: -600, windowWidth: 1500 }, null)
     expect(window).toEqual({ centre: -600, width: 1500 })
   })
 
   it('does not divide by nothing on a volume of one value', () => {
     const flat = new Float32Array(64).fill(7)
-    const volume: Volume = { samples: flat, columns: 4, rows: 4, depth: 4, spacing: { x: 1, y: 1, z: 1 } }
+    const volume: Volume = { samples: flat, columns: 4, rows: 4, depth: 4, spacing: { x: 1, y: 1, z: 1 }, low: 7 }
     expect(defaultWindow(volume, { ...plain, windowCentre: null, windowWidth: null }, null).width).toBeGreaterThan(0)
   })
 })

@@ -135,9 +135,21 @@ export type Plane = 'axial' | 'coronal' | 'sagittal'
 /** What a slab of the volume collapses to. `slice` takes one plane and no more. */
 export type Projection = 'slice' | 'mip' | 'minip' | 'mean'
 
+/**
+ * The plane a reformat is taken on: across, down, and the way it looks, as unit
+ * vectors in the volume's own millimetre space. Any orientation, not only the
+ * three anatomical ones — rotating them is what makes this an MPR rather than
+ * three fixed views.
+ */
+export interface ReformatFrame {
+  u: [number, number, number]
+  v: [number, number, number]
+  n: [number, number, number]
+}
+
 /** A reformat to build, as the dialog describes it. */
 export interface ReformatPlan {
-  plane: Plane
+  frame: ReformatFrame
   projection: Projection
   /** Slab thickness in millimetres; ignored for a plain slice. */
   thickness: number
@@ -161,8 +173,8 @@ export interface VolumeInfo {
   rows: number
   depth: number
   spacing: { x: number; y: number; z: number }
-  /** How far each plane's normal runs, in millimetres. */
-  extent: Record<Plane, number>
+  /** How far the volume runs along each of its own axes, in millimetres. */
+  size: { x: number; y: number; z: number }
   /** The in-plane pixel size, which is the finest a reformat is worth asking for. */
   finestSpacing: number
 }

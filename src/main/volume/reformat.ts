@@ -1,5 +1,7 @@
+import { AXES, boxRange, dot, isAxisAligned, type Frame, type Vec3 } from '@shared/geometry'
+
 /**
- * Reformatting a stack along another plane, and projecting slabs of it.
+ * Reformatting a stack along any plane, and projecting slabs of it.
  *
  * All of it works on stored sample values rather than rescaled ones. Maximum,
  * minimum and mean all commute with a linear rescale, so a slab projected here
@@ -7,25 +9,11 @@
  * the derived instance keep its parent's RescaleSlope and RescaleIntercept and
  * stay in Hounsfield units without a conversion pass over the whole volume.
  *
- * The volume is indexed in its own axes, not the patient's: `z` is the order
- * the slices were sorted into, `x` and `y` are the image's own columns and
- * rows. For an axial acquisition that makes coronal and sagittal mean what they
- * say. For an oblique one they mean "across the acquisition", which is why the
- * user sees the result before it can be added to a case.
+ * A plane is a frame — across, down, and the way it looks — in the volume's own
+ * millimetre space. The three anatomical planes are three particular frames and
+ * have no special case here: an oblique one is sampled exactly the same way,
+ * which is what makes rotating them cost nothing.
  */
-
-import type { Plane, ReformatRequestMessage } from '@shared/types'
-
-export type { Plane }
-
-/**
- * One image to build. `spacing` here is the size of a pixel in the result, not
- * the gap between one result and the next — the two were one number once, and
- * asking for images 10 mm apart quietly produced images with 10 mm pixels.
- */
-export interface ReformatRequest extends ReformatRequestMessage {
-  pixelSpacing: number
-}
 
 export interface Volume {
   /** Stored samples, slice by slice: index (z * rows + y) * columns + x. */
@@ -35,6 +23,21 @@ export interface Volume {
   depth: number
   /** Millimetres between neighbouring columns, rows and slices. */
   spacing: { x: number; y: number; z: number }
+  /** The lowest sample in the volume, which is what lies outside it. */
+  low: number
+}
+
+export type Projection = 'slice' | 'mip' | 'minip' | 'mean'
+
+export interface ReformatRequest {
+  frame: Frame
+  projection: Projection
+  /** Slab thickness in millimetres. Anything under one sample is one sample. */
+  thickness: number
+  /** Where the slab sits along the frame's normal, in mm from the volume's near edge. */
+  offset: number
+  /** Millimetres per pixel of the result, the same in both directions. */
+  pixelSpacing: number
 }
 
 export interface ReformatSlice {
@@ -45,7 +48,7 @@ export interface ReformatSlice {
   spacing: number
 }
 
-/** The volume's extent along each axis, in millimetres. */
+/** The volume's extent along each of its own axes, in millimetres. */
 export function extent(volume: Volume): { x: number; y: number; z: number } {
   return {
     x: Math.max(volume.columns - 1, 0) * volume.spacing.x,
@@ -54,45 +57,37 @@ export function extent(volume: Volume): { x: number; y: number; z: number } {
   }
 }
 
+/** How far the volume runs in one direction, in millimetres. */
+export function range(volume: Volume, direction: Vec3): { min: number; max: number } {
+  return boxRange(extent(volume), direction)
+}
+
+/** How thick the volume is along a frame's normal, in millimetres. */
+export function normalExtent(volume: Volume, frame: Frame): number {
+  const { min, max } = range(volume, frame.n)
+  return max - min
+}
+
 /**
- * How far a plane's normal runs, and how the image is laid out on it.
+ * One sample of the volume, linear between the eight neighbours around it.
  *
- * `v` points the way a reader expects: slices are sorted towards the head, so a
- * coronal or sagittal image is built from the last slice down and the head ends
- * up at the top rather than the bottom.
+ * Outside the volume it returns the volume's own floor rather than the nearest
+ * edge value: an oblique plane leaves the box halfway across the picture, and
+ * clamping would smear the last row of voxels across everything beyond it.
  */
-function axes(plane: Plane): { u: 'x' | 'y' | 'z'; v: 'x' | 'y' | 'z'; n: 'x' | 'y' | 'z'; flipV: boolean } {
-  switch (plane) {
-    case 'axial':
-      return { u: 'x', v: 'y', n: 'z', flipV: false }
-    case 'coronal':
-      return { u: 'x', v: 'z', n: 'y', flipV: true }
-    case 'sagittal':
-      return { u: 'y', v: 'z', n: 'x', flipV: true }
-  }
-}
-
-/** How thick the volume is along a plane's normal, in millimetres. */
-export function normalExtent(volume: Volume, plane: Plane): number {
-  return extent(volume)[axes(plane).n]
-}
-
-/** One sample of the volume, linear between the eight neighbours around it. */
 export function sampleAt(volume: Volume, x: number, y: number, z: number): number {
   const { columns, rows, depth, samples } = volume
-  const cx = Math.min(Math.max(x, 0), columns - 1)
-  const cy = Math.min(Math.max(y, 0), rows - 1)
-  const cz = Math.min(Math.max(z, 0), depth - 1)
+  if (x < 0 || y < 0 || z < 0 || x > columns - 1 || y > rows - 1 || z > depth - 1) return volume.low
 
-  const x0 = Math.floor(cx)
-  const y0 = Math.floor(cy)
-  const z0 = Math.floor(cz)
+  const x0 = Math.floor(x)
+  const y0 = Math.floor(y)
+  const z0 = Math.floor(z)
   const x1 = Math.min(x0 + 1, columns - 1)
   const y1 = Math.min(y0 + 1, rows - 1)
   const z1 = Math.min(z0 + 1, depth - 1)
-  const fx = cx - x0
-  const fy = cy - y0
-  const fz = cz - z0
+  const fx = x - x0
+  const fy = y - y0
+  const fz = z - z0
 
   const at = (xi: number, yi: number, zi: number): number => samples[(zi * rows + yi) * columns + xi]
 
@@ -107,6 +102,35 @@ export function sampleAt(volume: Volume, x: number, y: number, z: number): numbe
 }
 
 /**
+ * Where a slab is read, in millimetres along the normal from the slab's centre.
+ *
+ * On one of the volume's own axes those are the voxel planes themselves, which
+ * makes a maximum a maximum of the data. A maximum of interpolated samples is
+ * not: a step straddling the brightest voxel returns the average of it and its
+ * neighbour, and a vessel comes out half as bright as it is. An oblique plane
+ * has no voxel planes to read, so it is stepped at half the finest spacing —
+ * as close to the same thing as sampling can get.
+ */
+function slabSteps(volume: Volume, frame: Frame, centre: number, thickness: number): number[] {
+  const half = Math.max(thickness, 0) / 2
+  if (half <= 0) return [centre]
+
+  if (isAxisAligned(frame.n)) {
+    const axis = (['x', 'y', 'z'] as const).find((name) => Math.abs(Math.abs(dot(frame.n, AXES[name])) - 1) < 1e-9)
+    const step = axis === undefined ? 0 : volume.spacing[axis]
+    if (step > 0) {
+      const first = Math.ceil((centre - half) / step - 1e-6)
+      const last = Math.floor((centre + half) / step + 1e-6)
+      if (last >= first) return Array.from({ length: last - first + 1 }, (_, i) => (first + i) * step)
+    }
+  }
+
+  const fine = Math.min(volume.spacing.x, volume.spacing.y, volume.spacing.z) / 2
+  const count = Math.max(1, Math.round((half * 2) / fine) + 1)
+  return Array.from({ length: count }, (_, i) => centre - half + (i * half * 2) / Math.max(count - 1, 1))
+}
+
+/**
  * Build one reformatted image.
  *
  * The output grid is isotropic whatever the volume's spacing was: a CT at 0.7 mm
@@ -114,47 +138,35 @@ export function sampleAt(volume: Volume, x: number, y: number, z: number): numbe
  * whole point of doing this rather than looking at the stack sideways.
  */
 export function reformatSlice(volume: Volume, request: ReformatRequest): ReformatSlice {
-  const { u, v, n, flipV } = axes(request.plane)
-  const size = extent(volume)
+  const { frame } = request
   const spacing = Math.max(request.pixelSpacing, 0.01)
 
-  const width = Math.max(2, Math.round(size[u] / spacing) + 1)
-  const height = Math.max(2, Math.round(size[v] / spacing) + 1)
+  const across = range(volume, frame.u)
+  const down = range(volume, frame.v)
+  const through = range(volume, frame.n)
 
-  /**
-   * The slab is read at the voxel planes inside it rather than at even steps
-   * along it. A maximum taken from interpolated samples is not a maximum of the
-   * data: a step that straddles the brightest voxel returns the average of it
-   * and its neighbour, and a vessel comes out half as bright as it is.
-   *
-   * A plain slice is the exception and is read where it was asked for, between
-   * two planes if that is where it falls — there is nothing to lose by
-   * interpolating one image.
-   */
-  const centre = request.offset / volume.spacing[n]
-  const half = Math.max(request.thickness, 0) / 2 / volume.spacing[n]
-  const first = Math.max(Math.ceil(centre - half - 1e-6), 0)
-  const last = Math.min(Math.floor(centre + half + 1e-6), size[n] / volume.spacing[n])
-  const planes: number[] =
-    request.projection === 'slice' || last < first
-      ? [centre]
-      : Array.from({ length: last - first + 1 }, (_, i) => first + i)
-  const count = planes.length
+  const width = Math.max(2, Math.round((across.max - across.min) / spacing) + 1)
+  const height = Math.max(2, Math.round((down.max - down.min) / spacing) + 1)
+
+  const centre = through.min + request.offset
+  const steps = request.projection === 'slice' ? [centre] : slabSteps(volume, frame, centre, request.thickness)
+  const count = steps.length
 
   const samples = new Float32Array(width * height)
-  const position: Record<'x' | 'y' | 'z', number> = { x: 0, y: 0, z: 0 }
+  const { x: dx, y: dy, z: dz } = volume.spacing
 
   for (let iv = 0; iv < height; iv++) {
-    const vMm = flipV ? size[v] - iv * spacing : iv * spacing
+    const v = down.min + iv * spacing
     for (let iu = 0; iu < width; iu++) {
-      const uMm = iu * spacing
+      const u = across.min + iu * spacing
 
       let value = request.projection === 'minip' ? Infinity : request.projection === 'mip' ? -Infinity : 0
-      for (const plane of planes) {
-        position[u] = uMm / volume.spacing[u]
-        position[v] = vMm / volume.spacing[v]
-        position[n] = plane
-        const sample = sampleAt(volume, position.x, position.y, position.z)
+      for (const n of steps) {
+        // p = u·U + v·V + n·N, in the volume's millimetres, then into voxels.
+        const px = (u * frame.u[0] + v * frame.v[0] + n * frame.n[0]) / dx
+        const py = (u * frame.u[1] + v * frame.v[1] + n * frame.n[1]) / dy
+        const pz = (u * frame.u[2] + v * frame.v[2] + n * frame.n[2]) / dz
+        const sample = sampleAt(volume, px, py, pz)
 
         if (request.projection === 'mip') value = Math.max(value, sample)
         else if (request.projection === 'minip') value = Math.min(value, sample)
@@ -169,9 +181,22 @@ export function reformatSlice(volume: Volume, request: ReformatRequest): Reforma
   return { samples, width, height, spacing }
 }
 
+/** Where the first pixel of such an image sits, in the volume's millimetres. */
+export function imageOrigin(volume: Volume, frame: Frame, offset: number): Vec3 {
+  const across = range(volume, frame.u)
+  const down = range(volume, frame.v)
+  const through = range(volume, frame.n)
+  const n = through.min + offset
+  return [
+    across.min * frame.u[0] + down.min * frame.v[0] + n * frame.n[0],
+    across.min * frame.u[1] + down.min * frame.v[1] + n * frame.n[1],
+    across.min * frame.u[2] + down.min * frame.v[2] + n * frame.n[2]
+  ]
+}
+
 /** Where each image of a reformatted series sits along the normal, in mm. */
-export function slabOffsets(volume: Volume, plane: Plane, spacing: number): number[] {
-  const span = normalExtent(volume, plane)
+export function slabOffsets(volume: Volume, frame: Frame, spacing: number): number[] {
+  const span = normalExtent(volume, frame)
   const step = Math.max(spacing, 0.01)
   const count = Math.max(1, Math.floor(span / step) + 1)
   // Centred on the volume, so the images that get dropped are at both ends

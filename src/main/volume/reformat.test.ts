@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { extent, normalExtent, reformatSlice, sampleAt, slabOffsets, type Volume } from './reformat'
+import { AXES, negate, normalise, rotate, type Frame } from '@shared/geometry'
+import { extent, imageOrigin, normalExtent, reformatSlice, sampleAt, slabOffsets, type Volume } from './reformat'
+
+/** The three anatomical frames, which are three particular bases and no more. */
+const FRAMES: Record<'axial' | 'coronal' | 'sagittal', Frame> = {
+  axial: { u: AXES.x, v: AXES.y, n: AXES.z },
+  coronal: { u: AXES.x, v: negate(AXES.z), n: AXES.y },
+  sagittal: { u: AXES.y, v: negate(AXES.z), n: negate(AXES.x) }
+}
 
 /**
  * A volume whose value is its own z index, so a reformat can be checked by
@@ -10,15 +18,14 @@ function ramp(columns = 4, rows = 4, depth = 5, spacing = { x: 1, y: 1, z: 1 }):
   for (let z = 0; z < depth; z++) {
     for (let i = 0; i < rows * columns; i++) samples[z * rows * columns + i] = z
   }
-  return { samples, columns, rows, depth, spacing }
+  return { samples, columns, rows, depth, spacing, low: 0 }
 }
 
 /** A volume that is zero everywhere except one bright voxel. */
 function speck(at: { x: number; y: number; z: number }, value = 100): Volume {
-  const volume = ramp(8, 8, 8)
   const samples = new Float32Array(8 * 8 * 8)
   samples[(at.z * 8 + at.y) * 8 + at.x] = value
-  return { ...volume, samples }
+  return { samples, columns: 8, rows: 8, depth: 8, spacing: { x: 1, y: 1, z: 1 }, low: Math.min(0, value) }
 }
 
 describe('sampleAt', () => {
@@ -31,53 +38,47 @@ describe('sampleAt', () => {
     expect(sampleAt(ramp(), 0, 0, 2.25)).toBeCloseTo(2.25)
   })
 
-  it('clamps outside the volume instead of reading past the end', () => {
-    expect(sampleAt(ramp(), -5, -5, -5)).toBe(0)
-    expect(sampleAt(ramp(), 99, 99, 99)).toBe(4)
+  it('returns the floor outside the volume, not the nearest edge', () => {
+    // An oblique plane leaves the box halfway across the picture. Clamping
+    // would smear the last row of voxels across everything beyond it.
+    const volume = ramp()
+    expect(sampleAt(volume, -0.5, 0, 0)).toBe(volume.low)
+    expect(sampleAt(volume, 0, 0, 99)).toBe(volume.low)
   })
 })
 
 describe('extent', () => {
   it('measures the gaps, not the voxels', () => {
-    // Five slices 2 mm apart span 8 mm from the first centre to the last.
     expect(extent(ramp(4, 4, 5, { x: 1, y: 1, z: 2 }))).toEqual({ x: 3, y: 3, z: 8 })
   })
 
-  it('knows which axis a plane looks along', () => {
+  it('knows which way a frame looks', () => {
     const volume = ramp(4, 4, 5, { x: 1, y: 1, z: 2 })
-    expect(normalExtent(volume, 'axial')).toBe(8)
-    expect(normalExtent(volume, 'coronal')).toBe(3)
-    expect(normalExtent(volume, 'sagittal')).toBe(3)
+    expect(normalExtent(volume, FRAMES.axial)).toBe(8)
+    expect(normalExtent(volume, FRAMES.coronal)).toBe(3)
+    expect(normalExtent(volume, FRAMES.sagittal)).toBe(3)
+  })
+
+  it('measures the diagonal a tilted frame crosses', () => {
+    const volume = ramp(4, 4, 4, { x: 1, y: 1, z: 1 })
+    const tilted = { ...FRAMES.axial, n: normalise([0, 1, 1]) }
+    expect(normalExtent(volume, tilted)).toBeCloseTo(6 / Math.SQRT2)
   })
 })
 
 describe('reformatSlice', () => {
+  const request = { projection: 'slice' as const, thickness: 0, offset: 1.5, pixelSpacing: 1 }
+
   it('gives an isotropic grid whatever the slice spacing was', () => {
     // 4 columns 1 mm apart, 5 slices 5 mm apart: 3 mm across and 20 mm deep.
-    const volume = ramp(4, 4, 5, { x: 1, y: 1, z: 5 })
-    const image = reformatSlice(volume, {
-      plane: 'coronal',
-      projection: 'slice',
-      thickness: 0,
-      offset: 1.5,
-      spacing: 1,
-      pixelSpacing: 1
-    })
+    const image = reformatSlice(ramp(4, 4, 5, { x: 1, y: 1, z: 5 }), { ...request, frame: FRAMES.coronal })
     expect(image.width).toBe(4)
     expect(image.height).toBe(21)
     expect(image.spacing).toBe(1)
   })
 
   it('puts the last slice at the top of a coronal image', () => {
-    // Slices are sorted towards the head, so the head belongs at the top.
-    const image = reformatSlice(ramp(4, 4, 5), {
-      plane: 'coronal',
-      projection: 'slice',
-      thickness: 0,
-      offset: 1.5,
-      spacing: 1,
-      pixelSpacing: 1
-    })
+    const image = reformatSlice(ramp(4, 4, 5), { ...request, frame: FRAMES.coronal })
     expect(image.samples[0]).toBeCloseTo(4)
     expect(image.samples[image.samples.length - 1]).toBeCloseTo(0)
   })
@@ -85,54 +86,98 @@ describe('reformatSlice', () => {
   it('takes the brightest sample of the slab for a MIP', () => {
     const volume = speck({ x: 4, y: 4, z: 4 })
     const flat = reformatSlice(volume, {
-      plane: 'axial',
+      frame: FRAMES.axial,
       projection: 'mip',
       thickness: 8,
       offset: 3.5,
-      spacing: 1,
       pixelSpacing: 1
     })
-    // The bright voxel is inside the slab, so the ray through it finds it even
-    // though the slab is centred half a millimetre away.
     expect(Math.max(...flat.samples)).toBeCloseTo(100)
-    // And nothing else is lit.
     expect(flat.samples.filter((v) => v > 1)).toHaveLength(1)
   })
 
   it('takes the darkest for a MinIP, which is the point of one', () => {
     const volume = speck({ x: 4, y: 4, z: 4 }, -100)
-    const flat = reformatSlice(volume, { plane: 'axial', projection: 'minip', thickness: 8, offset: 3.5, spacing: 1, pixelSpacing: 1 })
+    const flat = reformatSlice(volume, {
+      frame: FRAMES.axial,
+      projection: 'minip',
+      thickness: 8,
+      offset: 3.5,
+      pixelSpacing: 1
+    })
     expect(Math.min(...flat.samples)).toBeCloseTo(-100)
   })
 
   it('averages the slab for a mean, so one bright voxel is diluted', () => {
     const volume = speck({ x: 4, y: 4, z: 4 })
-    const flat = reformatSlice(volume, { plane: 'axial', projection: 'mean', thickness: 8, offset: 3.5, spacing: 1, pixelSpacing: 1 })
+    const flat = reformatSlice(volume, {
+      frame: FRAMES.axial,
+      projection: 'mean',
+      thickness: 8,
+      offset: 3.5,
+      pixelSpacing: 1
+    })
     const brightest = Math.max(...flat.samples)
     expect(brightest).toBeGreaterThan(0)
     expect(brightest).toBeLessThan(100)
   })
 
   it('reads one sample for a plain slice, whatever the thickness says', () => {
-    const volume = ramp(4, 4, 5)
-    const image = reformatSlice(volume, { plane: 'axial', projection: 'slice', thickness: 20, offset: 2, spacing: 1, pixelSpacing: 1 })
+    const image = reformatSlice(ramp(4, 4, 5), { ...request, frame: FRAMES.axial, thickness: 20, offset: 2 })
     for (const value of image.samples) expect(value).toBeCloseTo(2)
+  })
+
+  it('finds a bright spot through a tilted slab as well as a straight one', () => {
+    // The reason the oblique case is stepped finely rather than at the voxel
+    // planes it does not have: a MIP that misses the peak is not a MIP.
+    //
+    // A block rather than a single voxel, because a tilted grid lands between
+    // voxels by definition — interpolating a one-voxel spike is always a
+    // fraction of it, however finely the slab is stepped.
+    const volume = speck({ x: 4, y: 4, z: 4 })
+    const bright = volume.samples as Float32Array
+    for (const z of [4, 5]) for (const y of [4, 5]) for (const x of [4, 5]) bright[(z * 8 + y) * 8 + x] = 100
+    const tilted: Frame = {
+      u: rotate(AXES.x, AXES.y, 0.3),
+      v: AXES.y,
+      n: rotate(AXES.z, AXES.y, 0.3)
+    }
+    const flat = reformatSlice(volume, { frame: tilted, projection: 'mip', thickness: 6, offset: 3.5, pixelSpacing: 1 })
+    expect(Math.max(...flat.samples)).toBeGreaterThan(90)
+  })
+
+  it('holds a tilted image to the same isotropic grid', () => {
+    const volume = ramp(8, 8, 8)
+    const tilted: Frame = { u: rotate(AXES.x, AXES.z, 0.4), v: rotate(AXES.y, AXES.z, 0.4), n: AXES.z }
+    const image = reformatSlice(volume, { ...request, frame: tilted })
+    // The diagonal of a 7 mm square is about 9.9 mm, so the image grows to hold it.
+    expect(image.width).toBeGreaterThan(8)
+    expect(image.spacing).toBe(1)
+  })
+})
+
+describe('imageOrigin', () => {
+  it('starts an axial image at the volume’s own corner', () => {
+    expect(imageOrigin(ramp(4, 4, 5), FRAMES.axial, 2)).toEqual([0, 0, 2])
+  })
+
+  it('starts a coronal image at the far end, because it is built downwards', () => {
+    const origin = imageOrigin(ramp(4, 4, 5), FRAMES.coronal, 1)
+    expect(origin[1]).toBeCloseTo(1)
+    expect(origin[2]).toBeCloseTo(4)
   })
 })
 
 describe('slabOffsets', () => {
   it('covers the volume at the spacing asked for', () => {
-    const volume = ramp(4, 4, 11, { x: 1, y: 1, z: 1 })
-    expect(slabOffsets(volume, 'axial', 2)).toEqual([0, 2, 4, 6, 8, 10])
+    expect(slabOffsets(ramp(4, 4, 11), FRAMES.axial, 2)).toEqual([0, 2, 4, 6, 8, 10])
   })
 
   it('centres what it cannot divide evenly, so both ends lose the same', () => {
-    const volume = ramp(4, 4, 11, { x: 1, y: 1, z: 1 })
-    const offsets = slabOffsets(volume, 'axial', 3)
-    expect(offsets).toEqual([0.5, 3.5, 6.5, 9.5])
+    expect(slabOffsets(ramp(4, 4, 11), FRAMES.axial, 3)).toEqual([0.5, 3.5, 6.5, 9.5])
   })
 
   it('gives one image for a volume thinner than the spacing', () => {
-    expect(slabOffsets(ramp(4, 4, 2, { x: 1, y: 1, z: 1 }), 'axial', 10)).toHaveLength(1)
+    expect(slabOffsets(ramp(4, 4, 2), FRAMES.axial, 10)).toHaveLength(1)
   })
 })
