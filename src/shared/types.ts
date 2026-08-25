@@ -177,6 +177,15 @@ export interface VolumeInfo {
   size: { x: number; y: number; z: number }
   /** The in-plane pixel size, which is the finest a reformat is worth asking for. */
   finestSpacing: number
+  /**
+   * The three planes to start from, in the volume's own axes. Worked out from
+   * ImageOrientationPatient, so they are the patient's planes and not the
+   * acquisition's — on a sagittally acquired brain study those are not the same
+   * thing, and the difference is the whole point of computing them.
+   */
+  frames: Record<Plane, ReformatFrame>
+  /** False when the file did not say where it was pointing and these are a guess. */
+  anatomical: boolean
 }
 
 /** Which build this is, for the home screen and for bug reports. */

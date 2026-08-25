@@ -55,15 +55,15 @@ than being discovered during anonymisation, where the failure is per file and us
 the whole series out of the case behind "N file(s) could not be anonymised". Exporting the
 run uncompressed from the PACS is the way to publish it.
 
-## A reformat is flat, and starts on the acquisition's axes
+## A reformat is flat
 
-[Reformat](/guide/reformat) opens on the axes of the acquisition rather than of the patient.
-On an axial study they are the same thing; on an oblique one — a tilted gantry, an angled
-shoulder — "coronal" means across the acquisition until you turn the crosshair to fix it,
-and a turned plane is called Oblique from then on.
+[Reformat](/guide/reformat) opens on the patient's own planes, worked out from
+`ImageOrientationPatient`, and the crosshair turns them from there. What there is no way to
+do is **curve** one: a reformat along the length of a vessel or a nerve root needs a path
+drawn in the image and a different piece of machinery behind it.
 
-What there is no way to do is **curve** it. A reformat along the length of a vessel or a
-nerve root needs a path drawn in the image and a different piece of machinery behind it.
+Files that do not carry `ImageOrientationPatient` fall back to the acquisition's own axes,
+which on anything but an axial study is a guess. The dialog says when it has had to.
 
 ## Multiframe dynamic series are not split into phases
 

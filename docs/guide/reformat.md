@@ -66,11 +66,16 @@ per image would make every step through the stack a different picture.
 
 ## What the planes mean
 
-Before you turn anything, they are the **acquisition's own axes**, not the patient's. On an
-axial study coronal and sagittal mean what they say. On an oblique acquisition — a tilted
-gantry, an angled shoulder — they mean "across the acquisition", which may be nothing a
-reader would call coronal. The dialog shows the result before it can be added for exactly
-this reason, and turning the axes is how you fix it.
+They are the **patient's**, not the array's. `ImageOrientationPatient` says which way the
+rows and columns of the images point, and the three planes are worked out from it — so a
+brain FLAIR acquired sagittally opens with a real axial in the axial pane, even though the
+plane of its own images is the sagittal one.
+
+That only works when the files say where they were pointing. When they do not, the planes
+fall back to the acquisition's own axes and the dialog says so in the line above the button.
+
+A **tilted gantry or an angled shoulder** is a different matter: the planes are right, but
+the anatomy in them is not square, and that is what turning the crosshair is for.
 
 Images are built from the last slice down, so the end of the stack ends up at the top of a
 coronal or sagittal image. On a study acquired feet-first that is upside down; look before

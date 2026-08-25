@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as dcmio from 'dicomanon'
 import { describePlane, type Vec3 } from '@shared/geometry'
+import { toPatient } from './orientation'
 import type { Projection, ReformatPlan, Series, SliceRef, WindowLevel } from '@shared/types'
 import { pixelSpacingOf, type BuiltVolume } from './build'
 import { imageOrigin, reformatSlice, slabOffsets } from './reformat'
@@ -30,11 +31,19 @@ const PROJECTION_WORDS: Record<Projection, string> = {
   mean: 'Mean'
 }
 
-/** What the derived series is called, in the words a reader would use. */
-export function describePlan(plan: ReformatPlan): string {
+/**
+ * What the derived series is called, in the words a reader would use.
+ *
+ * The plane is named in the patient's axes, not the volume's. A sagittally
+ * acquired brain study has its axial plane across two of the volume's axes at
+ * once, and calling that "Oblique" would be true of the array and false of the
+ * anatomy.
+ */
+export function describePlan(built: BuiltVolume, plan: ReformatPlan): string {
   const projection = PROJECTION_WORDS[plan.projection]
   const thickness = plan.projection === 'slice' ? '' : ` ${round(plan.thickness)} mm`
-  return `${describePlane(plan.frame.n)} ${projection}${thickness}`
+  const normal = toPatient(built.header, plan.frame.n)
+  return `${normal === null ? 'Reformat' : describePlane(normal)} ${projection}${thickness}`
 }
 
 function round(value: number): string {
@@ -113,7 +122,7 @@ export async function writeReformatted(
   const source = await fs.readFile(built.sourcePath)
   const seriesUid = uid()
   const offsets = slabOffsets(built.volume, plan.frame, plan.spacing)
-  const label = describePlan(plan)
+  const label = describePlan(built, plan)
 
   const wide = built.header.bitsAllocated > 8
   const low = wide ? (built.header.signed ? -32768 : 0) : 0

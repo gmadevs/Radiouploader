@@ -1,17 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  AXES,
-  boxRange,
-  cross,
-  describePlane,
-  dot,
-  negate,
-  rotate,
-  scale,
-  square,
-  type Frame,
-  type Vec3
-} from '@shared/geometry'
+import { AXES, boxRange, cross, dot, negate, rotate, square, type Frame, type Vec3 } from '@shared/geometry'
 import type { PreviewFrame, Projection, ReformatPlan, Series, Stack, VolumeInfo, WindowLevel } from '@shared/types'
 import { previewErrorText } from '../dicomPreview'
 import { ReformatPanel } from './ReformatPanel'
@@ -44,18 +32,30 @@ const PANE_EDGE = 512
 const RESULT_EDGE = 1024
 
 /**
- * The three views, from one set of axes.
+ * Turn the planes that are not the one being dragged.
  *
- * Each is right-handed — u × v = n — which is what lets an angle measured on
- * screen be applied as a rotation about that pane's normal without having to
- * guess at a sign. The two that look sideways are built downwards so that the
- * end of the stack ends up at the top of the picture.
+ * A crosshair at a workstation turns the *other* two planes about the one you
+ * are dragging on: the picture under your hand stays put and its crosshair
+ * sweeps round it. Turning all three — which is what one shared set of axes
+ * does — leaves the crosshair painted at the same angle over an image that
+ * spins underneath, which is both wrong and unusable.
+ *
+ * Each frame stays right-handed, u × v = n, which is what lets an angle
+ * measured on screen be applied as a rotation without guessing at a sign.
  */
-function paneFrame(basis: [Vec3, Vec3, Vec3], pane: PaneId): Frame {
-  const [e0, e1, e2] = basis
-  if (pane === 'axial') return { u: e0, v: e1, n: e2 }
-  if (pane === 'coronal') return { u: e0, v: negate(e2), n: e1 }
-  return { u: e1, v: negate(e2), n: negate(e0) }
+function turnOthers(planes: Record<PaneId, Frame>, about: PaneId, radians: number): Record<PaneId, Frame> {
+  const axis = planes[about].n
+  const turned = { ...planes }
+  for (const pane of PANES) {
+    if (pane === about) continue
+    const frame = planes[pane]
+    turned[pane] = square({
+      u: rotate(frame.u, axis, radians),
+      v: rotate(frame.v, axis, radians),
+      n: rotate(frame.n, axis, radians)
+    })
+  }
+  return turned
 }
 
 /**
@@ -81,12 +81,12 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
   const [thickness, setThickness] = useState(5)
   const [spacing, setSpacing] = useState(5)
   const [window_, setWindow] = useState<WindowLevel | null>(null)
-  /** The volume's axes as they stand, and the point all three planes pass through. */
-  const [basis, setBasis] = useState<[Vec3, Vec3, Vec3]>([AXES.x, AXES.y, AXES.z])
+  /** The three planes as they stand, and the point all three pass through. */
+  const [planes, setPlanes] = useState<Record<PaneId, Frame> | null>(null)
   const [focus, setFocus] = useState<Vec3>([0, 0, 0])
 
   const size = info?.size ?? { x: 0, y: 0, z: 0 }
-  const frame = useMemo(() => paneFrame(basis, output), [basis, output])
+  const frame = planes?.[output] ?? { u: AXES.x, v: negate(AXES.z), n: AXES.y }
 
   /** Where a plane through the focus sits along its own normal, from the near edge. */
   const offsetOf = (direction: Vec3): number => dot(focus, direction) - boxRange(size, direction).min
@@ -103,6 +103,7 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
       .then((opened) => {
         if (cancelled) return
         setInfo(opened)
+        setPlanes(opened.frames)
         const wanted = Math.max(opened.finestSpacing, step(opened.size.y / 24))
         setSpacing(wanted)
         setThickness(wanted)
@@ -124,9 +125,10 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
     if (info === null) return
     const ticket = ++request.current
 
+    if (planes === null) return
     const wanted: [string, Promise<PreviewFrame>][] = [
       ...PANES.map((pane): [string, Promise<PreviewFrame>] => {
-        const paneAxes = paneFrame(basis, pane)
+        const paneAxes = planes[pane]
         return [
           pane,
           window.api.reformatFrame(
@@ -147,7 +149,7 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
         if (ticket === request.current) setFrames(Object.fromEntries(pairs))
       })
       .catch((err: unknown) => ticket === request.current && setError(previewErrorText(err)))
-  }, [info, basis, focus, frame, projection, thickness, spacing])
+  }, [info, planes, focus, frame, projection, thickness, spacing])
 
   useEffect(() => {
     if (info === null) return
@@ -203,7 +205,8 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
 
   /** Put the focus somewhere on a pane, keeping its position along that pane's normal. */
   const pick = (pane: PaneId) => (u: number, v: number): void => {
-    const axes = paneFrame(basis, pane)
+    if (planes === null) return
+    const axes = planes[pane]
     const across = boxRange(size, axes.u)
     const down = boxRange(size, axes.v)
     const along = dot(focus, axes.n)
@@ -216,26 +219,12 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
     ])
   }
 
-  /**
-   * Turn all three planes about the normal of the pane being dragged.
-   *
-   * They are one set of axes: rotating a plane rotates the two perpendicular to
-   * it as well, which is exactly what a crosshair at a workstation does. The
-   * angle is measured in the pane's own coordinates, and every pane frame is
-   * right-handed, so the same sign works in all three.
-   */
-  const rotateAbout = (pane: PaneId, radians: number): void => {
-    const axis = paneFrame(basis, pane).n
-    setBasis((current) => {
-      const turned = current.map((vector) => rotate(vector, axis, radians)) as [Vec3, Vec3, Vec3]
-      const fixed = square({ u: turned[0], v: turned[1], n: turned[2] })
-      return [fixed.u, fixed.v, fixed.n]
-    })
-  }
+  const rotateAbout = (pane: PaneId, radians: number): void =>
+    setPlanes((current) => (current === null ? current : turnOthers(current, pane, radians)))
 
   /** Where the other two planes cross this one, as fractions of its image. */
   const crosshair = (pane: PaneId): { u: number; v: number; angle: number } => {
-    const axes = paneFrame(basis, pane)
+    const axes = planes?.[pane] ?? frame
     const across = boxRange(size, axes.u)
     const down = boxRange(size, axes.v)
     const u = (dot(focus, axes.u) - across.min) / Math.max(across.max - across.min, 1e-6)
@@ -243,7 +232,7 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
     // The other planes meet this one along the line perpendicular to both
     // normals; drawn at that angle, the crosshair shows how the axes are turned.
     const other = PANES.find((id) => id !== pane) as PaneId
-    const line = cross(axes.n, paneFrame(basis, other).n)
+    const line = cross(axes.n, (planes?.[other] ?? frame).n)
     return { u, v, angle: Math.atan2(dot(line, axes.v), dot(line, axes.u)) }
   }
 
@@ -272,7 +261,17 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
     }
   }
 
-  const tilted = describePlane(frame.n) === 'Oblique'
+  /**
+   * What the plane is called: matched against the ones this volume started on
+   * rather than against the volume's axes, since those are the acquisition's
+   * and this is the patient's.
+   */
+  const nameOf = (direction: Vec3): string => {
+    const named = PANES.find((pane) => info && Math.abs(dot(direction, info.frames[pane].n)) > 0.999)
+    return named ? PANE_NAMES[named] : 'Oblique'
+  }
+
+  const tilted = nameOf(frame.n) === 'Oblique'
   const throughSpan = spanOf(frame.n)
 
   return (
@@ -300,8 +299,8 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
             {tilted && (
               <button
                 className="small ghost"
-                title="Put the three planes back on the acquisition's own axes"
-                onClick={() => setBasis([AXES.x, AXES.y, AXES.z])}
+                title="Put the three planes back where they started"
+                onClick={() => info && setPlanes(info.frames)}
               >
                 Straighten
               </button>
@@ -331,14 +330,14 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
                 onPick={pick(pane)}
                 onRotate={(radians) => rotateAbout(pane, radians)}
                 onScroll={(steps) => {
-                  const axes = paneFrame(basis, pane)
+                  const axes = planes?.[pane] ?? frame
                   move(axes.n, offsetOf(axes.n) + steps * spacing)
                 }}
               />
             ))}
             <ReformatPanel
               result
-              label={`${describePlane(frame.n)} · ${PROJECTIONS.find((p) => p.id === projection)?.label ?? ''}`}
+              label={`${nameOf(frame.n)} · ${PROJECTIONS.find((p) => p.id === projection)?.label ?? ''}`}
               title="The image that will be added. Drag to window it; the wheel steps through the series"
               frame={result}
               window={level}
@@ -448,7 +447,9 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
             <span className="muted small">
               {info === null
                 ? ''
-                : `${count} image${count === 1 ? '' : 's'} · ${step(spacing)} mm apart, interpolated from ${step(info.spacing.z)} mm slices`}
+                : `${count} image${count === 1 ? '' : 's'} · ${step(spacing)} mm apart, interpolated from ${step(info.spacing.z)} mm slices${
+                    info.anatomical ? '' : ' · these files do not say which way they face, so the planes are the acquisition’s'
+                  }`}
             </span>
             <button className="primary" disabled={info === null || busy || count === 0} onClick={() => void add()}>
               Add to the case

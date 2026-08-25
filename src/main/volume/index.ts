@@ -12,6 +12,7 @@ import type {
 } from '@shared/types'
 import { session } from '../session'
 import { buildVolume, pixelSpacingOf, VolumeError, type BuiltVolume } from './build'
+import { ACQUISITION_FRAMES, anatomicalFrames } from './orientation'
 import { defaultWindow } from './window'
 import { extent, reformatSlice, slabOffsets } from './reformat'
 import { describePlan, writeReformatted } from './write'
@@ -59,13 +60,16 @@ export async function openVolume(stackId: string): Promise<VolumeInfo> {
   const built = await buildVolume(stack)
   open = { stackId, built, parent }
 
+  const anatomical = anatomicalFrames(built.header)
   return {
     columns: built.volume.columns,
     rows: built.volume.rows,
     depth: built.volume.depth,
     spacing: built.volume.spacing,
     size: extent(built.volume),
-    finestSpacing: pixelSpacingOf(built)
+    finestSpacing: pixelSpacingOf(built),
+    frames: anatomical ?? ACQUISITION_FRAMES,
+    anatomical: anatomical !== null
   }
 }
 
