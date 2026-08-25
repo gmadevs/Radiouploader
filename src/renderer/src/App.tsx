@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppInfo, IngestResult, Progress, Series, Stack } from '@shared/types'
 import { AccountBar } from './components/AccountBar'
 import { quotaExhausted, type AccountState } from './quota'
@@ -63,7 +63,20 @@ export function App(): React.JSX.Element {
         }
       : null
 
-  useEffect(() => window.api.onProgress(setProgress), [])
+  /**
+   * The bar belongs to whatever is running. A run's last progress event can
+   * arrive after the run's own reply — the two cross the bridge by different
+   * routes and nothing orders them — and a bar stuck at "parsing 49/49" over a
+   * finished screen says the app has hung when it has not.
+   */
+  const running = useRef(false)
+  const setWorking = (value: boolean): void => {
+    running.current = value
+    setBusy(value)
+    if (!value) setProgress(null)
+  }
+
+  useEffect(() => window.api.onProgress((update) => running.current && setProgress(update)), [])
   useEffect(() => {
     void window.api.appInfo().then(setInfo).catch(() => setInfo(null))
   }, [])
@@ -143,7 +156,7 @@ export function App(): React.JSX.Element {
   }
 
   const runIngest = async (paths: string[]): Promise<void> => {
-    setBusy(true)
+    setWorking(true)
     setError(null)
     try {
       const res = await window.api.ingest(paths)
@@ -156,14 +169,13 @@ export function App(): React.JSX.Element {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setBusy(false)
-      setProgress(null)
+      setWorking(false)
     }
   }
 
   const anonymiseAndContinue = async (): Promise<void> => {
     setConfirming(false)
-    setBusy(true)
+    setWorking(true)
     setError(null)
     try {
       await window.api.setSelection(
@@ -201,13 +213,12 @@ export function App(): React.JSX.Element {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setBusy(false)
-      setProgress(null)
+      setWorking(false)
     }
   }
 
   const upload = async (): Promise<void> => {
-    setBusy(true)
+    setWorking(true)
     setError(null)
     try {
       const res = await window.api.upload({
@@ -240,8 +251,7 @@ export function App(): React.JSX.Element {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setBusy(false)
-      setProgress(null)
+      setWorking(false)
     }
   }
 

@@ -17,19 +17,24 @@ Detecting text would mean either an OCR pass or a cheaper heuristic — a satura
 high-gradient region identical on every frame is almost always an overlay — and both need
 decoded pixels, which is the same blocker as below.
 
-## Previews decode uncompressed DICOM only
+## Compressed images can be reviewed, but not erased
 
-Explicit and implicit VR little endian and explicit VR big endian all render; JPEG,
-JPEG-LS, JPEG 2000, HTJ2K and RLE are named in the placeholder instead of being
-mis-rendered.
+JPEG, lossless JPEG, JPEG-LS, JPEG 2000 and HTJ2K all decode, through the standalone
+`@cornerstonejs/codec-*` WASM builds — not `@cornerstonejs/dicom-image-loader`, which drags
+in `@cornerstonejs/core`. A compressed series previews, scrubs and windows like any other.
 
-A single-frame compressed object still **uploads** — it is anonymised and sent untouched,
-only the preview is blank. Adding them means pulling in the standalone
-`@cornerstonejs/codec-*` WASM packages, which unlike `@cornerstonejs/dicom-image-loader` do
-not depend on `@cornerstonejs/core`.
+**RLE is not decoded yet** and still shows the reason in place of the image.
 
-Erasing burnt-in text needs the same decoder, so it is unavailable on those images too —
-which matters most for ultrasound, where JPEG is common and burnt-in banners are the norm.
+What is missing is writing back. A mask is painted into the stored samples, and on a
+compressed image those samples are a bitstream — painting into it corrupts the image rather
+than redacting it. So the **eraser is withheld** on a compressed image and the anonymiser
+refuses a mask on one, instead of producing a file that looks redacted and is not. This
+bites hardest on ultrasound, where JPEG is common and burnt-in banners are the norm: until
+the app can write those files back out uncompressed, blank them in another tool before
+importing.
+
+Windowing is unaffected — it is written to `WindowCenter` / `WindowWidth` and never touches
+the pixels.
 
 ## A compressed multiframe run does not upload at all
 
@@ -40,6 +45,10 @@ cannot be cut into frames at all.
 It is said in the picker rather than discovered later: the card names the codec, cannot be
 ticked, and the count of stacks in that state sits next to the selection count. Until the
 codecs land, exporting the run uncompressed from the PACS is the way to publish it.
+
+Decoding is no longer the obstacle — the frames of a compressed cine can be read. Writing
+them back out as separate uncompressed instances is, and that is the same missing half as
+the eraser above.
 
 The anonymiser refuses it too, and now says which codec. It used to be caught only by a
 bound check on the frame offset, which worked by arithmetic rather than by design — a

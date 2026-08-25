@@ -43,10 +43,12 @@ setting.
 
 ## What the preview will and will not show
 
-The preview decodes uncompressed DICOM. A JPEG, JPEG-LS, JPEG 2000, HTJ2K or RLE image
-shows the reason it cannot be drawn instead of being mis-rendered, and since the eraser
-needs the same pixels, it is not offered there either. A single-frame compressed object
-still uploads perfectly well — it is anonymised and sent untouched. See
+The preview decodes JPEG, lossless JPEG, JPEG-LS, JPEG 2000 and HTJ2K as well as
+uncompressed DICOM. RLE is the one that is left: it shows the reason it cannot be drawn
+rather than being mis-rendered.
+
+A compressed image can be reviewed and windowed but **not erased** — a mask would have to be
+painted into the compressed data. It still uploads: it is anonymised and sent untouched. See
 [known limitations](/limitations).
 
 A compressed **cine** is the one case that cannot be uploaded at all: its frames would have

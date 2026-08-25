@@ -48,10 +48,11 @@ reader on Radiopaedia can still re-window it.
 
 ## Where erasing is unavailable
 
-Erasing needs decodable pixels, so it is offered only where the preview works. A compressed
-image shows the reason instead of the eraser, and a mask on one is refused at anonymisation
-rather than painted over the compressed bitstream.
+**Erase** is greyed out on a compressed image. Decoding one is no longer the problem — it
+previews and windows like any other — but a mask is painted into the stored samples, and
+there the samples are a bitstream. Painting into it would corrupt the image instead of
+redacting it, so the eraser is withheld and the anonymiser refuses a mask on one.
 
 This bites hardest on ultrasound, where JPEG is common and burnt-in banners are the norm —
-the one place the eraser is needed most is the one place it may not be available. Until the
-decoders land, blank those in another tool before importing.
+the one place the eraser is needed most is the one place it is not available. Until the app
+can write those files back out uncompressed, blank them in another tool before importing.

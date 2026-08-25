@@ -80,8 +80,16 @@ export interface ImageHeader extends PixelGeometry {
   windowCentre: number | null
   windowWidth: number | null
   frames: number
-  /** Byte offset of the first frame's pixel data within the file. */
+  /** Byte offset of the first frame's pixel data. Meaningless when encapsulated. */
   pixelDataOffset: number
+  /** The file's own transfer syntax, which decides how the pixels are read. */
+  transferSyntax: string
+  /**
+   * Compressed pixel data, stored as fragments rather than at an offset. Frames
+   * have to be pulled out through the fragment table and decoded; there is
+   * nothing to address arithmetically.
+   */
+  encapsulated: boolean
 }
 
 export interface DecodedFrame {
@@ -127,12 +135,14 @@ export function parseHeader(bytes: Uint8Array): ImageHeader {
   const transferSyntax = ds.string('x00020010') ?? IMPLICIT_VR_LITTLE_ENDIAN
   const pixelData = ds.elements['x7fe00010']
   if (!pixelData) throw new Error('No pixel data in this file')
-  // Encapsulated pixel data has an undefined length and is split into fragments.
-  if (pixelData.encapsulatedPixelData === true || TRANSFER_SYNTAX_NAMES[transferSyntax]) {
-    throw new UnsupportedTransferSyntaxError(transferSyntax)
-  }
 
   const header: ImageHeader = {
+    transferSyntax,
+    // Encapsulated pixel data has an undefined length and is split into
+    // fragments. Both marks are checked: an exporter can write fragments under
+    // a syntax this list does not name, and the arithmetic below would then be
+    // reading a bitstream as if it were samples.
+    encapsulated: pixelData.encapsulatedPixelData === true || compressionOf(transferSyntax) !== null,
     rows: ds.uint16('x00280010') ?? 0,
     columns: ds.uint16('x00280011') ?? 0,
     samplesPerPixel: ds.uint16('x00280002') ?? 1,

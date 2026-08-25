@@ -14,6 +14,10 @@ files:
   - '!node_modules/**/{Dockerfile,jest.config.js,.eslintrc.js,tsconfig.json,CLAUDE.md,.editorconfig}'
 asarUnpack:
   - resources/**
+  # Each codec finds its own .wasm beside its .js and reads it with plain fs.
+  # Unpacked, that is an ordinary path rather than one the asar shim has to
+  # answer for.
+  - node_modules/@cornerstonejs/**
 mac:
   target:
     - target: dmg

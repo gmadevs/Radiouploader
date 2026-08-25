@@ -103,8 +103,14 @@ export type PreviewFrame =
       /** The window the file asks for, or the frame's own range. */
       window: WindowLevel
       invert: boolean
+      /**
+       * The file's pixels are compressed. The frame here was decoded to show,
+       * but a mask cannot be written back into a bitstream, so the eraser is
+       * not offered on one.
+       */
+      compressed: boolean
     }
-  | { kind: 'colour'; width: number; height: number; rgba: Uint8ClampedArray }
+  | { kind: 'colour'; width: number; height: number; rgba: Uint8ClampedArray; compressed: boolean }
 
 /** Which build this is, for the home screen and for bug reports. */
 export interface AppInfo {

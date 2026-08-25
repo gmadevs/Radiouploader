@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises'
+import dicomParser from 'dicom-parser'
 import {
   decodeFrame,
   decodeGreyFrame,
@@ -10,6 +11,7 @@ import {
   type ImageHeader
 } from '@shared/dicomImage'
 import type { PreviewFrame } from '@shared/types'
+import { decodeEncapsulatedFrame } from './codecs/decode'
 
 /**
  * Frame previews, decoded here rather than in the renderer.
@@ -21,7 +23,11 @@ import type { PreviewFrame } from '@shared/types'
  * frame cross the bridge now.
  */
 
-/** Enough for any conventional header; retried larger if an exporter is unusual. */
+/**
+ * Enough for any conventional header; retried larger if an exporter is unusual.
+ * Compressed files need the whole thing — the fragments that hold the frames
+ * live inside the pixel data element, so there is no header to read short of it.
+ */
 const HEADER_PROBE_SIZES = [64 * 1024, 1024 * 1024, 16 * 1024 * 1024]
 
 /** The preview card is a couple of hundred pixels wide even at 2x. */
@@ -41,7 +47,7 @@ async function headerFor(filePath: string): Promise<ImageHeader> {
   const { size } = await fs.stat(filePath)
   let lastError: unknown
 
-  for (const probe of HEADER_PROBE_SIZES) {
+  for (const probe of [...HEADER_PROBE_SIZES, size]) {
     const length = Math.min(probe, size)
     const handle = await fs.open(filePath, 'r')
     try {
@@ -57,9 +63,6 @@ async function headerFor(filePath: string): Promise<ImageHeader> {
       return header
     } catch (err) {
       lastError = err
-      // A compressed transfer syntax will not parse at any size; reading more
-      // of the file would only waste time.
-      if (err instanceof Error && err.name === 'UnsupportedTransferSyntaxError') throw err
       if (length >= size) break
     } finally {
       await handle.close()
@@ -69,6 +72,55 @@ async function headerFor(filePath: string): Promise<ImageHeader> {
   throw lastError instanceof Error ? lastError : new Error('Could not read the DICOM header')
 }
 
+/**
+ * The most recently parsed compressed file.
+ *
+ * A frame of an encapsulated object cannot be addressed arithmetically: frames
+ * are fragments, and which fragment a frame starts at is written in the basic
+ * offset table inside the pixel data element. Finding that means parsing the
+ * file, so scrubbing a cine would re-read and re-parse it once per frame. One
+ * file is held instead — the compressed copy, which is the small one. The 250 MB
+ * a cine costs elsewhere in this app is what a run weighs decoded.
+ */
+let openFile: { path: string; dataSet: dicomParser.DataSet } | null = null
+
+/** Pull one frame's compressed bytes out of an encapsulated pixel data element. */
+async function encapsulatedFrame(filePath: string, frame: number, frames: number): Promise<Uint8Array> {
+  if (openFile?.path !== filePath) {
+    const bytes = new Uint8Array(await fs.readFile(filePath))
+    openFile = { path: filePath, dataSet: dicomParser.parseDicom(bytes) }
+  }
+
+  const element = openFile.dataSet.elements.x7fe00010
+  if (!element?.fragments?.length) throw new Error('This file has no compressed pixel data to read')
+
+  // A single-frame object owns every fragment, however many it was split into.
+  if (frames <= 1) {
+    return dicomParser.readEncapsulatedPixelDataFromFragments(
+      openFile.dataSet,
+      element,
+      0,
+      element.fragments.length
+    )
+  }
+
+  const offsets = element.basicOffsetTable ?? []
+  if (offsets.length > frame) {
+    return dicomParser.readEncapsulatedImageFrame(openFile.dataSet, element, frame)
+  }
+  // No offset table. One fragment per frame is the common way to write that,
+  // and for the JPEG family the frame starts can be recovered from the SOI
+  // markers instead. Anything else is guesswork, so it says so.
+  if (element.fragments.length === frames) {
+    return dicomParser.readEncapsulatedPixelDataFromFragments(openFile.dataSet, element, frame)
+  }
+  const scanned = dicomParser.createJPEGBasicOffsetTable(openFile.dataSet, element)
+  if (scanned.length > frame) {
+    return dicomParser.readEncapsulatedImageFrame(openFile.dataSet, element, frame, scanned)
+  }
+  throw new Error(`Cannot tell where frame ${frame + 1} starts: this file has no basic offset table`)
+}
+
 /** Decode one frame of one file, shrunk to fit `maxEdge`. */
 export async function readPreviewFrame(
   filePath: string,
@@ -76,6 +128,19 @@ export async function readPreviewFrame(
   maxEdge: number = MAX_PREVIEW_EDGE
 ): Promise<PreviewFrame> {
   const header = await headerFor(filePath)
+
+  if (header.encapsulated) {
+    const encoded = await encapsulatedFrame(filePath, frame, header.frames)
+    const decoded = await decodeEncapsulatedFrame(encoded, header)
+    // What came out of the codec is what the pixels are now: the file's own
+    // bit depth, planar configuration and colour space describe the bitstream,
+    // not the samples it unpacks to.
+    const asDecoded: ImageHeader = { ...header, ...decoded, encapsulated: false }
+    return asDecoded.samplesPerPixel > 1
+      ? { kind: 'colour', compressed: true, ...downscale(decodeFrame(asDecoded, decoded.bytes), maxEdge) }
+      : { kind: 'grey', compressed: true, ...downscaleGrey(decodeGreyFrame(asDecoded, decoded.bytes), maxEdge) }
+  }
+
   const length = frameByteLength(header)
   const offset = frameOffset(header, frame)
 
@@ -86,9 +151,9 @@ export async function readPreviewFrame(
     const bytes = new Uint8Array(buffer.subarray(0, bytesRead))
 
     if (header.samplesPerPixel > 1) {
-      return { kind: 'colour', ...downscale(decodeFrame(header, bytes), maxEdge) }
+      return { kind: 'colour', compressed: false, ...downscale(decodeFrame(header, bytes), maxEdge) }
     }
-    return { kind: 'grey', ...downscaleGrey(decodeGreyFrame(header, bytes), maxEdge) }
+    return { kind: 'grey', compressed: false, ...downscaleGrey(decodeGreyFrame(header, bytes), maxEdge) }
   } finally {
     await handle.close()
   }
@@ -97,4 +162,5 @@ export async function readPreviewFrame(
 /** Forget cached headers when a new import starts. */
 export function clearPreviewHeaders(): void {
   headers.clear()
+  openFile = null
 }

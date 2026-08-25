@@ -3,7 +3,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
-  UnsupportedTransferSyntaxError,
   applyWindow,
   blackSamples,
   compressionOf,
@@ -58,6 +57,8 @@ function synthetic(options: {
     windowCentre: options.windowCentre ?? null,
     windowWidth: options.windowWidth ?? null,
     frames: options.frames ?? 1,
+    transferSyntax: '1.2.840.10008.1.2.1',
+    encapsulated: false,
     bigEndian: options.bigEndian ?? false,
     pixelDataOffset: 0
   }
@@ -131,10 +132,18 @@ describe('parseHeader', () => {
     expect(truncated).toEqual(full)
   })
 
-  it('refuses compressed pixel data by name instead of rendering nonsense', () => {
-    const jpeg = read('TestPattern_JPEG-Baseline_YBRFull.dcm')
-    expect(() => parseHeader(jpeg)).toThrow(UnsupportedTransferSyntaxError)
-    expect(() => parseHeader(jpeg)).toThrow(/JPEG baseline/)
+  it('marks compressed pixel data as encapsulated rather than addressable', () => {
+    // The offset arithmetic below only describes plain samples, so everything
+    // that would use it has to know this before it starts.
+    const header = parseHeader(read('TestPattern_JPEG-Baseline_YBRFull.dcm'))
+    expect(header.encapsulated).toBe(true)
+    expect(header.transferSyntax).toBe('1.2.840.10008.1.2.4.50')
+    expect(header.columns).toBe(640)
+  })
+
+  it('reports plain pixel data as addressable', () => {
+    const header = parseHeader(read('01_ras_physician.dcm'))
+    expect(header.encapsulated).toBe(false)
   })
 })
 
