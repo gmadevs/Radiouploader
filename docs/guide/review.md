@@ -25,6 +25,12 @@ taken back through the rescale, so a redaction stays black on a CT (where 0 is s
 and on MONOCHROME1 (where 0 is white); on YBR colour it is luminance 0 with the chroma
 channels centred.
 
+A box drawn in the wrong place can be put right rather than redrawn: click it to select it,
+drag it to move it, drag a corner to resize it, and press <kbd>Delete</kbd> to remove that
+one. It stays inside the image and never shrinks to nothing — a redaction that quietly got
+smaller would uncover what it was put there to hide. <kbd>Esc</kbd> lets go of the box
+first, and only closes the window once nothing is selected.
+
 ::: tip Undo is not destructive
 **Undo box** and **Clear boxes** are always available up to the moment you anonymise. The
 original files are never modified — anonymisation writes new ones.

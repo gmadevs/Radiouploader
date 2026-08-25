@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MaskRect, PreviewFrame, Stack, WindowLevel } from '@shared/types'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
+import { MIN_MASK_SIDE, moveMask, resizeMask, type MaskHandle } from '../maskEdit'
 import { useWheelScrub } from '../wheelScrub'
 
 interface Props {
@@ -16,8 +17,8 @@ type Tool = 'contrast' | 'erase'
 /** As large as the main process will decode; asking for more is pointless. */
 const VIEWER_EDGE = 1024
 
-/** Below this a drag is a mis-click rather than a rectangle. */
-const MIN_MASK_SIDE = 0.004
+/** The corners offered on a selected mask, clockwise from the top left. */
+const HANDLES: MaskHandle[] = ['nw', 'ne', 'se', 'sw']
 
 function clampUnit(value: number): number {
   return Math.min(Math.max(value, 0), 1)
@@ -54,8 +55,12 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
   const [tool, setTool] = useState<Tool>('erase')
   /** The rectangle being dragged out, drawn but not yet part of the stack. */
   const [pending, setPending] = useState<MaskRect | null>(null)
+  /** Which mask is being edited, if any. Cleared when the masks change under it. */
+  const [chosen, setChosen] = useState<number | null>(null)
 
   const masks = stack.masks ?? []
+  const imageRef = useRef<HTMLDivElement>(null)
+  const selected = chosen !== null && chosen < masks.length ? chosen : null
   const greyscale = frame?.kind === 'grey'
   // The stack's window if one was chosen, otherwise whatever the file asks for.
   const level: WindowLevel | null = stack.window ?? (frame?.kind === 'grey' ? frame.window : null)
@@ -177,6 +182,52 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
     })
   }
 
+  /**
+   * Moving and resizing an existing box.
+   *
+   * Every move is computed from the rectangle as it was at pointer-down plus
+   * the total travel, never from the last frame — accumulating deltas drifts,
+   * and a redaction that drifts is one that stops covering what it was put over.
+   */
+  const edit = useRef<{ index: number; handle: MaskHandle | 'move'; from: { x: number; y: number }; rect: MaskRect } | null>(
+    null
+  )
+
+  /** Pointer position as a fraction of the image, from the box around it. */
+  const pointOnImage = (event: React.PointerEvent): { x: number; y: number } | null => {
+    const rect = imageRef.current?.getBoundingClientRect()
+    if (!rect || rect.width === 0 || rect.height === 0) return null
+    return {
+      x: clampUnit((event.clientX - rect.left) / rect.width),
+      y: clampUnit((event.clientY - rect.top) / rect.height)
+    }
+  }
+
+  const startEdit = (event: React.PointerEvent, index: number, handle: MaskHandle | 'move'): void => {
+    const from = pointOnImage(event)
+    if (!from) return
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setChosen(index)
+    edit.current = { index, handle, from, rect: masks[index] }
+  }
+
+  const onEditMove = (event: React.PointerEvent): void => {
+    const active = edit.current
+    if (!active) return
+    const to = pointOnImage(event)
+    if (!to) return
+    const dx = to.x - active.from.x
+    const dy = to.y - active.from.y
+    const moved =
+      active.handle === 'move' ? moveMask(active.rect, dx, dy) : resizeMask(active.rect, active.handle, dx, dy)
+    onChange({ masks: masks.map((mask, i) => (i === active.index ? moved : mask)) })
+  }
+
+  const endEdit = (): void => {
+    edit.current = null
+  }
+
   const stepImage = (steps: number): void =>
     setIndex((i) => Math.min(Math.max(i + steps, 0), stack.slices.length - 1))
 
@@ -186,15 +237,22 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose()
-      else if (event.key === 'ArrowLeft') setIndex((i) => Math.max(i - 1, 0))
+      // Escape lets go of the box before it closes the window, so the key that
+      // means "never mind" cannot throw away the review by one press too many.
+      if (event.key === 'Escape') {
+        if (selected === null) onClose()
+        else setChosen(null)
+      } else if (event.key === 'ArrowLeft') setIndex((i) => Math.max(i - 1, 0))
       else if (event.key === 'ArrowRight') setIndex((i) => Math.min(i + 1, stack.slices.length - 1))
-      else return
+      else if ((event.key === 'Delete' || event.key === 'Backspace') && selected !== null) {
+        onChange({ masks: masks.filter((_, i) => i !== selected) })
+        setChosen(null)
+      } else return
       event.preventDefault()
     }
     globalThis.addEventListener('keydown', onKey)
     return () => globalThis.removeEventListener('keydown', onKey)
-  }, [onClose, stack.slices.length])
+  }, [onClose, stack.slices.length, selected, masks, onChange])
 
   const outsideTrim = index < stack.trimStart || index > stack.trimEnd
 
@@ -244,14 +302,46 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
               </span>
             </div>
           ) : (
-            <canvas
-              ref={canvasRef}
-              style={fitted}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-            />
+            <div className="image-box" style={fitted} ref={imageRef}>
+              <canvas
+                ref={canvasRef}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+              />
+              {/* Only while erasing: in contrast mode the drag belongs to the
+                  window, and an outline over every box would be in the way. */}
+              {tool === 'erase' && !pending && (
+                <div className="mask-layer">
+                  {masks.map((mask, i) => (
+                    <div
+                      key={i}
+                      className={i === selected ? 'mask on' : 'mask'}
+                      style={{
+                        left: `${mask.x * 100}%`,
+                        top: `${mask.y * 100}%`,
+                        width: `${mask.width * 100}%`,
+                        height: `${mask.height * 100}%`
+                      }}
+                      title="Drag to move, or a corner to resize. Delete removes it."
+                      onPointerDown={(e) => startEdit(e, i, 'move')}
+                      onPointerMove={onEditMove}
+                      onPointerUp={endEdit}
+                      onPointerCancel={endEdit}
+                    >
+                      {HANDLES.map((handle) => (
+                        <span
+                          key={handle}
+                          className={`handle ${handle}`}
+                          onPointerDown={(e) => startEdit(e, i, handle)}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           {outsideTrim && <div className="dropped-tag">not uploaded</div>}
         </div>
@@ -308,7 +398,7 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
             <span className="muted small">
               {masks.length === 0
                 ? 'Drag over any burnt-in text to blank it on every image'
-                : `${masks.length} area${masks.length === 1 ? '' : 's'} blanked on every image`}
+                : `${masks.length} area${masks.length === 1 ? '' : 's'} blanked on every image — drag a box to move it, a corner to resize`}
             </span>
             <div className="spacer" />
             {masks.length > 0 && (
