@@ -17,45 +17,41 @@ Detecting text would mean either an OCR pass or a cheaper heuristic — a satura
 high-gradient region identical on every frame is almost always an overlay — and both need
 decoded pixels, which is the same blocker as below.
 
-## Compressed images can be reviewed, but not erased
+## RLE is the one format that is not decoded
 
 JPEG, lossless JPEG, JPEG-LS, JPEG 2000 and HTJ2K all decode, through the standalone
 `@cornerstonejs/codec-*` WASM builds — not `@cornerstonejs/dicom-image-loader`, which drags
-in `@cornerstonejs/core`. A compressed series previews, scrubs and windows like any other.
+in `@cornerstonejs/core`. Those series preview, scrub, window, erase and split like any
+other. **RLE does not**: it shows the reason in place of the image, and an RLE cine cannot be
+uploaded at all.
 
-**RLE is not decoded yet** and still shows the reason in place of the image.
+## Blanking a compressed image makes it bigger
 
-What is missing is writing back. A mask is painted into the stored samples, and on a
-compressed image those samples are a bitstream — painting into it corrupts the image rather
-than redacting it. So the **eraser is withheld** on a compressed image and the anonymiser
-refuses a mask on one, instead of producing a file that looks redacted and is not. This
-bites hardest on ultrasound, where JPEG is common and burnt-in banners are the norm: until
-the app can write those files back out uncompressed, blank them in another tool before
-importing.
+Nothing can be painted into a bitstream, so an image that has to change — a mask to apply, or
+frames to lift out of a cine — is decoded and written back out as **explicit VR little
+endian**, with the tags that describe the pixels rewritten to match what came out of the
+decoder rather than what went in.
 
-Windowing is unaffected — it is written to `WindowCenter` / `WindowWidth` and never touches
-the pixels.
+That file is larger, and not by a little: the JPEG test pattern in this repository is 49 kB,
+and 768 kB once decoded. It is the price of two things there is no other way to have — a
+redaction that is really in the pixels, and a cine run that arrives as a run instead of as
+its first frame.
 
-## A compressed multiframe run does not upload at all
+A compressed image that needs no change is **passed through untouched**, which keeps it small
+and keeps it lossless. Windowing counts as no change: it is written to `WindowCenter` /
+`WindowWidth` and never touches the pixels.
 
-Frames are split by indexing the pixel data at a length computed from the geometry, which
-only describes uncompressed samples, so a JPEG or RLE cine — an XA run, an ultrasound loop —
-cannot be cut into frames at all.
+## A cine in a format with no decoder cannot be uploaded
 
-It is said in the picker rather than discovered later: the card names the codec, cannot be
-ticked, and the count of stacks in that state sits next to the selection count. Until the
-codecs land, exporting the run uncompressed from the PACS is the way to publish it.
+A multiframe object keeps its frames as fragments when it is compressed, so they are decoded
+before they are sent one at a time. Sending the file whole is not an answer: Radiopaedia does
+not expand multiframe objects, and a run of dozens would be published as its first frame.
 
-Decoding is no longer the obstacle — the frames of a compressed cine can be read. Writing
-them back out as separate uncompressed instances is, and that is the same missing half as
-the eraser above.
-
-The anonymiser refuses it too, and now says which codec. It used to be caught only by a
-bound check on the frame offset, which worked by arithmetic rather than by design — a
-lossless codec that expanded a noisy image past its raw size would have passed the check and
-handed back arbitrary pieces of the bitstream as frames. And because that failure is per
-file, every frame of the run was lost at once and the series disappeared from the case
-behind "N file(s) could not be anonymised".
+Which leaves RLE. Such a run is **named in the picker** — the card carries the codec, cannot
+be ticked, and the count of stacks in that state sits beside the selection count — rather
+than being discovered during anonymisation, where the failure is per file and used to take
+the whole series out of the case behind "N file(s) could not be anonymised". Exporting the
+run uncompressed from the PACS is the way to publish it.
 
 ## Multiframe dynamic series are not split into phases
 

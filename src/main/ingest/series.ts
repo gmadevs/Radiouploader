@@ -1,4 +1,5 @@
 import { compressionOf } from '@shared/dicomImage'
+import { canDecode } from '../codecs/decode'
 import type { ImageComponent, Series, SliceRef, Stack, StackKind, Study } from '@shared/types'
 import type { InstanceMeta } from './dicom'
 
@@ -130,21 +131,24 @@ function toSliceRefs(meta: InstanceMeta): SliceRef[] {
 /**
  * Why this stack cannot be uploaded, if it cannot.
  *
- * A multiframe object that is also compressed — an XA cine run, an ultrasound
- * cineloop — cannot have its frames lifted out, because that is done by byte
- * offset into plain samples. Sending the file whole is not an answer either:
- * Radiopaedia does not expand multiframe objects, so a run of dozens would be
- * published as its first frame.
- *
- * This used to be found during anonymisation, one file at a time, which lost
- * every frame of the run and left only "N file(s) could not be anonymised" to
- * explain a series that had silently gone missing from the case.
+ * A multiframe object holds its frames as fragments when it is compressed, so
+ * they have to be decoded before they can be sent one by one — and sending the
+ * file whole is not an answer, because Radiopaedia does not expand multiframe
+ * objects and would publish a run of dozens as its first frame. A run in a
+ * format this app decodes is fine; one in a format it does not is not, and it
+ * says so here rather than during anonymisation, where the failure is per file
+ * and takes the whole series out of the case behind a count of errors.
  */
 function unsupportedReason(instances: InstanceMeta[]): string | null {
-  const blocked = instances.find((m) => m.numberOfFrames > 1 && compressionOf(m.transferSyntaxUid) !== null)
+  const blocked = instances.find(
+    (m) =>
+      m.numberOfFrames > 1 &&
+      compressionOf(m.transferSyntaxUid) !== null &&
+      !canDecode(m.transferSyntaxUid ?? '')
+  )
   if (blocked === undefined) return null
   const codec = compressionOf(blocked.transferSyntaxUid)
-  return `${codec} multiframe — compressed frames cannot be split yet, so this run cannot be uploaded`
+  return `${codec} multiframe — this app has no decoder for it, so the run cannot be split or uploaded`
 }
 
 function buildLabel(d: Dimensions, phaseIndex: number | null, echoTime: number | null, multi: Set<StackKind>): string {

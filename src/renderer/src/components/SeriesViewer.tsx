@@ -61,16 +61,7 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
   const masks = stack.masks ?? []
   const imageRef = useRef<HTMLDivElement>(null)
   const selected = chosen !== null && chosen < masks.length ? chosen : null
-  /**
-   * A compressed image can be shown but not written back into: painting a mask
-   * over a bitstream corrupts it, so the anonymiser refuses one. The eraser is
-   * withheld here rather than letting a box be drawn that fails on upload.
-   *
-   * Only a frame that has arrived and says so counts. Treating "not loaded yet"
-   * as compressed takes the eraser away from every image for the moment before
-   * its first frame lands, and the tool never comes back on its own.
-   */
-  const redactable = frame?.compressed !== true
+
   const greyscale = frame?.kind === 'grey'
   // The stack's window if one was chosen, otherwise whatever the file asks for.
   const level: WindowLevel | null = stack.window ?? (frame?.kind === 'grey' ? frame.window : null)
@@ -102,9 +93,6 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
     paintFrame(canvas, frame, { window: level, masks: pending ? [...masks, pending] : masks })
   }, [frame, level, masks, pending])
 
-  useEffect(() => {
-    if (frame?.compressed === true) setTool('contrast')
-  }, [frame?.compressed])
 
   // The canvas is sized to the image's own aspect ratio inside the stage, so a
   // 512-pixel scan fills the window and a pointer position maps straight onto
@@ -284,11 +272,10 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
             <button
               className={tool === 'erase' ? 'small on' : 'small'}
               onClick={() => setTool('erase')}
-              disabled={!redactable}
               title={
-                redactable
-                  ? 'Drag over burnt-in text to blank it out on every image of this series'
-                  : 'This image is compressed. A mask would have to be painted into the compressed data, which would corrupt it, so it is refused rather than attempted.'
+                frame?.compressed
+                  ? 'Drag over burnt-in text to blank it out on every image of this series. A compressed image cannot be written into, so blanking one uploads it decoded — a larger file.'
+                  : 'Drag over burnt-in text to blank it out on every image of this series'
               }
             >
               Erase
@@ -415,9 +402,7 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
 
           <div className="viewer-actions">
             <span className="muted small">
-              {!redactable
-                ? 'Compressed image: it can be reviewed and windowed here, but not erased'
-                : masks.length === 0
+              {masks.length === 0
                 ? 'Drag over any burnt-in text to blank it on every image'
                 : `${masks.length} area${masks.length === 1 ? '' : 's'} blanked on every image — drag a box to move it, a corner to resize`}
             </span>

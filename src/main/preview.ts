@@ -12,6 +12,7 @@ import {
 } from '@shared/dicomImage'
 import type { PreviewFrame } from '@shared/types'
 import { decodeEncapsulatedFrame } from './codecs/decode'
+import { encodedFrame } from './codecs/frames'
 
 /**
  * Frame previews, decoded here rather than in the renderer.
@@ -75,50 +76,19 @@ async function headerFor(filePath: string): Promise<ImageHeader> {
 /**
  * The most recently parsed compressed file.
  *
- * A frame of an encapsulated object cannot be addressed arithmetically: frames
- * are fragments, and which fragment a frame starts at is written in the basic
- * offset table inside the pixel data element. Finding that means parsing the
- * file, so scrubbing a cine would re-read and re-parse it once per frame. One
- * file is held instead — the compressed copy, which is the small one. The 250 MB
- * a cine costs elsewhere in this app is what a run weighs decoded.
+ * Finding a frame inside encapsulated pixel data means parsing the file, so
+ * scrubbing a cine would re-read and re-parse it once per frame. One file is
+ * held instead — the compressed copy, which is the small one. The 250 MB a cine
+ * costs elsewhere in this app is what a run weighs decoded.
  */
 let openFile: { path: string; dataSet: dicomParser.DataSet } | null = null
 
-/** Pull one frame's compressed bytes out of an encapsulated pixel data element. */
 async function encapsulatedFrame(filePath: string, frame: number, frames: number): Promise<Uint8Array> {
   if (openFile?.path !== filePath) {
     const bytes = new Uint8Array(await fs.readFile(filePath))
     openFile = { path: filePath, dataSet: dicomParser.parseDicom(bytes) }
   }
-
-  const element = openFile.dataSet.elements.x7fe00010
-  if (!element?.fragments?.length) throw new Error('This file has no compressed pixel data to read')
-
-  // A single-frame object owns every fragment, however many it was split into.
-  if (frames <= 1) {
-    return dicomParser.readEncapsulatedPixelDataFromFragments(
-      openFile.dataSet,
-      element,
-      0,
-      element.fragments.length
-    )
-  }
-
-  const offsets = element.basicOffsetTable ?? []
-  if (offsets.length > frame) {
-    return dicomParser.readEncapsulatedImageFrame(openFile.dataSet, element, frame)
-  }
-  // No offset table. One fragment per frame is the common way to write that,
-  // and for the JPEG family the frame starts can be recovered from the SOI
-  // markers instead. Anything else is guesswork, so it says so.
-  if (element.fragments.length === frames) {
-    return dicomParser.readEncapsulatedPixelDataFromFragments(openFile.dataSet, element, frame)
-  }
-  const scanned = dicomParser.createJPEGBasicOffsetTable(openFile.dataSet, element)
-  if (scanned.length > frame) {
-    return dicomParser.readEncapsulatedImageFrame(openFile.dataSet, element, frame, scanned)
-  }
-  throw new Error(`Cannot tell where frame ${frame + 1} starts: this file has no basic offset table`)
+  return encodedFrame(openFile.dataSet, frame, frames)
 }
 
 /** Decode one frame of one file, shrunk to fit `maxEdge`. */

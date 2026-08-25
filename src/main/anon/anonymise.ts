@@ -2,8 +2,11 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as dcmio from 'dicomanon'
-import { blackSamples, compressionOf, fillMasks, frameSamples, type PixelGeometry } from '@shared/dicomImage'
+import dicomParser from 'dicom-parser'
+import { blackSamples, compressionOf, fillMasks, frameSamples, parseHeader, type PixelGeometry } from '@shared/dicomImage'
 import type { AnonWarning, MaskRect, WindowLevel } from '@shared/types'
+import { canDecode, decodeEncapsulatedFrame, type DecodedSamples } from '../codecs/decode'
+import { encodedFrame } from '../codecs/frames'
 
 export interface AnonymisedFile {
   sourcePath: string
@@ -31,6 +34,7 @@ export interface FrameTask {
 const WINDOW_TAGS = ['00281050', '00281051', '00281055', '00283010']
 
 const EXPLICIT_VR_BIG_ENDIAN = '1.2.840.10008.1.2.2'
+const EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1'
 
 /** Warning levels below this are noise for a case uploader. */
 const WARNING_LEVEL_FLOOR = 3
@@ -92,6 +96,50 @@ function transferSyntaxOf(message: { meta?: Dict }): string | undefined {
 }
 
 /**
+ * Replace compressed pixel data with the samples it decodes to, and make every
+ * tag that describes those pixels tell the truth about them.
+ *
+ * The transfer syntax goes with them: what leaves here is an ordinary explicit
+ * VR little endian instance. The file is larger — a JPEG frame is perhaps a
+ * sixteenth of its own samples — and that is the price of two things that
+ * cannot be had otherwise: a redaction that is really in the pixels, and a cine
+ * run that arrives as a run instead of as its first frame.
+ *
+ * The geometry comes from the codec rather than from the file. A decoder is
+ * free to undo a colour transform or unpack to a wider container, so the header
+ * describes the bitstream, not what came out of it.
+ */
+function writeDecodedFrame(
+  message: { meta?: Dict },
+  dict: Dict,
+  decoded: DecodedSamples,
+  instanceNumber: number
+): void {
+  if (message.meta) message.meta['00020010'] = { vr: 'UI', Value: [EXPLICIT_VR_LITTLE_ENDIAN] }
+
+  const bytes = decoded.bytes
+  const pixels = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+  dict['7FE00010'] = { vr: decoded.bitsAllocated <= 8 ? 'OB' : 'OW', Value: [pixels] }
+
+  dict['00280002'] = { vr: 'US', Value: [decoded.samplesPerPixel] }
+  dict['00280004'] = { vr: 'CS', Value: [decoded.photometric] }
+  dict['00280100'] = { vr: 'US', Value: [decoded.bitsAllocated] }
+  // A 12-bit image unpacks into 16-bit words but still stores 12 of them.
+  const stored = Math.min(numberOf(dict, '00280101', decoded.bitsAllocated), decoded.bitsAllocated)
+  dict['00280101'] = { vr: 'US', Value: [stored] }
+  dict['00280102'] = { vr: 'US', Value: [stored - 1] }
+  dict['00280103'] = { vr: 'US', Value: [decoded.signed ? 1 : 0] }
+
+  // Planar configuration means nothing on a single-sample image, and a stray
+  // one contradicts the pixels it claims to describe.
+  if (decoded.samplesPerPixel > 1) dict['00280006'] = { vr: 'US', Value: [decoded.planarConfiguration] }
+  else delete dict['00280006']
+
+  dict['00280008'] = { vr: 'IS', Value: ['1'] }
+  dict['00200013'] = { vr: 'IS', Value: [String(instanceNumber)] }
+}
+
+/**
  * Anonymise one instance, producing one output file per requested frame.
  *
  * Multiframe instances are split here rather than uploaded whole. Radiopaedia
@@ -124,13 +172,30 @@ export async function anonymiseFile(
   const dict = message.dict as unknown as Dict
 
   const transferSyntax = transferSyntaxOf(message)
-  // Painting a mask writes over the stored samples, and splitting a multiframe
-  // run cuts them by byte offset. Neither is meaningful on a bitstream, so both
-  // are refused rather than attempted on a compressed file.
   const compression = compressionOf(transferSyntax)
   const totalFrames = numberOf(dict, '00280008', 1)
   const pixelElement = dict['7FE00010']
   const allPixels = pixelElement?.Value?.[0] as ArrayBuffer | undefined
+
+  /**
+   * Painting a mask writes over the stored samples, and splitting a run cuts
+   * them by byte offset. Neither means anything on a bitstream, so a compressed
+   * file that needs either is decoded and written back out as plain samples.
+   *
+   * A compressed file that needs neither — a single frame with nothing to blank
+   * — is passed through untouched, which keeps it small and keeps it lossless.
+   */
+  const changingPixels = totalFrames > 1 || tasks.some((task) => (task.masks?.length ?? 0) > 0)
+  const rewriting = compression !== null && changingPixels
+  if (rewriting && !canDecode(transferSyntax ?? '')) {
+    throw new Error(
+      `Cannot read the pixel data of ${path.basename(sourcePath)}: ${compression} is not a format this app decodes`
+    )
+  }
+  // Frames of an encapsulated object are fragments rather than offsets, and
+  // dicom-parser is what knows how to find them.
+  const encapsulated = rewriting ? dicomParser.parseDicom(new Uint8Array(buf)) : null
+  const header = rewriting ? parseHeader(new Uint8Array(buf)) : null
 
   // Frame size from the geometry, so a frame can be sliced without decoding.
   const rows = numberOf(dict, '00280010', 0)
@@ -139,7 +204,7 @@ export async function anonymiseFile(
   const bitsAllocated = numberOf(dict, '00280100', 16)
   const frameLength = rows * columns * samples * (bitsAllocated <= 8 ? 1 : 2)
 
-  const geometry: PixelGeometry = {
+  const storedGeometry: PixelGeometry = {
     rows,
     columns,
     samplesPerPixel: samples,
@@ -148,7 +213,7 @@ export async function anonymiseFile(
     planarConfiguration: numberOf(dict, '00280006', 0),
     bigEndian: transferSyntax === EXPLICIT_VR_BIG_ENDIAN
   }
-  const photometric = firstValue(dict, '00280004') ?? 'MONOCHROME2'
+  const storedPhotometric = firstValue(dict, '00280004') ?? 'MONOCHROME2'
   const rescale = { slope: decimalOf(dict, '00281053', 1), intercept: decimalOf(dict, '00281052', 0) }
   const fileWindow = windowOf(dict)
 
@@ -160,20 +225,26 @@ export async function anonymiseFile(
 
   for (const task of tasks) {
     const masks = task.masks ?? []
-    if (masks.length > 0 && compression !== null) {
-      throw new Error(`Cannot redact ${path.basename(sourcePath)}: its pixel data is ${compression} compressed`)
-    }
+    // What the pixels are once this task has had its way with them. For a file
+    // left as it was stored that is what the header said; for a decoded one it
+    // is what the codec handed back, which is not the same thing.
+    let geometry = storedGeometry
+    let photometric = storedPhotometric
 
-    if (totalFrames > 1) {
-      // The bound check below would catch most of these anyway, since a
-      // compressed run is smaller than the raw frames it stands for — but only
-      // by accident. A codec that expanded a noisy image past the raw size would
-      // pass it and hand back arbitrary pieces of the bitstream as frames.
-      if (compression !== null) {
-        throw new Error(
-          `Cannot split the ${totalFrames} frames of ${path.basename(sourcePath)}: its pixel data is ${compression} compressed`
-        )
+    if (rewriting && encapsulated && header) {
+      const decoded = await decodeEncapsulatedFrame(encodedFrame(encapsulated, task.frame, totalFrames), header)
+      writeDecodedFrame(message, dict, decoded, task.instanceNumber)
+      geometry = {
+        rows,
+        columns,
+        samplesPerPixel: decoded.samplesPerPixel,
+        bitsAllocated: decoded.bitsAllocated,
+        signed: decoded.signed,
+        planarConfiguration: decoded.planarConfiguration,
+        bigEndian: false
       }
+      photometric = decoded.photometric
+    } else if (totalFrames > 1) {
       if (!allPixels || frameLength === 0) {
         throw new Error(`Cannot split frames of ${path.basename(sourcePath)}: pixel data is not addressable`)
       }
@@ -194,13 +265,20 @@ export async function anonymiseFile(
     }
 
     if (masks.length > 0) {
-      const bytes = new Uint8Array(pixelElement.Value[0] as ArrayBuffer)
+      const element = dict['7FE00010']
+      const bytes = new Uint8Array(element.Value[0] as ArrayBuffer)
       const window = task.window ?? fileWindow
       const fill = blackSamples(
-        { photometric, samplesPerPixel: samples, bitsAllocated, signed: geometry.signed, ...rescale },
+        {
+          photometric,
+          samplesPerPixel: geometry.samplesPerPixel,
+          bitsAllocated: geometry.bitsAllocated,
+          signed: geometry.signed,
+          ...rescale
+        },
         window,
         // Only worth a scan when nothing says which end of the range is dark.
-        window === null && samples === 1 ? frameSamples(geometry, bytes) : undefined
+        window === null && geometry.samplesPerPixel === 1 ? frameSamples(geometry, bytes) : undefined
       )
       fillMasks(bytes, geometry, masks, fill)
     }

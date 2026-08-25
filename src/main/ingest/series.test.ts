@@ -155,14 +155,22 @@ describe('buildStacks — multiframe objects', () => {
 })
 
 describe('buildStacks — compressed multiframe', () => {
-  const jpegCine = (): InstanceMeta[] => [
-    inst({ numberOfFrames: 40, transferSyntaxUid: '1.2.840.10008.1.2.4.50' })
+  /** RLE: encapsulated like the rest, and the one format with no decoder here. */
+  const undecodableCine = (): InstanceMeta[] => [
+    inst({ numberOfFrames: 40, transferSyntaxUid: '1.2.840.10008.1.2.5' })
   ]
 
-  it('names the codec and refuses the run, instead of losing it at anonymisation', () => {
-    const { stacks } = buildStacks('s', jpegCine())
-    expect(stacks[0].unsupported).toContain('JPEG baseline')
+  it('names the codec and refuses a run it cannot decode', () => {
+    const { stacks } = buildStacks('s', undecodableCine())
+    expect(stacks[0].unsupported).toContain('RLE')
     expect(stacks[0].selected).toBe(false)
+  })
+
+  it('accepts a compressed run it can decode — the frames are split after decoding', () => {
+    const { stacks } = buildStacks('s', [inst({ numberOfFrames: 40, transferSyntaxUid: '1.2.840.10008.1.2.4.50' })])
+    expect(stacks[0].unsupported).toBeNull()
+    expect(stacks[0].selected).toBe(true)
+    expect(stacks[0].slices).toHaveLength(40)
   })
 
   it('treats an unrecognised transfer syntax as compressed too', () => {
@@ -186,7 +194,7 @@ describe('buildStacks — compressed multiframe', () => {
     // A component split runs applyDefaultSelection, which ticks every
     // magnitude-like stack; the compressed cine must not come back with it.
     const { stacks } = buildStacks('s', [
-      ...jpegCine(),
+      ...undecodableCine(),
       inst({ component: 'phase', imageType: ['ORIGINAL', 'PRIMARY', 'P'] })
     ])
     const blocked = stacks.find((stack) => stack.unsupported !== null)

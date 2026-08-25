@@ -105,8 +105,8 @@ export type PreviewFrame =
       invert: boolean
       /**
        * The file's pixels are compressed. The frame here was decoded to show,
-       * but a mask cannot be written back into a bitstream, so the eraser is
-       * not offered on one.
+       * and blanking one is decoded too — so the viewer can warn that the
+       * upload will be plain samples, and larger than the file it came from.
        */
       compressed: boolean
     }

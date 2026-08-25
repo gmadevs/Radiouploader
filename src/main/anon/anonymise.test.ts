@@ -135,28 +135,69 @@ describe('anonymiseFile — multiframe', () => {
 
   /**
    * A compressed cine — an XA run or an ultrasound loop — built here rather than
-   * committed as a fixture: the JPEG fixture with a NumberOfFrames put on it.
-   * Either half alone is handled; it is the combination that has no answer.
+   * committed as a fixture: the JPEG fixture's own bitstream repeated as four
+   * frames. Written through the anonymiser's own writer, so the fragments and
+   * the basic offset table are the real thing rather than a hand-made table.
    */
   async function compressedCine(): Promise<string> {
     const buf = await fs.readFile(path.join(fixtures, 'TestPattern_JPEG-Baseline_YBRFull.dcm'))
     const bytes = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
     const message = dcmio.Message.readFile(bytes)
     const dict = message.dict as unknown as Record<string, { vr: string; Value: unknown[] }>
+    const frame = dict['7FE00010'].Value[0] as ArrayBuffer
     dict['00280008'] = { vr: 'IS', Value: ['4'] }
+    dict['7FE00010'] = { vr: 'OB', Value: [frame, frame, frame, frame] }
     const outputPath = path.join(outDir, 'jpeg-cine.dcm')
     await fs.writeFile(outputPath, Buffer.from(message.write()))
     return outputPath
   }
 
-  it('refuses to split a compressed run, naming the codec', async () => {
-    // The frame is cut by byte offset, which means nothing in a bitstream. Left
-    // to the bound check this only failed because the JPEG happens to be
-    // smaller than the raw frames — 47 kB against 768 kB — and the message said
-    // nothing about compression.
+  it('splits a compressed run by decoding it, and writes the frames out uncompressed', async () => {
+    // A frame cannot be cut out of a bitstream by offset, so each one is
+    // decoded and written back as plain samples. Sending the file whole is no
+    // answer: Radiopaedia does not expand multiframe objects, so a run of four
+    // would be published as one picture.
+    const results = await anonymiseFile(
+      await compressedCine(),
+      outDir,
+      [0, 1, 2, 3].map((frame) => ({ frame, outputName: `cine-${frame}.dcm`, instanceNumber: frame + 1 }))
+    )
+    expect(results).toHaveLength(4)
+
+    for (const result of results) {
+      const ds = await tagsOf(result.outputPath)
+      expect(ds.string('x00020010')).toBe('1.2.840.10008.1.2.1')
+      expect(ds.string('x00280008')).toBe('1')
+      // 640 x 400, three samples of eight bits, as the JPEG decodes to.
+      expect(ds.elements['x7fe00010'].length).toBe(640 * 400 * 3)
+      expect(ds.uint16('x00280100')).toBe(8)
+      expect(ds.uint16('x00280002')).toBe(3)
+      // The file said YBR_FULL; libjpeg-turbo hands back RGB, and the tag has
+      // to say what the pixels are rather than what the bitstream was.
+      expect(ds.string('x00280004')).toBe('RGB')
+    }
+    // Same picture four times over, but each carries its own instance number,
+    // so S3 stores four objects rather than deduplicating the run to one.
+    expect(new Set(results.map((r) => r.sha256)).size).toBe(4)
+  })
+
+  it('refuses a compressed run it has no decoder for, rather than guessing', async () => {
+    const buf = await fs.readFile(path.join(fixtures, 'TestPattern_JPEG-Baseline_YBRFull.dcm'))
+    const bytes = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+    const message = dcmio.Message.readFile(bytes)
+    const dict = message.dict as unknown as Record<string, { vr: string; Value: unknown[] }>
+    dict['00280008'] = { vr: 'IS', Value: ['4'] }
+    // RLE: encapsulated like the others, and nothing here reads it.
+    ;(message.meta as Record<string, { vr: string; Value: unknown[] }>)['00020010'] = {
+      vr: 'UI',
+      Value: ['1.2.840.10008.1.2.5']
+    }
+    const outputPath = path.join(outDir, 'rle-cine.dcm')
+    await fs.writeFile(outputPath, Buffer.from(message.write()))
+
     await expect(
-      anonymiseFile(await compressedCine(), outDir, [{ frame: 1, outputName: 'cine.dcm', instanceNumber: 1 }])
-    ).rejects.toThrow(/JPEG baseline compressed/)
+      anonymiseFile(outputPath, outDir, [{ frame: 1, outputName: 'rle.dcm', instanceNumber: 1 }])
+    ).rejects.toThrow(/RLE is not a format this app decodes/)
   })
 })
 
@@ -245,11 +286,34 @@ describe('anonymiseFile — redaction and window', () => {
     }
   })
 
-  it('refuses to paint over compressed pixel data rather than corrupting it', async () => {
-    await expect(
-      anonymiseFile(path.join(fixtures, 'TestPattern_JPEG-Baseline_YBRFull.dcm'), outDir, [
-        { frame: 0, outputName: 'jpeg.dcm', instanceNumber: 1, masks: leftHalf }
-      ])
-    ).rejects.toThrow(/compressed/)
+  it('blanks a compressed image by decoding it and writing it back uncompressed', async () => {
+    // A mask painted into a bitstream corrupts the image instead of redacting
+    // it, so the file is decoded first and leaves as plain samples.
+    const [result] = await anonymiseFile(path.join(fixtures, 'TestPattern_JPEG-Baseline_YBRFull.dcm'), outDir, [
+      { frame: 0, outputName: 'jpeg-masked.dcm', instanceNumber: 1, masks: leftHalf }
+    ])
+    const ds = await tagsOf(result.outputPath)
+    expect(ds.string('x00020010')).toBe('1.2.840.10008.1.2.1')
+    expect(ds.elements['x7fe00010'].length).toBe(640 * 400 * 3)
+
+    const pixels = new Uint8Array(await fs.readFile(result.outputPath))
+    const at = (x: number, y: number): number[] => {
+      const o = ds.elements['x7fe00010'].dataOffset + (y * 640 + x) * 3
+      return [pixels[o], pixels[o + 1], pixels[o + 2]]
+    }
+    // The left half is black on every row; the right half kept its picture.
+    expect(at(10, 200)).toEqual([0, 0, 0])
+    expect(at(300, 200)).toEqual([0, 0, 0])
+    expect(at(500, 200).some((v) => v > 0)).toBe(true)
+  })
+
+  it('leaves a compressed image alone when there is nothing to blank', async () => {
+    // Decoding it would upload a file sixteen times the size for no reason.
+    const [result] = await anonymiseFile(path.join(fixtures, 'TestPattern_JPEG-Baseline_YBRFull.dcm'), outDir, [
+      { frame: 0, outputName: 'jpeg-untouched.dcm', instanceNumber: 1 }
+    ])
+    const ds = await tagsOf(result.outputPath)
+    expect(ds.string('x00020010')).toBe('1.2.840.10008.1.2.4.50')
+    expect(ds.string('x00280004')).toBe('YBR_FULL')
   })
 })

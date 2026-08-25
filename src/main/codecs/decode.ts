@@ -96,6 +96,17 @@ const CODECS: Record<string, DecoderFactory> = {
 const JPEG_LOSSLESS = new Set(['1.2.840.10008.1.2.4.57', '1.2.840.10008.1.2.4.70'])
 
 /**
+ * Whether this app can turn the given transfer syntax into samples.
+ *
+ * Asked before anything commits to a file: a compressed run can only be split
+ * if its frames can be decoded first, and a mask can only be painted on an
+ * image this can read back.
+ */
+export function canDecode(transferSyntax: string): boolean {
+  return transferSyntax in CODECS || JPEG_LOSSLESS.has(transferSyntax)
+}
+
+/**
  * The colours the decoded samples are actually in.
  *
  * A codec is free to undo a colour transform on the way out, and every one of

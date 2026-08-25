@@ -47,11 +47,12 @@ The preview decodes JPEG, lossless JPEG, JPEG-LS, JPEG 2000 and HTJ2K as well as
 uncompressed DICOM. RLE is the one that is left: it shows the reason it cannot be drawn
 rather than being mis-rendered.
 
-A compressed image can be reviewed and windowed but **not erased** — a mask would have to be
-painted into the compressed data. It still uploads: it is anonymised and sent untouched. See
+A compressed image can be reviewed, windowed and erased like any other. It is sent untouched
+unless something has to change its pixels — a blanked area, or a cine run being split — in
+which case it is decoded and uploaded uncompressed, which makes a larger file. See
 [known limitations](/limitations).
 
-A compressed **cine** is the one case that cannot be uploaded at all: its frames would have
-to be decoded before they could be split. That card says so in place of the tick, and the
-count beside *selected* tells you how many stacks are in that state, so a run cannot go
+A cine in a format with no decoder — RLE — is the one case that cannot be uploaded at all,
+because its frames cannot be read to be split. That card says so in place of the tick, and
+the count beside *selected* tells you how many stacks are in that state, so a run cannot go
 missing from the case without having been mentioned.

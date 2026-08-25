@@ -46,13 +46,15 @@ any `WindowCenterWidthExplanation` or `VOILUTSequence` that would contradict it 
 **The pixels themselves are untouched**, so the upload keeps its original values and a
 reader on Radiopaedia can still re-window it.
 
-## Where erasing is unavailable
+## Erasing a compressed image
 
-**Erase** is greyed out on a compressed image. Decoding one is no longer the problem — it
-previews and windows like any other — but a mask is painted into the stored samples, and
-there the samples are a bitstream. Painting into it would corrupt the image instead of
-redacting it, so the eraser is withheld and the anonymiser refuses a mask on one.
+It works, and it changes the file that gets uploaded. Nothing can be painted into a
+bitstream, so a JPEG, JPEG-LS, JPEG 2000, HTJ2K or lossless-JPEG image with a box on it is
+decoded, blanked, and written out as plain uncompressed samples. Expect it to be several
+times the size of the original — the test pattern in the repository goes from 49 kB to
+768 kB.
 
-This bites hardest on ultrasound, where JPEG is common and burnt-in banners are the norm —
-the one place the eraser is needed most is the one place it is not available. Until the app
-can write those files back out uncompressed, blank them in another tool before importing.
+An image with no box on it is uploaded exactly as it arrived.
+
+Only **RLE** is left out: it does not decode, so it cannot be previewed and cannot be
+erased. Blank one in another tool before importing.
