@@ -28,7 +28,12 @@ series carries several b-values plus the ADC map.
 | Echo | `EchoNumbers` (0018,0086) |
 | Time point | `TemporalPositionIdentifier` (0020,0100), or repeated slice positions ordered by `TriggerTime` / `AcquisitionTime` |
 
-Multiframe objects — cine runs, enhanced MR — are expanded to one scrubbable frame each.
+Multiframe objects — cine runs, enhanced MR — are expanded to one scrubbable frame each,
+and each frame is written out as its own instance at anonymisation, because Radiopaedia does
+not expand them server-side: a run sent whole would be published as its first frame. A
+compressed run has to be decoded before its frames can be separated at all, so one in a
+format with no decoder is refused by name in the picker.
+
 Objects with no pixel data are rejected at ingest so they never appear as series to upload.
 
 ## Why UIDs matter later

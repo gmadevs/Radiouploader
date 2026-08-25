@@ -16,6 +16,9 @@ series that contain more than one acquisition — multiphase, diffusion, SWI —
 what to keep, blank out any text burnt into the pixels and set the contrast, anonymises
 everything with Radiopaedia's reference anonymiser, and uploads the result as a draft case.
 
+Before it anonymises it looks through the images for burnt-in banners and rings what it
+finds. It finds the obvious ones, and it never reports a selection as clean.
+
 Runs on macOS, Linux and Windows.
 
 > Unofficial. Not affiliated with or endorsed by Radiopaedia.org.

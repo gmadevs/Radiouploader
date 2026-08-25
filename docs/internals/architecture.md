@@ -44,17 +44,28 @@ the structured clone. Doing it that way is how this used to fail with
 
 ## The decoder
 
-Previews are decoded by a small purpose-built reader in `src/shared/dicomImage.ts`, split
-into a header parse and a per-frame decode. Nothing ever holds a whole file: the header
-comes from the first few kilobytes, and each frame is read from just its own byte range.
+Uncompressed pixel data is read by a small purpose-built reader in
+`src/shared/dicomImage.ts`, split into a header parse and a per-frame decode. Nothing ever
+holds a whole file: the header comes from the first few kilobytes, and each frame is read
+from just its own byte range.
+
+Compressed pixel data goes through `src/main/codecs/decode.ts`, which loads the standalone
+`@cornerstonejs/codec-*` WASM builds on first use — JPEG, JPEG-LS, JPEG 2000 and HTJ2K —
+with a plain JavaScript decoder for lossless JPEG. Only RLE is left out. A compressed frame
+cannot be addressed arithmetically, so the fragment table is read to find where each one
+starts, and the most recently parsed file is kept so scrubbing a cine does not re-parse it
+per frame.
 
 It deliberately does **not** use `@cornerstonejs/dicom-image-loader`, which drags in
 `@cornerstonejs/core`, whose viewport and rendering-engine class hierarchy is circular
 enough to throw `Class extends value undefined` once bundled — and none of it is needed,
-since the pixels are painted onto a plain canvas.
+since the pixels are painted onto a plain canvas. The codecs are CommonJS Emscripten modules
+that find their own `.wasm` through `__filename`, so they stay external to the bundle and are
+unpacked from the asar; only the decode-only builds are shipped.
 
-The cost of that choice is that compressed transfer syntaxes are reported rather than
-rendered. See [known limitations](/limitations).
+What comes back is not always what the header described — a decoder may undo a colour
+transform or unpack to a wider container — so the geometry travels with the samples rather
+than being read from the file again.
 
 ## Where data lives
 

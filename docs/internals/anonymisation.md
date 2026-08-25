@@ -30,14 +30,26 @@ channels centred.
 contradict it dropped. The pixels are not touched, so the original values reach Radiopaedia
 and stay re-windowable.
 
-## Where a mask is refused
+## A mask on a compressed image
 
 Painting a mask means writing into stored samples. On a compressed transfer syntax those
 samples are a bitstream, and writing into it would corrupt the image rather than redact it.
 
-So a mask on a compressed object is **refused at anonymisation** rather than attempted. The
-viewer never offers the eraser there in the first place, since it cannot decode the image
-to show you what you would be erasing.
+So the file is decoded first. The pixel data is replaced by the samples it decodes to, the
+transfer syntax becomes explicit VR little endian, and the tags that describe the pixels are
+rewritten from what the codec returned — bit depth, planar configuration, and photometric
+interpretation, which is the one that bites: a file declaring `YBR_FULL` hands back RGB, and
+leaving the tag alone publishes an image with red and blue swapped.
+
+All of that happens **before** `Anonymize` runs, like the mask itself, so the bytes written
+are final and Radiopaedia's re-run of the same anonymiser stays a no-op.
+
+The uploaded file is much larger — the JPEG test pattern in the repository is 49 kB and
+768 kB decoded. A compressed image with nothing to blank is passed through untouched
+instead, so it stays small and lossless. The same machinery splits a compressed cine, which
+cannot have its frames cut out of a bitstream by offset either.
+
+Only a format with no decoder is refused, and RLE is the one that is left.
 
 ## Warnings
 
