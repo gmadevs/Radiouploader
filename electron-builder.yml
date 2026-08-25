@@ -12,6 +12,17 @@ files:
   - '!node_modules/**/*.{map,md,markdown}'
   - '!node_modules/**/{src,spec,test,tests,__tests__,docs,doc,fixtures,example,examples,scripts}/**'
   - '!node_modules/**/{Dockerfile,jest.config.js,.eslintrc.js,tsconfig.json,CLAUDE.md,.editorconfig}'
+  # Each codec publishes three builds: an asm.js one, a WASM one carrying the
+  # encoder, and the decode-only WASM one. Only the last is ever loaded — see
+  # the entry points in src/main/codecs/decode.ts — and the other two are 4.5 MB
+  # of code that never runs. openjph publishes only the one build, so it is not
+  # named here.
+  - '!node_modules/@cornerstonejs/codec-libjpeg-turbo-8bit/dist/libjpegturbojs*.js'
+  - '!node_modules/@cornerstonejs/codec-libjpeg-turbo-8bit/dist/libjpegturbowasm.{js,wasm}'
+  - '!node_modules/@cornerstonejs/codec-charls/dist/charlsjs*.js'
+  - '!node_modules/@cornerstonejs/codec-charls/dist/charlswasm.{js,wasm}'
+  - '!node_modules/@cornerstonejs/codec-openjpeg/dist/openjpegjs*.js'
+  - '!node_modules/@cornerstonejs/codec-openjpeg/dist/openjpegwasm.{js,wasm}'
 asarUnpack:
   - resources/**
   # Each codec finds its own .wasm beside its .js and reads it with plain fs.

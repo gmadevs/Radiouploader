@@ -18,6 +18,10 @@ const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '
  * encoder and decoding it back through the app's path. That proves the wiring —
  * buffer handling, geometry, the copy out of the WASM heap — which is where
  * these go wrong; it does not prove the codec against a third-party file.
+ *
+ * The encoders live in the codecs' full builds, which are a development
+ * dependency only: electron-builder leaves them out of the packaged app, where
+ * nothing but the decode-only builds is ever loaded.
  */
 function header(overrides: Partial<ImageHeader>): ImageHeader {
   return {
