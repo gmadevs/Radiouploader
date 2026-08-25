@@ -3,19 +3,21 @@
 The app is alpha. These are the things it does not do, written down so nobody has to
 discover them mid-upload.
 
-## Burnt-in text is not detected
+## Burnt-in text is only partly detected
 
-Nothing looks for it. The anonymiser works on tags, so finding text in the pixels is your
-job: review the images before uploading and blank anything identifying with
-[Open for review](/guide/review) — that is why the app shows previews at all.
+The [check before anonymising](/guide/check) looks for it now, and it finds obvious banners:
+bright, hard-edged marks that sit in the same place while the anatomy under them changes.
+That is what a patient banner or a hospital name looks like to a computer, and it is ringed
+on the thumbnail so you know where to look.
 
-The [dialog before anonymisation](/guide/check) tracks only what you *opened*, which is a
-proxy for having looked and no more than that. It cannot tell a blank corner from an unread
-one, and it will never report a selection as clean.
+What it does **not** find: small print, text written over anatomy rather than over black,
+low-contrast overlays, and anything on the images it did not read — it compares two images
+per series, not all of them. It is not OCR and it does not read what it finds.
 
-Detecting text would mean either an OCR pass or a cheaper heuristic — a saturated,
-high-gradient region identical on every frame is almost always an overlay — and both need
-decoded pixels, which is the same blocker as below.
+So it can only ever add a warning. **A series it says nothing about is a series nothing was
+noticed in, which is not the same as a series that is clean**, and nowhere in the app will
+say otherwise. Finding the text is still your job; this only makes the obvious cases harder
+to walk past.
 
 ## RLE is the one format that is not decoded
 

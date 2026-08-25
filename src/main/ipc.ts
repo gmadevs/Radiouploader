@@ -3,8 +3,9 @@ import { BrowserWindow, dialog, ipcMain } from 'electron'
 // whenever the app is started without its package.json beside it, which is
 // exactly the case when the app is driven by a script.
 import { version } from '../../package.json'
-import type { AppInfo, AnonResult, IngestResult, Progress, StackSelection } from '@shared/types'
+import type { AppInfo, AnonResult, BurnInFinding, IngestResult, Progress, StackSelection } from '@shared/types'
 import { anonymiseStacks, summariseWarnings } from './anon'
+import { scanForBurnIn } from './burnInScan'
 import { RadiopaediaClient, type CaseDraft } from './api/client'
 import type { OAuthConfig } from './api/oauth'
 import { loadConfig, saveConfig } from './api/store'
@@ -67,6 +68,10 @@ export function registerIpc(): void {
   ipcMain.handle('selection:set', (_e, selection: StackSelection[]) => {
     session.applySelection(selection)
   })
+
+  // Runs on the selection as it stands, trim and masks included, so an area
+  // already blanked is not reported back as something to blank.
+  ipcMain.handle('burnIn:scan', async (): Promise<BurnInFinding[]> => scanForBurnIn(session.selectedStacks()))
 
   // Preview pixels for the renderer. Only paths belonging to the current ingest
   // are served, so the renderer cannot read arbitrary files through this bridge.

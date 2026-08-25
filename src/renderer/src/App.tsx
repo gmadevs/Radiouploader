@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AppInfo, IngestResult, Progress, Series, Stack } from '@shared/types'
+import type { AppInfo, BurnInFinding, IngestResult, Progress, Series, Stack } from '@shared/types'
 import { AccountBar } from './components/AccountBar'
 import { quotaExhausted, type AccountState } from './quota'
 import { describeInterval } from '@shared/interval'
@@ -48,6 +48,8 @@ export function App(): React.JSX.Element {
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set())
   /** The burnt-in check, which stands between the review step and anonymisation. */
   const [confirming, setConfirming] = useState(false)
+  /** What the pixel check noticed, or null while it is still looking. */
+  const [findings, setFindings] = useState<BurnInFinding[] | null>(null)
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [showInfo, setShowInfo] = useState(false)
 
@@ -153,6 +155,28 @@ export function App(): React.JSX.Element {
   const openViewer = (stackId: string, heading: string): void => {
     setViewing({ stackId, heading })
     setOpened((current) => new Set(current).add(stackId))
+  }
+
+  /** Push the selection, then look through it for text burnt into the pixels. */
+  const openCheck = async (): Promise<void> => {
+    setConfirming(true)
+    setFindings(null)
+    try {
+      await window.api.setSelection(
+        selectedStacks.map((s) => ({
+          id: s.id,
+          trimStart: s.trimStart,
+          trimEnd: s.trimEnd,
+          masks: s.masks ?? [],
+          window: s.window ?? null
+        }))
+      )
+      setFindings(await window.api.scanBurnIn())
+    } catch {
+      // A check that could not run says nothing, which is what an empty list
+      // means everywhere else here too.
+      setFindings([])
+    }
   }
 
   const runIngest = async (paths: string[]): Promise<void> => {
@@ -358,8 +382,10 @@ export function App(): React.JSX.Element {
           Escape closes one thing and the list is re-read on the way back. */}
       {confirming && !viewing && (
         <BurnInCheck
+          entries={selectedEntries}
           seenCount={seen.length}
           unseen={unseen}
+          findings={findings}
           busy={busy}
           onOpen={(entry) => openViewer(entry.stack.id, entry.heading)}
           onBack={() => setConfirming(false)}
@@ -406,7 +432,7 @@ export function App(): React.JSX.Element {
             <button
               className="primary"
               disabled={busy || selectedStacks.length === 0}
-              onClick={() => setConfirming(true)}
+              onClick={() => void openCheck()}
             >
               Anonymise and continue
             </button>

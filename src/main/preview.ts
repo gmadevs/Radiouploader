@@ -41,7 +41,8 @@ export const MAX_VIEWER_EDGE = 1024
 const headers = new Map<string, ImageHeader>()
 const MAX_CACHED_HEADERS = 64
 
-async function headerFor(filePath: string): Promise<ImageHeader> {
+/** The header of one file, cached — read for the pixels, and for the tags about them. */
+export async function imageHeader(filePath: string): Promise<ImageHeader> {
   const cached = headers.get(filePath)
   if (cached) return cached
 
@@ -97,7 +98,7 @@ export async function readPreviewFrame(
   frame: number,
   maxEdge: number = MAX_PREVIEW_EDGE
 ): Promise<PreviewFrame> {
-  const header = await headerFor(filePath)
+  const header = await imageHeader(filePath)
 
   if (header.encapsulated) {
     const encoded = await encapsulatedFrame(filePath, frame, header.frames)

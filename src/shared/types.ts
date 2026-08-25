@@ -112,6 +112,23 @@ export type PreviewFrame =
     }
   | { kind: 'colour'; width: number; height: number; rgba: Uint8ClampedArray; compressed: boolean }
 
+/**
+ * What the check for burnt-in text found in one stack.
+ *
+ * There is no entry for "nothing found", and no field that means clean: this
+ * looks for obvious overlays and misses faint ones, so a stack with no finding
+ * is a stack nothing was noticed in, which is not the same thing.
+ */
+export interface BurnInFinding {
+  stackId: string
+  /** Areas that look like overlaid text, in fractions of the image. */
+  regions: MaskRect[]
+  /** The file's own BurnedInAnnotation says YES. */
+  declared: boolean
+  /** Images compared; 1 means the "same on every image" test could not run. */
+  compared: number
+}
+
 /** Which build this is, for the home screen and for bug reports. */
 export interface AppInfo {
   version: string

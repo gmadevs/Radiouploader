@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { AnonResult, AppInfo, IngestResult, PreviewFrame, Progress, StackSelection } from '@shared/types'
+import type {
+  AnonResult,
+  AppInfo,
+  BurnInFinding,
+  IngestResult,
+  PreviewFrame,
+  Progress,
+  StackSelection
+} from '@shared/types'
 
 /** The only surface the renderer has onto the filesystem and the network. */
 const api = {
@@ -22,6 +30,11 @@ const api = {
    */
   readPreviewFrame: (filePath: string, frame: number, maxEdge?: number): Promise<PreviewFrame> =>
     ipcRenderer.invoke('preview:frame', filePath, frame, maxEdge),
+  /**
+   * Look for text burnt into the pixels of the selection. Only stacks something
+   * was noticed in come back; silence about a stack is not a clean bill.
+   */
+  scanBurnIn: (): Promise<BurnInFinding[]> => ipcRenderer.invoke('burnIn:scan'),
   anonymise: (): Promise<AnonResult & { summary: { tag: string; text: string; level: number; count: number }[] }> =>
     ipcRenderer.invoke('anon:run'),
 

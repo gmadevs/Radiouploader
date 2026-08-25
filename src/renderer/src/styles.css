@@ -317,3 +317,4 @@ label.field { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
 .check-item .placeholder { color: var(--muted); font-size: 10px; text-align: center; padding: 6px; }
 .check-item .cap { padding: 0 8px; font-size: 11px; line-height: 1.35; color: var(--muted); }
 .check-item .cap .name { display: block; color: var(--text); }
+.check-item.flagged { outline: 1px solid color-mix(in srgb, var(--warn) 55%, transparent); }

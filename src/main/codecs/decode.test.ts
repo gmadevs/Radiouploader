@@ -41,6 +41,7 @@ function header(overrides: Partial<ImageHeader>): ImageHeader {
     pixelDataOffset: 0,
     transferSyntax: '1.2.840.10008.1.2.1',
     encapsulated: true,
+    burnedInAnnotation: null,
     ...overrides
   }
 }

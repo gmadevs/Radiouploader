@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
+import type { BurnInFinding, MaskRect } from '@shared/types'
 import type { StackEntry } from '../burnIn'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
 
 interface Props {
+  /** Everything going to upload, so a flagged stack can be shown whether or not it was opened. */
+  entries: StackEntry[]
   /** Stacks already opened full size; counted, not listed. */
   seenCount: number
   /** Stacks going to upload that have never been on screen full size. */
   unseen: StackEntry[]
+  /** What the pixel check noticed; null while it is still looking. */
+  findings: BurnInFinding[] | null
   busy: boolean
   /** Open one from the list; the dialog stays behind the viewer. */
   onOpen: (entry: StackEntry) => void
@@ -15,7 +20,7 @@ interface Props {
 }
 
 /** A middle image of one stack, as it will be uploaded — masks and window included. */
-function Thumb({ entry }: { entry: StackEntry }): React.JSX.Element {
+function Thumb({ entry, outline }: { entry: StackEntry; outline?: MaskRect[] }): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [error, setError] = useState<string | null>(null)
   const { stack } = entry
@@ -31,6 +36,7 @@ function Thumb({ entry }: { entry: StackEntry }): React.JSX.Element {
       .then((frame) => {
         if (cancelled || !canvasRef.current) return
         paintFrame(canvasRef.current, frame, { window: stack.window, masks: stack.masks })
+        drawOutline(canvasRef.current, outline)
         setError(null)
       })
       .catch((err: unknown) => {
@@ -40,7 +46,7 @@ function Thumb({ entry }: { entry: StackEntry }): React.JSX.Element {
     return () => {
       cancelled = true
     }
-  }, [stack.slices, stack.window, stack.masks])
+  }, [stack.slices, stack.window, stack.masks, outline])
 
   return (
     <div className="shot">
@@ -59,6 +65,33 @@ function Thumb({ entry }: { entry: StackEntry }): React.JSX.Element {
   )
 }
 
+/** Ring what the check noticed, on the picture rather than in words about it. */
+function drawOutline(canvas: HTMLCanvasElement, outline: MaskRect[] | undefined): void {
+  if (!outline?.length) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.strokeStyle = '#e0a44a'
+  ctx.lineWidth = Math.max(1, Math.round(canvas.width / 128))
+  for (const region of outline) {
+    ctx.strokeRect(
+      region.x * canvas.width,
+      region.y * canvas.height,
+      region.width * canvas.width,
+      region.height * canvas.height
+    )
+  }
+}
+
+/** What was noticed about one stack, in as few words as it can be put. */
+function findingText(finding: BurnInFinding): string {
+  if (finding.declared && finding.regions.length === 0) return 'The file says it carries burnt-in annotation'
+  const places = finding.regions.length === 1 ? 'one place' : `${finding.regions.length} places`
+  const weaker = finding.compared < 2 ? ', from a single image' : ''
+  return finding.declared
+    ? `The file says it carries annotation, and something looks like text in ${places}`
+    : `Looks like text in ${places}${weaker}`
+}
+
 /**
  * The last stop before anonymisation, which is where a mask stops being an
  * overlay and becomes pixels.
@@ -69,7 +102,16 @@ function Thumb({ entry }: { entry: StackEntry }): React.JSX.Element {
  * than a click — and it never reports the rest as clean, because opening a
  * stack is not the same as having read every frame of it.
  */
-export function BurnInCheck({ seenCount, unseen, busy, onOpen, onBack, onConfirm }: Props): React.JSX.Element {
+export function BurnInCheck({
+  entries,
+  seenCount,
+  unseen,
+  findings,
+  busy,
+  onOpen,
+  onBack,
+  onConfirm
+}: Props): React.JSX.Element {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onBack()
@@ -79,6 +121,11 @@ export function BurnInCheck({ seenCount, unseen, busy, onOpen, onBack, onConfirm
   }, [onBack])
 
   const total = seenCount + unseen.length
+  const noticed = new Map((findings ?? []).map((finding) => [finding.stackId, finding]))
+  const flagged = entries.filter((entry) => noticed.has(entry.stack.id))
+  // A flagged stack is listed under its finding, opened or not, so it is not
+  // shown twice and not hidden by having been opened once.
+  const stillUnseen = unseen.filter((entry) => !noticed.has(entry.stack.id))
 
   return (
     <div className="viewer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onBack()}>
@@ -98,16 +145,47 @@ export function BurnInCheck({ seenCount, unseen, busy, onOpen, onBack, onConfirm
             images upload exactly as they are. Only what you blank with <strong>Open for review</strong> is removed.
           </div>
 
-          {unseen.length > 0 ? (
+          {findings === null && (
+            <p className="muted small" style={{ margin: 0 }}>
+              Looking through the images for text…
+            </p>
+          )}
+
+          {flagged.length > 0 && (
+            <>
+              <p className="small" style={{ margin: 0, color: 'var(--warn)' }}>
+                {flagged.length === 1 ? 'Something was noticed in one series' : `Something was noticed in ${flagged.length} series`}
+                . Open it and blank anything identifying — the ring is where to look, not the whole of what is there.
+              </p>
+              <div className="check-grid">
+                {flagged.map((entry) => (
+                  <button
+                    key={entry.stack.id}
+                    className="check-item flagged"
+                    title="Open for review — blank out burnt-in text and set the contrast"
+                    onClick={() => onOpen(entry)}
+                  >
+                    <Thumb entry={entry} outline={noticed.get(entry.stack.id)?.regions} />
+                    <span className="cap">
+                      <span className="name">{entry.label}</span>
+                      <span style={{ color: 'var(--warn)' }}>{findingText(noticed.get(entry.stack.id)!)}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {stillUnseen.length > 0 ? (
             <>
               <p className="muted small" style={{ margin: 0 }}>
-                {unseen.length === 1
+                {stillUnseen.length === 1
                   ? 'One selected series has not been opened full size yet:'
-                  : `${unseen.length} selected series have not been opened full size yet:`}{' '}
+                  : `${stillUnseen.length} selected series have not been opened full size yet:`}{' '}
                 open anything that could carry text — ultrasound, screen captures, reconstructions.
               </p>
               <div className="check-grid">
-                {unseen.map((entry) => (
+                {stillUnseen.map((entry) => (
                   <button
                     key={entry.stack.id}
                     className="check-item"
@@ -125,9 +203,18 @@ export function BurnInCheck({ seenCount, unseen, busy, onOpen, onBack, onConfirm
               </div>
             </>
           ) : (
+            unseen.length === 0 && (
+              <p className="muted small" style={{ margin: 0 }}>
+                Every selected series has been opened full size. That is not the same as having read every image in
+                them — go back if any of these carry text you have not looked for.
+              </p>
+            )
+          )}
+
+          {findings !== null && (
             <p className="muted small" style={{ margin: 0 }}>
-              Every selected series has been opened full size. That is not the same as having read every image in
-              them — go back if any of these carry text you have not looked for.
+              Nothing was noticed in the rest. That check reads two images per series and finds obvious banners; it
+              does not find small print, text over anatomy, or anything on the images it did not look at.
             </p>
           )}
         </div>

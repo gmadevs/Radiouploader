@@ -90,6 +90,12 @@ export interface ImageHeader extends PixelGeometry {
    * nothing to address arithmetically.
    */
   encapsulated: boolean
+  /**
+   * BurnedInAnnotation (0028,0301) as the file states it. Only "YES" says
+   * anything: exporters leave it absent or set it to NO out of habit, so it can
+   * raise suspicion and must never settle it.
+   */
+  burnedInAnnotation: string | null
 }
 
 export interface DecodedFrame {
@@ -155,6 +161,7 @@ export function parseHeader(bytes: Uint8Array): ImageHeader {
     windowCentre: firstNumber(ds.string('x00281050')),
     windowWidth: firstNumber(ds.string('x00281051')),
     frames: Math.max(1, Number.parseInt(ds.string('x00280008') ?? '1', 10) || 1),
+    burnedInAnnotation: ds.string('x00280301') ?? null,
     bigEndian: transferSyntax === EXPLICIT_VR_BIG_ENDIAN,
     pixelDataOffset: pixelData.dataOffset
   }
