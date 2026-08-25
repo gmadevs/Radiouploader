@@ -49,6 +49,10 @@ input, textarea, select {
 }
 input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 textarea { resize: vertical; min-height: 84px; }
+/* The discussion and the findings are the two fields a reader actually reads,
+   and they are written here rather than pasted in. A four-line box makes two
+   sentences look like a finished case. */
+.field.tall textarea { min-height: 200px; }
 
 .app { display: flex; flex-direction: column; height: 100vh; }
 

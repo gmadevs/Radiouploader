@@ -11,6 +11,10 @@ The example above shows both cases: the CT is one stack of 12 images, while the 
 series arrived as one series and was split by b-value into `b=0` and `b=1000`, badged
 **Split by b-value**.
 
+Scrolling with the wheel or the trackpad over a card looks through its images. The page
+stays where it is while the pointer is over one, so a card can be scrubbed without the grid
+sliding out from under it.
+
 ## Defaults you can leave alone
 
 The common case is meant to need no clicking:

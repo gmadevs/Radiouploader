@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PreviewFrame, Stack } from '@shared/types'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
+import { useWheelScrub } from '../wheelScrub'
 
 interface Props {
   stack: Stack
@@ -13,6 +14,7 @@ interface Props {
 /** One stack: a scrubable preview, the trim range, and the include control. */
 export function StackCard({ stack, onToggle, onTrim, onOpen }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
   const [frame, setFrame] = useState<PreviewFrame | null>(null)
   // Open on the middle image — the ends of a volume are rarely informative.
   const [index, setIndex] = useState(() => Math.floor(stack.slices.length / 2))
@@ -67,9 +69,13 @@ export function StackCard({ stack, onToggle, onTrim, onOpen }: Props): React.JSX
   const outsideTrim = index < stack.trimStart || index > stack.trimEnd
   const maskCount = stack.masks?.length ?? 0
 
+  // Scrolling over a card looks through the stack; the page keeps still while
+  // the pointer is on one, which is the only way this is useful in a grid.
+  useWheelScrub(previewRef, (steps) => setIndex((i) => Math.min(Math.max(i + steps, 0), last)))
+
   return (
     <div className={stack.unsupported ? 'stack blocked' : stack.selected ? 'stack on' : 'stack'}>
-      <div className="stack-preview">
+      <div className="stack-preview" ref={previewRef}>
         {error ? (
           <div className="placeholder">
             Preview unavailable

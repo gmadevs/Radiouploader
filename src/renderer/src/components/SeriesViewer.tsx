@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MaskRect, PreviewFrame, Stack, WindowLevel } from '@shared/types'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
+import { useWheelScrub } from '../wheelScrub'
 
 interface Props {
   stack: Stack
@@ -175,6 +176,13 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
       return null
     })
   }
+
+  const stepImage = (steps: number): void =>
+    setIndex((i) => Math.min(Math.max(i + steps, 0), stack.slices.length - 1))
+
+  // The same movement the arrow keys make, on the wheel and the trackpad. The
+  // slider is for jumping across a stack, not for looking through one.
+  useWheelScrub(stageRef, stepImage)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {

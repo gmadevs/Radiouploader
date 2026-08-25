@@ -120,7 +120,7 @@ export function CaseStep({ form, onChange, studies, warnings }: Props): React.JS
             </select>
           </label>
         </div>
-        <label className="field">
+        <label className="field tall">
           Case discussion
           <textarea value={form.body} onChange={(e) => set('body', e.target.value)} />
         </label>
@@ -179,7 +179,7 @@ export function CaseStep({ form, onChange, studies, warnings }: Props): React.JS
                 </label>
               </div>
 
-              <label className="field">
+              <label className="field tall">
                 Findings
                 <textarea value={entry.findings} onChange={(e) => update({ findings: e.target.value })} />
               </label>

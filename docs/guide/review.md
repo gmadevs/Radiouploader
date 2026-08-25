@@ -1,6 +1,8 @@
 # Erase and set contrast
 
 **Open for review** on any stack shows it full size with a scrubber through every image.
+The wheel and the trackpad move through the stack as well, and so do the left and right
+arrow keys — the slider is for jumping across a series, not for reading through one.
 
 ![The ultrasound, banner and all](/shots/04-viewer.png)
 
