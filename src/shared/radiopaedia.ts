@@ -39,6 +39,18 @@ export const DIAGNOSTIC_CERTAINTIES: { id: number; name: string }[] = [
 ]
 
 /**
+ * The ages the case form offers: every year to 18, then every fifth year. This
+ * field used to be free text, which let a case go live with an age written in a
+ * form the site never uses. There is no entry below a year — a case younger than
+ * that is uploaded with the age not stated.
+ */
+export const AGE_OPTIONS: string[] = [
+  '1 year',
+  ...Array.from({ length: 17 }, (_, i) => `${i + 2} years`),
+  ...Array.from({ length: 17 }, (_, i) => `${20 + i * 5} years`)
+]
+
+/**
  * The modality values the study endpoint accepts. Anything outside this list is
  * rejected; a blank value is also allowed.
  */

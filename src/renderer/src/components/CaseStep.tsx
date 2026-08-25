@@ -1,5 +1,5 @@
 import type { Study } from '@shared/types'
-import { DIAGNOSTIC_CERTAINTIES, MODALITIES, SYSTEMS } from '@shared/radiopaedia'
+import { AGE_OPTIONS, DIAGNOSTIC_CERTAINTIES, MODALITIES, SYSTEMS } from '@shared/radiopaedia'
 import { describeInterval } from '@shared/interval'
 
 export interface StudyForm {
@@ -102,7 +102,14 @@ export function CaseStep({ form, onChange, studies, warnings }: Props): React.JS
         <div className="row2">
           <label className="field">
             Age
-            <input value={form.age} onChange={(e) => set('age', e.target.value)} placeholder="e.g. 45 years" />
+            <select value={form.age} onChange={(e) => set('age', e.target.value)}>
+              <option value="">Not stated</option>
+              {AGE_OPTIONS.map((age) => (
+                <option key={age} value={age}>
+                  {age}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="field">
             Gender

@@ -11,8 +11,11 @@ else will.
 
 ## The case
 
-`Title` and `System` are required, the rest is optional. Two notes on the taxonomy:
+`Title` and `System` are required, the rest is optional. Three notes on the taxonomy:
 
+- **Age is a list, not a number.** Every year up to 18, then every fifth year to 100, and
+  nothing below a year — the values the site itself offers. A patient younger than that
+  goes up with the age not stated.
 - **Modality is a closed enum.** `DSA (angiography)`, not "Angiography", and there is no
   PET-CT value.
 - **System ids have gaps.** 5, 10, 13 and 14 are unused, because retired systems keep their
