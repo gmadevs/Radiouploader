@@ -27,7 +27,8 @@ function stack(id: string, sliceCount: number): Stack {
     trimStart: 0,
     trimEnd: sliceCount - 1,
     masks: [],
-    window: null
+    window: null,
+    unsupported: null
   }
 }
 
@@ -68,6 +69,14 @@ beforeEach(() => {
 })
 
 describe('applySelection', () => {
+  it('will not select a stack the app cannot upload, however it was asked', () => {
+    // The renderer disables the tick, but this tree is the one that reaches the
+    // anonymiser — where a compressed run fails per file and loses the stack.
+    session.ingest = ingestWith([{ ...stack('cine', 40), unsupported: 'JPEG baseline multiframe' }])
+    session.applySelection([{ id: 'cine', trimStart: 0, trimEnd: 39 }])
+    expect(session.selectedStacks()).toEqual([])
+  })
+
   it('keeps only the stacks named in the selection', () => {
     session.applySelection([{ id: 'a', trimStart: 0, trimEnd: 9 }])
     expect(session.selectedStacks().map((s) => s.id)).toEqual(['a'])

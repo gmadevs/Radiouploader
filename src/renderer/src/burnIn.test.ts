@@ -18,7 +18,8 @@ function entry(id: string, masks: Stack['masks'] = []): StackEntry {
       trimStart: 0,
       trimEnd: 0,
       masks,
-      window: null
+      window: null,
+      unsupported: null
     },
     label: id,
     modality: 'US',

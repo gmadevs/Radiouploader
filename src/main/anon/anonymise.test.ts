@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import dicomParser from 'dicom-parser'
+import * as dcmio from 'dicomanon'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { anonymiseFile } from './anonymise'
 
@@ -130,6 +131,32 @@ describe('anonymiseFile — multiframe', () => {
     // being re-read per frame.
     const results = await anonymiseFile(source(), outDir, tasks('once'))
     expect(results.map((r) => r.sourcePath)).toEqual(Array(4).fill(source()))
+  })
+
+  /**
+   * A compressed cine — an XA run or an ultrasound loop — built here rather than
+   * committed as a fixture: the JPEG fixture with a NumberOfFrames put on it.
+   * Either half alone is handled; it is the combination that has no answer.
+   */
+  async function compressedCine(): Promise<string> {
+    const buf = await fs.readFile(path.join(fixtures, 'TestPattern_JPEG-Baseline_YBRFull.dcm'))
+    const bytes = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+    const message = dcmio.Message.readFile(bytes)
+    const dict = message.dict as unknown as Record<string, { vr: string; Value: unknown[] }>
+    dict['00280008'] = { vr: 'IS', Value: ['4'] }
+    const outputPath = path.join(outDir, 'jpeg-cine.dcm')
+    await fs.writeFile(outputPath, Buffer.from(message.write()))
+    return outputPath
+  }
+
+  it('refuses to split a compressed run, naming the codec', async () => {
+    // The frame is cut by byte offset, which means nothing in a bitstream. Left
+    // to the bound check this only failed because the JPEG happens to be
+    // smaller than the raw frames — 47 kB against 768 kB — and the message said
+    // nothing about compression.
+    await expect(
+      anonymiseFile(await compressedCine(), outDir, [{ frame: 1, outputName: 'cine.dcm', instanceNumber: 1 }])
+    ).rejects.toThrow(/JPEG baseline compressed/)
   })
 })
 

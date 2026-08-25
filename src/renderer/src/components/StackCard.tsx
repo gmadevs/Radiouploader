@@ -68,7 +68,7 @@ export function StackCard({ stack, onToggle, onTrim, onOpen }: Props): React.JSX
   const maskCount = stack.masks?.length ?? 0
 
   return (
-    <div className={stack.selected ? 'stack on' : 'stack'}>
+    <div className={stack.unsupported ? 'stack blocked' : stack.selected ? 'stack on' : 'stack'}>
       <div className="stack-preview">
         {error ? (
           <div className="placeholder">
@@ -145,6 +145,7 @@ export function StackCard({ stack, onToggle, onTrim, onOpen }: Props): React.JSX
           type="checkbox"
           id={stack.id}
           checked={stack.selected}
+          disabled={stack.unsupported !== null}
           onChange={(e) => onToggle(stack.id, e.target.checked)}
         />
         <label htmlFor={stack.id}>
@@ -163,7 +164,7 @@ export function StackCard({ stack, onToggle, onTrim, onOpen }: Props): React.JSX
             {stack.window && <> · contrast set</>}
           </div>
         </label>
-        {stack.slices.length > 2 && !showTrim && (
+        {stack.slices.length > 2 && !showTrim && !stack.unsupported && (
           <button
             className={trimmed ? 'small trim-toggle on' : 'small trim-toggle'}
             title="Choose the first and last image to upload"
@@ -173,6 +174,10 @@ export function StackCard({ stack, onToggle, onTrim, onOpen }: Props): React.JSX
           </button>
         )}
       </div>
+
+      {/* Says what the failed preview above does not: this one is not merely
+          unviewable here, it cannot go to Radiopaedia at all. */}
+      {stack.unsupported && <div className="stack-blocked">{stack.unsupported}</div>}
     </div>
   )
 }

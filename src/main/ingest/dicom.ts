@@ -38,6 +38,12 @@ export interface InstanceMeta {
   bValue: number | null
   /** Frames inside this object; more than 1 for cine and enhanced objects. */
   numberOfFrames: number
+  /**
+   * Transfer syntax from the file meta. Read here because what can be done with
+   * a series — split its frames, blank a region — is decided while the tree is
+   * built, long before anything opens the pixel data.
+   */
+  transferSyntaxUid: string | null
 }
 
 type DataSet = dicomParser.DataSet
@@ -208,6 +214,7 @@ export async function readInstance(filePath: string): Promise<InstanceMeta> {
     triggerTime: num(ds, 'x00181060'),
     acquisitionTime: str(ds, 'x00080032') ?? str(ds, 'x00080033'),
     bValue: readBValue(ds),
-    numberOfFrames: num(ds, 'x00280008') ?? 1
+    numberOfFrames: num(ds, 'x00280008') ?? 1,
+    transferSyntaxUid: str(ds, 'x00020010')
   }
 }

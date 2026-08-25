@@ -32,6 +32,26 @@ const TRANSFER_SYNTAX_NAMES: Record<string, string> = {
 }
 
 const EXPLICIT_VR_BIG_ENDIAN = '1.2.840.10008.1.2.2'
+const IMPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2'
+
+/**
+ * Transfer syntaxes whose pixel data is plain samples. It is a whitelist, not a
+ * list of codecs, because everything that consults it is deciding whether to
+ * write into the pixel data or cut it up by byte offset — both of which corrupt
+ * a bitstream — so an unrecognised UID has to count as compressed.
+ */
+const UNCOMPRESSED_SYNTAXES = new Set([IMPLICIT_VR_LITTLE_ENDIAN, '1.2.840.10008.1.2.1', EXPLICIT_VR_BIG_ENDIAN])
+
+/**
+ * Name the compression of a transfer syntax, or null when its pixel data is
+ * plain samples and can be read, masked and sliced by offset. A file with no
+ * meta header is implicit VR little endian, as the standard says.
+ */
+export function compressionOf(transferSyntax: string | null | undefined): string | null {
+  const uid = transferSyntax ?? IMPLICIT_VR_LITTLE_ENDIAN
+  if (UNCOMPRESSED_SYNTAXES.has(uid)) return null
+  return TRANSFER_SYNTAX_NAMES[uid] ?? uid
+}
 
 export class UnsupportedTransferSyntaxError extends Error {
   constructor(transferSyntax: string) {
@@ -104,7 +124,7 @@ function firstNumber(value: string | undefined): number | null {
 export function parseHeader(bytes: Uint8Array): ImageHeader {
   const ds = dicomParser.parseDicom(bytes, { untilTag: 'x7fe00010' })
 
-  const transferSyntax = ds.string('x00020010') ?? '1.2.840.10008.1.2'
+  const transferSyntax = ds.string('x00020010') ?? IMPLICIT_VR_LITTLE_ENDIAN
   const pixelData = ds.elements['x7fe00010']
   if (!pixelData) throw new Error('No pixel data in this file')
   // Encapsulated pixel data has an undefined length and is split into fragments.

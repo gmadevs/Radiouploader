@@ -34,12 +34,19 @@ which matters most for ultrasound, where JPEG is common and burnt-in banners are
 ## A compressed multiframe run does not upload at all
 
 Frames are split by indexing the pixel data at a length computed from the geometry, which
-only describes uncompressed samples. A JPEG or RLE cine therefore fails anonymisation with a
-message about running past the pixel data, and the series is dropped from the case behind a
-generic error.
+only describes uncompressed samples, so a JPEG or RLE cine — an XA run, an ultrasound loop —
+cannot be cut into frames at all.
 
-Nothing is corrupted — the bound check catches it — but it is caught by arithmetic rather
-than by design, and the fix is the same decoder the previews want.
+It is said in the picker rather than discovered later: the card names the codec, cannot be
+ticked, and the count of stacks in that state sits next to the selection count. Until the
+codecs land, exporting the run uncompressed from the PACS is the way to publish it.
+
+The anonymiser refuses it too, and now says which codec. It used to be caught only by a
+bound check on the frame offset, which worked by arithmetic rather than by design — a
+lossless codec that expanded a noisy image past its raw size would have passed the check and
+handed back arbitrary pieces of the bitstream as frames. And because that failure is per
+file, every frame of the run was lost at once and the series disappeared from the case
+behind "N file(s) could not be anonymised".
 
 ## Multiframe dynamic series are not split into phases
 

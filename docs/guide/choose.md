@@ -44,3 +44,8 @@ shows the reason it cannot be drawn instead of being mis-rendered, and since the
 needs the same pixels, it is not offered there either. A single-frame compressed object
 still uploads perfectly well — it is anonymised and sent untouched. See
 [known limitations](/limitations).
+
+A compressed **cine** is the one case that cannot be uploaded at all: its frames would have
+to be decoded before they could be split. That card says so in place of the tick, and the
+count beside *selected* tells you how many stacks are in that state, so a run cannot go
+missing from the case without having been mentioned.

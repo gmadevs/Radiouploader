@@ -6,6 +6,7 @@ import {
   UnsupportedTransferSyntaxError,
   applyWindow,
   blackSamples,
+  compressionOf,
   decodeFrame,
   decodeGreyFrame,
   downscale,
@@ -86,6 +87,31 @@ function expectMidGrey(value: number): void {
   expect(value).toBeGreaterThan(125)
   expect(value).toBeLessThan(130)
 }
+
+describe('compressionOf', () => {
+  it('passes the three uncompressed syntaxes', () => {
+    for (const uid of ['1.2.840.10008.1.2', '1.2.840.10008.1.2.1', '1.2.840.10008.1.2.2']) {
+      expect(compressionOf(uid)).toBeNull()
+    }
+  })
+
+  it('reads a missing meta header as implicit VR little endian', () => {
+    expect(compressionOf(null)).toBeNull()
+    expect(compressionOf(undefined)).toBeNull()
+  })
+
+  it('names the codecs it knows', () => {
+    expect(compressionOf('1.2.840.10008.1.2.4.50')).toBe('JPEG baseline')
+    expect(compressionOf('1.2.840.10008.1.2.5')).toBe('RLE')
+  })
+
+  it('counts an unknown syntax as compressed — the safe way to be wrong', () => {
+    // Callers decide from this whether to write into the pixel data or cut it
+    // by offset. Guessing "plain samples" corrupts an image; guessing the other
+    // way refuses one that might have worked.
+    expect(compressionOf('1.2.840.10008.1.2.4.999')).toBe('1.2.840.10008.1.2.4.999')
+  })
+})
 
 describe('parseHeader', () => {
   it('reads geometry and photometric interpretation', () => {

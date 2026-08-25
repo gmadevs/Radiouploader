@@ -77,6 +77,13 @@ export interface Stack {
    * Null leaves the exporter's own window in place.
    */
   window: WindowLevel | null
+  /**
+   * Why this stack cannot be uploaded, in words for the picker; null when it
+   * can. Said here, while the tree is built, because the alternative is finding
+   * out during anonymisation — where the failure is per file, so the stack
+   * uploads nothing and disappears from the case behind a count of errors.
+   */
+  unsupported: string | null
 }
 
 /**

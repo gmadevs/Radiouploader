@@ -34,6 +34,7 @@ export function ReviewStep({
 }: Props): React.JSX.Element {
   const stacks = studies.flatMap((study) => study.series.flatMap((series) => series.stacks))
   const selectedCount = stacks.filter((stack) => stack.selected).length
+  const blockedCount = stacks.filter((stack) => stack.unsupported !== null).length
   // One button that does the useful thing: with a big export the first move is
   // to clear everything and tick back the few series that matter.
   const clearing = selectedCount > 0
@@ -55,6 +56,11 @@ export function ReviewStep({
           <span className="muted small">
             {selectedCount} of {stacks.length} selected
           </span>
+          {blockedCount > 0 && (
+            <span className="small" style={{ color: 'var(--warn)' }}>
+              {blockedCount} cannot be uploaded
+            </span>
+          )}
         </div>
       </div>
 

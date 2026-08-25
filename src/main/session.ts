@@ -67,8 +67,10 @@ class Session {
       for (const series of study.series) {
         for (const stack of series.stacks) {
           const chosen = byId.get(stack.id)
-          stack.selected = chosen !== undefined
-          if (!chosen) continue
+          // A stack the app cannot upload stays untickable here too: the
+          // renderer's copy is a suggestion, and this is the tree that is read.
+          stack.selected = chosen !== undefined && stack.unsupported === null
+          if (!chosen || !stack.selected) continue
           // Clamp against the real length; the renderer's copy could be stale.
           const last = stack.slices.length - 1
           stack.trimStart = Math.min(Math.max(chosen.trimStart, 0), last)

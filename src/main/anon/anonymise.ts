@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as dcmio from 'dicomanon'
-import { blackSamples, fillMasks, frameSamples, type PixelGeometry } from '@shared/dicomImage'
+import { blackSamples, compressionOf, fillMasks, frameSamples, type PixelGeometry } from '@shared/dicomImage'
 import type { AnonWarning, MaskRect, WindowLevel } from '@shared/types'
 
 export interface AnonymisedFile {
@@ -31,14 +31,6 @@ export interface FrameTask {
 const WINDOW_TAGS = ['00281050', '00281051', '00281055', '00283010']
 
 const EXPLICIT_VR_BIG_ENDIAN = '1.2.840.10008.1.2.2'
-
-/**
- * Transfer syntaxes whose pixel data is plain samples. Painting a mask into
- * anything else would write over a compressed bitstream and corrupt the image,
- * so a redaction on one of those is refused rather than attempted. The viewer
- * cannot show a compressed image either, so it never offers the eraser for one.
- */
-const UNCOMPRESSED_SYNTAXES = new Set(['1.2.840.10008.1.2', '1.2.840.10008.1.2.1', EXPLICIT_VR_BIG_ENDIAN])
 
 /** Warning levels below this are noise for a case uploader. */
 const WARNING_LEVEL_FLOOR = 3
@@ -132,6 +124,10 @@ export async function anonymiseFile(
   const dict = message.dict as unknown as Dict
 
   const transferSyntax = transferSyntaxOf(message)
+  // Painting a mask writes over the stored samples, and splitting a multiframe
+  // run cuts them by byte offset. Neither is meaningful on a bitstream, so both
+  // are refused rather than attempted on a compressed file.
+  const compression = compressionOf(transferSyntax)
   const totalFrames = numberOf(dict, '00280008', 1)
   const pixelElement = dict['7FE00010']
   const allPixels = pixelElement?.Value?.[0] as ArrayBuffer | undefined
@@ -164,11 +160,20 @@ export async function anonymiseFile(
 
   for (const task of tasks) {
     const masks = task.masks ?? []
-    if (masks.length > 0 && !UNCOMPRESSED_SYNTAXES.has(transferSyntax ?? '1.2.840.10008.1.2')) {
-      throw new Error(`Cannot redact ${path.basename(sourcePath)}: its pixel data is compressed`)
+    if (masks.length > 0 && compression !== null) {
+      throw new Error(`Cannot redact ${path.basename(sourcePath)}: its pixel data is ${compression} compressed`)
     }
 
     if (totalFrames > 1) {
+      // The bound check below would catch most of these anyway, since a
+      // compressed run is smaller than the raw frames it stands for — but only
+      // by accident. A codec that expanded a noisy image past the raw size would
+      // pass it and hand back arbitrary pieces of the bitstream as frames.
+      if (compression !== null) {
+        throw new Error(
+          `Cannot split the ${totalFrames} frames of ${path.basename(sourcePath)}: its pixel data is ${compression} compressed`
+        )
+      }
       if (!allPixels || frameLength === 0) {
         throw new Error(`Cannot split frames of ${path.basename(sourcePath)}: pixel data is not addressable`)
       }

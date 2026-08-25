@@ -124,7 +124,11 @@ export function App(): React.JSX.Element {
             ...series,
             stacks: series.stacks.map((stack) => {
               const patch = change(stack, series)
-              return patch === null ? stack : { ...stack, ...patch }
+              if (patch === null) return stack
+              // Select-all and the per-series buttons go through here too, and
+              // neither should be able to tick a stack that cannot be uploaded.
+              if (patch.selected === true && stack.unsupported !== null) return stack
+              return { ...stack, ...patch }
             })
           }))
         }))

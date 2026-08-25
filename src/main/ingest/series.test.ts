@@ -30,6 +30,7 @@ function inst(overrides: Partial<InstanceMeta> = {}): InstanceMeta {
     acquisitionTime: null,
     bValue: null,
     numberOfFrames: 1,
+    transferSyntaxUid: '1.2.840.10008.1.2.1',
     ...overrides
   }
 }
@@ -150,6 +151,46 @@ describe('buildStacks — multiframe objects', () => {
   it('gives a single-frame instance exactly one slice at frame 0', () => {
     const { stacks } = buildStacks('s', [inst()])
     expect(stacks[0].slices).toEqual([expect.objectContaining({ frame: 0 })])
+  })
+})
+
+describe('buildStacks — compressed multiframe', () => {
+  const jpegCine = (): InstanceMeta[] => [
+    inst({ numberOfFrames: 40, transferSyntaxUid: '1.2.840.10008.1.2.4.50' })
+  ]
+
+  it('names the codec and refuses the run, instead of losing it at anonymisation', () => {
+    const { stacks } = buildStacks('s', jpegCine())
+    expect(stacks[0].unsupported).toContain('JPEG baseline')
+    expect(stacks[0].selected).toBe(false)
+  })
+
+  it('treats an unrecognised transfer syntax as compressed too', () => {
+    const { stacks } = buildStacks('s', [inst({ numberOfFrames: 4, transferSyntaxUid: '1.2.840.10008.1.2.4.95' })])
+    expect(stacks[0].unsupported).not.toBeNull()
+  })
+
+  it('leaves a compressed single-frame image alone — it uploads untouched', () => {
+    const { stacks } = buildStacks('s', [inst({ transferSyntaxUid: '1.2.840.10008.1.2.4.50' })])
+    expect(stacks[0].unsupported).toBeNull()
+    expect(stacks[0].selected).toBe(true)
+  })
+
+  it('leaves an uncompressed cine run alone — those are split fine', () => {
+    const { stacks } = buildStacks('s', [inst({ numberOfFrames: 40 })])
+    expect(stacks[0].unsupported).toBeNull()
+    expect(stacks[0].selected).toBe(true)
+  })
+
+  it('stays unticked even when the defaults would have chosen it', () => {
+    // A component split runs applyDefaultSelection, which ticks every
+    // magnitude-like stack; the compressed cine must not come back with it.
+    const { stacks } = buildStacks('s', [
+      ...jpegCine(),
+      inst({ component: 'phase', imageType: ['ORIGINAL', 'PRIMARY', 'P'] })
+    ])
+    const blocked = stacks.find((stack) => stack.unsupported !== null)
+    expect(blocked?.selected).toBe(false)
   })
 })
 

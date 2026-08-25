@@ -1,3 +1,4 @@
+import { compressionOf } from '@shared/dicomImage'
 import type { ImageComponent, Series, SliceRef, Stack, StackKind, Study } from '@shared/types'
 import type { InstanceMeta } from './dicom'
 
@@ -126,6 +127,26 @@ function toSliceRefs(meta: InstanceMeta): SliceRef[] {
   }))
 }
 
+/**
+ * Why this stack cannot be uploaded, if it cannot.
+ *
+ * A multiframe object that is also compressed — an XA cine run, an ultrasound
+ * cineloop — cannot have its frames lifted out, because that is done by byte
+ * offset into plain samples. Sending the file whole is not an answer either:
+ * Radiopaedia does not expand multiframe objects, so a run of dozens would be
+ * published as its first frame.
+ *
+ * This used to be found during anonymisation, one file at a time, which lost
+ * every frame of the run and left only "N file(s) could not be anonymised" to
+ * explain a series that had silently gone missing from the case.
+ */
+function unsupportedReason(instances: InstanceMeta[]): string | null {
+  const blocked = instances.find((m) => m.numberOfFrames > 1 && compressionOf(m.transferSyntaxUid) !== null)
+  if (blocked === undefined) return null
+  const codec = compressionOf(blocked.transferSyntaxUid)
+  return `${codec} multiframe — compressed frames cannot be split yet, so this run cannot be uploaded`
+}
+
 function buildLabel(d: Dimensions, phaseIndex: number | null, echoTime: number | null, multi: Set<StackKind>): string {
   const parts: string[] = []
   if (multi.has('component')) parts.push(COMPONENT_LABELS[d.component])
@@ -195,6 +216,8 @@ export function buildStacks(seriesId: string, instances: InstanceMeta[]): { stac
 
   stacks.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
   applyDefaultSelection(stacks, varying)
+  // Whatever the defaults chose, nothing that cannot be uploaded is ticked.
+  for (const stack of stacks) if (stack.unsupported !== null) stack.selected = false
 
   return { stacks, splitReason: stacks.length > 1 ? primaryKind(varying) : null }
 }
@@ -217,6 +240,7 @@ function makeStack(
 ): Stack {
   const sorted = sortSlices(instances)
   const slices = sorted.flatMap(toSliceRefs)
+  const unsupported = unsupportedReason(instances)
   return {
     id: `${seriesId}::stack-${index}`,
     kind: primaryKind(varying),
@@ -227,11 +251,12 @@ function makeStack(
     phaseIndex,
     acquisitionTime: instances[0].acquisitionTime,
     slices,
-    selected: true,
+    selected: unsupported === null,
     trimStart: 0,
     trimEnd: slices.length - 1,
     masks: [],
-    window: null
+    window: null,
+    unsupported
   }
 }
 
