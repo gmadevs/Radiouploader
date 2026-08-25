@@ -233,7 +233,10 @@ label.field { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
   padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel-2);
 }
 .viewer-head h2 { font-size: 14px; }
-.viewer-head .tools { display: flex; gap: 6px; }
+/* Not scoped to the header: the reformat footer and the case form use a row of
+   these too, and outside the header they were unstyled and wrapped. */
+.tools { display: flex; align-items: center; gap: 6px; }
+.tools .spacer { flex: 1; }
 /* Not scoped to the header: the reformat dialog puts a set of these by the
    footer, and a chosen tool has to look chosen wherever it sits. */
 .tools button.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600; }

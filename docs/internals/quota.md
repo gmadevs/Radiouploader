@@ -3,12 +3,17 @@
 ## Draft quota
 
 Radiopaedia limits how many draft cases an account may hold. The quota is read at sign-in
-and shown in the header, and importing is **blocked before it starts** when the account is
-signed out or full — so a full allowance turns up before you import, preview and anonymise
-a whole study, rather than at the final API call.
+and shown in the header.
 
-It is re-checked server-side immediately before the case is created, because the renderer's
-copy can go stale while you work.
+Being signed out blocks the import before it starts. A **full quota does not**: it blocks
+only the creation of a new case, and the case step then offers
+[adding to a draft](/guide/upload) instead — which is exactly what someone with five drafts
+open and one to finish is trying to do. The step opens on that choice when there is no room
+for a new case.
+
+The quota is re-checked server-side immediately before a case is created, because the
+renderer's copy can go stale while you work. Adding to an existing draft skips that check,
+because it creates no case.
 
 An `allowed_draft_cases` of `null` means **unlimited**, not zero.
 

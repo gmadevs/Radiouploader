@@ -7,6 +7,7 @@ import type {
   AppInfo,
   AnonResult,
   BurnInFinding,
+  CaseSummary,
   IngestResult,
   PreviewFrame,
   Progress,
@@ -42,6 +43,12 @@ async function requireClient(): Promise<RadiopaediaClient> {
 }
 
 export interface UploadRequest {
+  /**
+   * An existing draft to add to. When set the case is not created and the
+   * draft below is not read: the case already has its title, its age and its
+   * system, and the API has no way to change them.
+   */
+  caseId?: string | null
   caseDraft: CaseDraft
   /** One entry per DICOM study; each becomes a study on the Radiopaedia case. */
   studies: StudyDraftInput[]
@@ -154,6 +161,10 @@ export function registerIpc(): void {
 
   ipcMain.handle('api:currentUser', async () => (await requireClient()).currentUser())
 
+  // The drafts this account can still add images to. There is no filter in the
+  // API, so the whole listing comes down and the drafts are picked out here.
+  ipcMain.handle('api:draftCases', async (): Promise<CaseSummary[]> => (await requireClient()).draftCases())
+
   ipcMain.handle('upload:run', async (_e, request: UploadRequest) => {
     const c = await requireClient()
     const anon = session.anon
@@ -168,19 +179,35 @@ export function registerIpc(): void {
     const key = (sourcePath: string, frame: number): string => `${sourcePath}#${frame}`
     const bySource = new Map(anon.files.map((f) => [key(f.sourcePath, f.frame), f]))
 
-    // Re-check the quota against the server. The renderer's copy can be stale —
-    // the user may have created drafts elsewhere since this session started —
-    // and a rejected case would otherwise surface as an opaque API error.
-    const { quota } = await c.currentUser()
-    if (quota?.allowedDraftCases !== null && quota !== null && quota.draftCaseCount >= quota.allowedDraftCases) {
-      throw new Error(
-        `Draft quota full: ${quota.draftCaseCount} of ${quota.allowedDraftCases} used. ` +
-          'Publish or delete a draft case on Radiopaedia first. ' +
-          'You can raise your quota at https://radiopaedia.org/supporters'
-      )
-    }
+    // Adding to a draft creates no case, so the quota does not apply — and it
+    // is exactly what a full quota leaves you able to do.
+    let caseId = request.caseId ?? null
 
-    const caseId = await c.createCase(request.caseDraft)
+    if (caseId === null) {
+      // Re-check the quota against the server. The renderer's copy can be stale —
+      // the user may have created drafts elsewhere since this session started —
+      // and a rejected case would otherwise surface as an opaque API error.
+      const { quota } = await c.currentUser()
+      if (quota?.allowedDraftCases !== null && quota !== null && quota.draftCaseCount >= quota.allowedDraftCases) {
+        throw new Error(
+          `Draft quota full: ${quota.draftCaseCount} of ${quota.allowedDraftCases} used. ` +
+            'Publish or delete a draft case on Radiopaedia first. ' +
+            'You can raise your quota at https://radiopaedia.org/supporters'
+        )
+      }
+      caseId = await c.createCase(request.caseDraft)
+    } else {
+      // The case may have been published, sent for review or deleted since the
+      // list was fetched, and only a draft takes new images. Checked here
+      // because this is the last moment before anything is sent.
+      const still = (await c.draftCases()).some((existing) => existing.id === caseId)
+      if (!still) {
+        throw new Error(
+          'That case is no longer a draft on Radiopaedia, so it cannot take new images. ' +
+            'It may have been published, sent for review, or deleted since the list was read.'
+        )
+      }
+    }
 
     // Studies are created oldest first so the case timeline reads in order.
     let seriesDone = 0

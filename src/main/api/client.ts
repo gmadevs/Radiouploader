@@ -1,3 +1,4 @@
+import type { CaseSummary } from '@shared/types'
 import {
   authorizeViaLoopback,
   buildAuthorization,
@@ -181,6 +182,56 @@ export class RadiopaediaClient {
           }
         : null
     }
+  }
+
+  /**
+   * The caller's own cases, newest first, as far back as the API will page.
+   *
+   * There is no filter parameter, so the whole listing comes down and the
+   * caller picks out what it wants. Paging is an opaque cursor carried in an
+   * `X-Next-Cursor` header rather than a page number, and a listing that
+   * repeats a cursor would page for ever, so a repeat stops it.
+   */
+  async listCases(): Promise<CaseSummary[]> {
+    const cases: CaseSummary[] = []
+    const seen = new Set<string>()
+    let cursor: string | null = null
+
+    // Radiopaedia's own client stops at 200 pages of 100; so does this.
+    for (let page = 0; page < 200; page++) {
+      const query = new URLSearchParams({ per_page: '100' })
+      if (cursor !== null) query.set('cursor', cursor)
+
+      const res = await this.request(`cases?${query.toString()}`)
+      const body = (await res.json()) as Record<string, unknown>[]
+      if (!Array.isArray(body) || body.length === 0) break
+
+      for (const item of body) {
+        cases.push({
+          id: String(item.id),
+          title: typeof item.title === 'string' ? item.title : null,
+          status: typeof item.status === 'string' ? item.status : null,
+          visibility: typeof item.visibility === 'string' ? item.visibility : null,
+          updatedAt: typeof item.updated_at === 'string' ? item.updated_at : null
+        })
+      }
+
+      cursor = res.headers.get('X-Next-Cursor')
+      if (cursor === null || cursor === '' || seen.has(cursor)) break
+      seen.add(cursor)
+    }
+    return cases
+  }
+
+  /**
+   * The cases that can still take images.
+   *
+   * Only a draft can: Radiopaedia refuses new imaging on a case that has gone
+   * for review or been published, and a case that has been deleted on the site
+   * simply stops appearing in the listing.
+   */
+  async draftCases(): Promise<CaseSummary[]> {
+    return (await this.listCases()).filter((existing) => existing.status === 'draft')
   }
 
   /** Create a draft case and return its id. */

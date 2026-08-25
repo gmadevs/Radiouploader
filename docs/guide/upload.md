@@ -9,6 +9,27 @@ because they carry imaging parameters — `SeriesDescription`, `ContentQualifica
 they are free text, and a hospital's export can put anything in them. Read them; nothing
 else will.
 
+## Where the images go
+
+The step opens by asking that, because there are two answers.
+
+**A new case** is the usual one: the details below become a new draft, and it counts against
+your draft quota.
+
+**An existing draft** adds the studies to a case you already have on Radiopaedia. The list
+comes from `GET /api/v1/cases`, which returns your own cases; only the **drafts** are
+offered, because a case that has gone for review or been published is closed to the API and
+refuses new imaging. The list is read when the step opens, and **Refresh** reads it again —
+a case can be published on the site while you are working.
+
+Adding to a draft leaves everything else about it alone. Its title, age, gender, system and
+discussion stay as they are: the API has no way to change them, so edit those on
+Radiopaedia. The studies arrive as new studies on the case.
+
+There is no way to see what the case already holds — the API has no endpoint that lists a
+case's existing studies — so a study you have already uploaded will arrive twice if you
+upload it twice.
+
 ## The case
 
 `Title` and `System` are required, the rest is optional. Three notes on the taxonomy:

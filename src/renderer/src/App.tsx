@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AppInfo, BurnInFinding, IngestResult, Progress, Series, Stack } from '@shared/types'
+import type { AppInfo, BurnInFinding, CaseSummary, IngestResult, Progress, Series, Stack } from '@shared/types'
 import { AccountBar } from './components/AccountBar'
 import { quotaExhausted, type AccountState } from './quota'
 import { describeInterval } from '@shared/interval'
@@ -25,6 +25,7 @@ const STEPS: { key: Step; label: string }[] = [
 const EMPTY_FORM: CaseForm = {
   title: '',
   presentation: '',
+  existingCaseId: null,
   age: '',
   gender: '',
   body: '',
@@ -55,6 +56,8 @@ export function App(): React.JSX.Element {
   )
   /** What the pixel check noticed, or null while it is still looking. */
   const [findings, setFindings] = useState<BurnInFinding[] | null>(null)
+  /** The account's draft cases, or null until they have been read. */
+  const [drafts, setDrafts] = useState<CaseSummary[] | null>(null)
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [showInfo, setShowInfo] = useState(false)
 
@@ -62,13 +65,16 @@ export function App(): React.JSX.Element {
    * Reasons the account cannot take a case right now. Checked before importing
    * so a full quota surfaces before any work is done, not after anonymising.
    */
-  const blocked = !account.authenticated
-    ? { reason: 'Sign in to Radiopaedia before importing a study.' }
-    : quotaExhausted(account.quota)
-      ? {
-          reason: `Your draft quota is full (${account.quota!.draftCaseCount} of ${account.quota!.allowedDraftCases}). Publish or delete a draft case on Radiopaedia before uploading another.`
-        }
-      : null
+  const blocked = !account.authenticated ? { reason: 'Sign in to Radiopaedia before importing a study.' } : null
+
+  /**
+   * A full quota stops a new case being made, and nothing else. Adding to a
+   * draft creates no case — which is exactly what someone with five drafts open
+   * and one to finish is trying to do — so the import is not blocked over it.
+   */
+  const newCaseBlocked = quotaExhausted(account.quota)
+    ? `Your draft quota is full (${account.quota!.draftCaseCount} of ${account.quota!.allowedDraftCases}), so a new case cannot be created. You can still add these images to a draft you already have.`
+    : null
 
   /**
    * The bar belongs to whatever is running. A run's last progress event can
@@ -192,6 +198,22 @@ export function App(): React.JSX.Element {
     }
   }
 
+  const readDrafts = async (): Promise<void> => {
+    setDrafts(null)
+    try {
+      const found = await window.api.draftCases()
+      setDrafts(found)
+      // With no room for a new case, the only way forward is a draft — so the
+      // step opens on one rather than on a form that cannot be submitted.
+      if (quotaExhausted(account.quota) && found.length > 0) {
+        setForm((current) => (current.existingCaseId === null ? { ...current, existingCaseId: found[0].id } : current))
+      }
+    } catch (e) {
+      setDrafts([])
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   const runIngest = async (paths: string[]): Promise<void> => {
     setWorking(true)
     setError(null)
@@ -255,6 +277,10 @@ export function App(): React.JSX.Element {
         )
       }))
       setStep('case')
+      // The drafts are read on the way in rather than at sign-in: one may have
+      // been published on the site in the meantime, and this is the moment the
+      // list is about to be looked at.
+      void readDrafts()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -267,6 +293,7 @@ export function App(): React.JSX.Element {
     setError(null)
     try {
       const res = await window.api.upload({
+        caseId: form.existingCaseId,
         caseDraft: {
           title: form.title,
           presentation: form.presentation,
@@ -378,22 +405,36 @@ export function App(): React.JSX.Element {
         )}
 
         {step === 'case' && (
-          <CaseStep form={form} onChange={setForm} studies={studiesToUpload} warnings={warnings} />
+          <CaseStep
+          form={form}
+          onChange={setForm}
+          studies={studiesToUpload}
+          warnings={warnings}
+          drafts={drafts}
+          newCaseBlocked={newCaseBlocked}
+          onRefreshDrafts={() => void readDrafts()}
+        />
         )}
 
         {step === 'done' && result && (
           <div className="card" style={{ textAlign: 'center', maxWidth: 480 }}>
-            <h1>Case uploaded</h1>
+            <h1>{form.existingCaseId === null ? 'Case uploaded' : 'Images added'}</h1>
             <p className="muted">
-              The case was created as a draft. Open it on Radiopaedia to review the images and publish it.
+              {form.existingCaseId === null
+                ? 'The case was created as a draft. Open it on Radiopaedia to review the images and publish it.'
+                : 'The studies were added to the draft. Open it on Radiopaedia to review the images and publish it.'}
             </p>
             {/* system_id is sent exactly as documented and accepted, but never
                 applied — diagnostic_certainty_id in the same request is. Tried
-                as JSON, as a form body and as a query parameter, all identical. */}
-            <div className="notice warn" style={{ textAlign: 'left', marginTop: 14 }}>
-              <strong>Set the System on the case.</strong> Radiopaedia's API accepts <code>system_id</code> but does
-              not apply it, so every case arrives without one.
-            </div>
+                as JSON, as a form body and as a query parameter, all identical.
+                Only a case this app created can be missing one; a draft it
+                added to has whatever system it already had. */}
+            {form.existingCaseId === null && (
+              <div className="notice warn" style={{ textAlign: 'left', marginTop: 14 }}>
+                <strong>Set the System on the case.</strong> Radiopaedia's API accepts <code>system_id</code> but does
+                not apply it, so every case arrives without one.
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16 }}>
               <a href={`${result.url}/edit`} target="_blank" rel="noreferrer">
                 <button className="primary">Open case for editing</button>
@@ -499,8 +540,17 @@ export function App(): React.JSX.Element {
             </button>
             <button
               className="primary"
-              disabled={busy || form.title.trim() === '' || form.systemId === null}
-              title={form.systemId === null ? 'Choose a system first' : undefined}
+              // A case that already exists needs no title and no system: it has
+              // them, and this upload cannot change them either way.
+              disabled={
+                busy ||
+                (form.existingCaseId === null
+                  ? form.title.trim() === '' || form.systemId === null
+                  : drafts?.some((draft) => draft.id === form.existingCaseId) !== true)
+              }
+              title={
+                form.existingCaseId === null && form.systemId === null ? 'Choose a system first' : undefined
+              }
               onClick={() => void upload()}
             >
               Upload to Radiopaedia

@@ -1,4 +1,4 @@
-import type { Study } from '@shared/types'
+import type { CaseSummary, Study } from '@shared/types'
 import { AGE_OPTIONS, DIAGNOSTIC_CERTAINTIES, MODALITIES, SYSTEMS } from '@shared/radiopaedia'
 import { describeInterval } from '@shared/interval'
 
@@ -10,6 +10,12 @@ export interface StudyForm {
 }
 
 export interface CaseForm {
+  /**
+   * The draft this upload joins, or null for a new case. A case that already
+   * exists keeps its own title, age and system: the API has no way to change
+   * them, so the fields below are not read when this is set.
+   */
+  existingCaseId: string | null
   title: string
   presentation: string
   age: string
@@ -35,10 +41,33 @@ interface Props {
   /** Studies that have at least one stack selected, oldest first. */
   studies: Study[]
   warnings: { tag: string; text: string; level: number; count: number }[]
+  /** The account's drafts; null while they are still being read. */
+  drafts: CaseSummary[] | null
+  /** Why a new case cannot be made, when it cannot. */
+  newCaseBlocked: string | null
+  /** Ask for the drafts again — one may have been published on the site since. */
+  onRefreshDrafts: () => void
 }
 
-export function CaseStep({ form, onChange, studies, warnings }: Props): React.JSX.Element {
+/** The day a draft was last touched, which is how you tell two alike apart. */
+function when(iso: string | null): string {
+  if (iso === null) return ''
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10)
+}
+
+export function CaseStep({
+  form,
+  onChange,
+  studies,
+  warnings,
+  drafts,
+  newCaseBlocked,
+  onRefreshDrafts
+}: Props): React.JSX.Element {
   const set = <K extends keyof CaseForm>(key: K, value: CaseForm[K]): void => onChange({ ...form, [key]: value })
+  const joining = form.existingCaseId !== null
+  const joined = drafts?.find((draft) => draft.id === form.existingCaseId) ?? null
 
   return (
     <div style={{ display: 'grid', gap: 20, maxWidth: 780, margin: '0 auto' }}>
@@ -59,6 +88,69 @@ export function CaseStep({ form, onChange, studies, warnings }: Props): React.JS
         </div>
       )}
 
+      <div className="card rows">
+        <h2>Where these images go</h2>
+        <div className="tools">
+          <button
+            className={joining ? 'small' : 'small on'}
+            disabled={newCaseBlocked !== null}
+            title={newCaseBlocked ?? 'Create a new draft case from the form below'}
+            onClick={() => set('existingCaseId', null)}
+          >
+            A new case
+          </button>
+          <button
+            className={joining ? 'small on' : 'small'}
+            disabled={drafts !== null && drafts.length === 0}
+            title="Add these images to a draft case you already have on Radiopaedia"
+            onClick={() => set('existingCaseId', drafts?.[0]?.id ?? null)}
+          >
+            An existing draft
+          </button>
+          <div className="spacer" />
+          <button className="small ghost" onClick={onRefreshDrafts}>
+            Refresh
+          </button>
+        </div>
+
+        {newCaseBlocked !== null && (
+          <p className="small" style={{ margin: 0, color: 'var(--warn)' }}>
+            {newCaseBlocked}
+          </p>
+        )}
+
+        {joining ? (
+          <>
+            <label className="field">
+              Draft case
+              <select
+                value={form.existingCaseId ?? ''}
+                onChange={(e) => set('existingCaseId', e.target.value === '' ? null : e.target.value)}
+              >
+                {(drafts ?? []).map((draft) => (
+                  <option key={draft.id} value={draft.id}>
+                    {draft.title ?? `Case ${draft.id}`}
+                    {when(draft.updatedAt) === '' ? '' : ` · ${when(draft.updatedAt)}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="muted small" style={{ margin: 0 }}>
+              {drafts === null
+                ? 'Reading your draft cases…'
+                : drafts.length === 0
+                  ? 'This account has no draft cases to add to.'
+                  : `The studies below are added to ${joined?.title ?? 'this case'} as new studies. Its title, age and the rest stay as they are — the API cannot change them, so edit those on Radiopaedia.`}
+            </p>
+          </>
+        ) : (
+          <p className="muted small" style={{ margin: 0 }}>
+            A new draft case is created from the details below, and counts against your draft quota.
+          </p>
+        )}
+      </div>
+
+      {!joining && (
       <div className="card rows">
         <h2>Case</h2>
         <label className="field">
@@ -132,6 +224,7 @@ export function CaseStep({ form, onChange, studies, warnings }: Props): React.JS
           <textarea value={form.body} onChange={(e) => set('body', e.target.value)} />
         </label>
       </div>
+      )}
 
       <div className="card rows">
         <h2>{studies.length > 1 ? `Studies (${studies.length})` : 'Study'}</h2>

@@ -3,6 +3,7 @@ import type {
   AnonResult,
   AppInfo,
   BurnInFinding,
+  CaseSummary,
   IngestResult,
   PreviewFrame,
   Progress,
@@ -39,6 +40,9 @@ const api = {
    * was noticed in come back; silence about a stack is not a clean bill.
    */
   scanBurnIn: (): Promise<BurnInFinding[]> => ipcRenderer.invoke('burnIn:scan'),
+
+  /** The account's draft cases: the ones that can still take images. */
+  draftCases: (): Promise<CaseSummary[]> => ipcRenderer.invoke('api:draftCases'),
 
   /**
    * Reformatting. The volume is built and held in the main process — a chest CT

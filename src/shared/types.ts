@@ -188,6 +188,21 @@ export interface VolumeInfo {
   anatomical: boolean
 }
 
+/**
+ * One of the user's cases on Radiopaedia, as the listing gives it.
+ *
+ * Only a draft can take new images — a case that has gone for review or been
+ * published is closed to the API, and one deleted on the site stops appearing
+ * in the listing at all.
+ */
+export interface CaseSummary {
+  id: string
+  title: string | null
+  status: string | null
+  visibility: string | null
+  updatedAt: string | null
+}
+
 /** Which build this is, for the home screen and for bug reports. */
 export interface AppInfo {
   version: string
