@@ -173,23 +173,6 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
   const result = frames.result ?? null
   const level = window_ ?? (result?.kind === 'grey' ? result.window : null)
 
-  /** The spread of the image, which is what the window sliders have to cover. */
-  const bounds = useMemo(() => {
-    if (result?.kind !== 'grey') return null
-    let min = Infinity
-    let max = -Infinity
-    for (const value of result.values) {
-      if (value < min) min = value
-      if (value > max) max = value
-    }
-    return Number.isFinite(min) && max > min ? { min, max } : null
-  }, [result])
-
-  const setLevel = (next: Partial<WindowLevel>): void => {
-    if (!level) return
-    setWindow({ centre: next.centre ?? level.centre, width: Math.max(next.width ?? level.width, 1) })
-  }
-
   /** Windowing by drag: right widens, down raises the centre, as everywhere else. */
   const dragFrom = useRef<WindowLevel | null>(null)
   const onWindowDrag = (dx: number, dy: number, first: boolean): void => {
@@ -393,37 +376,6 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
             <span className="n">{step(spacing)} mm</span>
           </div>
 
-          {level && bounds && (
-            <>
-              <div className="viewer-slider">
-                <span>Level</span>
-                <input
-                  type="range"
-                  min={bounds.min}
-                  max={bounds.max}
-                  step={Math.max((bounds.max - bounds.min) / 500, 0.01)}
-                  value={level.centre}
-                  aria-label="Window centre"
-                  onChange={(e) => setLevel({ centre: Number(e.target.value) })}
-                />
-                <span className="n">{step(level.centre)}</span>
-              </div>
-              <div className="viewer-slider">
-                <span>Window</span>
-                <input
-                  type="range"
-                  min={1}
-                  max={Math.max((bounds.max - bounds.min) * 2, 2)}
-                  step={Math.max((bounds.max - bounds.min) / 500, 0.01)}
-                  value={level.width}
-                  aria-label="Window width"
-                  onChange={(e) => setLevel({ width: Number(e.target.value) })}
-                />
-                <span className="n">{step(level.width)}</span>
-              </div>
-            </>
-          )}
-
           <div className="viewer-actions">
             <div className="tools">
               {PROJECTIONS.map((option) => (
@@ -438,6 +390,11 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
                 </button>
               ))}
             </div>
+            {level && (
+              <span className="muted small" style={{ flex: 'none' }}>
+                {step(level.centre)} / {step(level.width)}
+              </span>
+            )}
             {window_ && (
               <button className="small ghost" onClick={() => setWindow(null)}>
                 Reset contrast

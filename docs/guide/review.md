@@ -38,8 +38,9 @@ original files are never modified — anonymisation writes new ones.
 
 ## Contrast
 
-Drag on the image, or use the **Level** and **Window** sliders. Dragging right widens the
-window and dragging down raises its centre, the same directions every DICOM viewer uses.
+Pick **Contrast** and drag on the image: right widens the window, down raises its centre,
+the same directions every DICOM viewer uses. The numbers beside the buttons say where it
+has got to.
 
 The chosen window is written to `WindowCenter` / `WindowWidth` (0028,1050 / 0028,1051), and
 any `WindowCenterWidthExplanation` or `VOILUTSequence` that would contradict it is dropped.

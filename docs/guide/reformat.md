@@ -35,7 +35,6 @@ instances, written to the session's temp directory and removed with it.
 | **Through** | where the slab sits — the crosshair moves this too |
 | **Slab** | how thick it is, in millimetres |
 | **Every** | how far apart the images that come out are |
-| **Level / Window** | the contrast, which is also a drag on the image |
 
 **MIP** takes the brightest sample through the slab — vessels, contrast, bone. **MinIP**
 takes the darkest — airways, emphysema, fat. **Mean** averages it, which quietens noise at
@@ -47,9 +46,9 @@ will scroll past.
 
 ## The contrast
 
-Drag on the result pane, or use the **Level** and **Window** sliders — right widens, down raises
-the centre, the same as everywhere else. Whatever is on screen when you press **Add to the
-case** is written to the derived images.
+Drag on the result pane — right widens, down raises the centre, the same as everywhere else,
+and the numbers beside the buttons say where it has got to. Whatever is on screen when you
+press **Add to the case** is written to the derived images.
 
 The window it opens with is the file's own `WindowCenter` / `WindowWidth`, but **only if
 that window shows the data**. Some series carry one that describes something else: a 3D

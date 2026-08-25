@@ -113,19 +113,6 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
     return { width: `${frame.width * scale}px`, height: `${frame.height * scale}px` }
   }, [frame, stage])
 
-  /** The range of the data, which is what the window sliders have to cover. */
-  const bounds = useMemo(() => {
-    if (frame?.kind !== 'grey') return null
-    let min = Infinity
-    let max = -Infinity
-    for (const value of frame.values) {
-      if (value < min) min = value
-      if (value > max) max = value
-    }
-    if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) return { min: 0, max: 255 }
-    return { min, max }
-  }, [frame])
-
   const setLevel = (next: Partial<WindowLevel>): void => {
     if (!level) return
     onChange({ window: { centre: next.centre ?? level.centre, width: Math.max(next.width ?? level.width, 1) } })
@@ -369,37 +356,6 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
             </span>
           </label>
 
-          {greyscale && level && bounds && (
-            <>
-              <label className="viewer-slider">
-                <span>Level</span>
-                <input
-                  type="range"
-                  min={bounds.min}
-                  max={bounds.max}
-                  step={Math.max((bounds.max - bounds.min) / 500, 0.01)}
-                  value={level.centre}
-                  aria-label="Window centre"
-                  onChange={(e) => setLevel({ centre: Number(e.target.value) })}
-                />
-                <span className="n">{show(level.centre)}</span>
-              </label>
-              <label className="viewer-slider">
-                <span>Window</span>
-                <input
-                  type="range"
-                  min={1}
-                  max={Math.max((bounds.max - bounds.min) * 2, 2)}
-                  step={Math.max((bounds.max - bounds.min) / 500, 0.01)}
-                  value={level.width}
-                  aria-label="Window width"
-                  onChange={(e) => setLevel({ width: Number(e.target.value) })}
-                />
-                <span className="n">{show(level.width)}</span>
-              </label>
-            </>
-          )}
-
           <div className="viewer-actions">
             <span className="muted small">
               {masks.length === 0
@@ -407,6 +363,12 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
                 : `${masks.length} area${masks.length === 1 ? '' : 's'} blanked on every image — drag a box to move it, a corner to resize`}
             </span>
             <div className="spacer" />
+            {/* Beside the button that undoes it, rather than on a row of its own. */}
+            {greyscale && level && (
+              <span className="muted small" style={{ flex: 'none' }}>
+                {show(level.centre)} / {show(level.width)}
+              </span>
+            )}
             {masks.length > 0 && (
               <>
                 <button className="small ghost" onClick={() => onChange({ masks: masks.slice(0, -1) })}>
