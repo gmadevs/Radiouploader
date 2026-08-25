@@ -45,6 +45,7 @@ export default withMermaid(
             { text: 'Import a study', link: '/guide/import' },
             { text: 'Choose what to upload', link: '/guide/choose' },
             { text: 'Erase and set contrast', link: '/guide/review' },
+            { text: 'Reformat, MIP and MinIP', link: '/guide/reformat' },
             { text: 'The check before anonymising', link: '/guide/check' },
             { text: 'Case details and upload', link: '/guide/upload' }
           ]

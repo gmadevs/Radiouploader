@@ -3,7 +3,18 @@ import { BrowserWindow, dialog, ipcMain } from 'electron'
 // whenever the app is started without its package.json beside it, which is
 // exactly the case when the app is driven by a script.
 import { version } from '../../package.json'
-import type { AppInfo, AnonResult, BurnInFinding, IngestResult, Progress, StackSelection } from '@shared/types'
+import type {
+  AppInfo,
+  AnonResult,
+  BurnInFinding,
+  IngestResult,
+  PreviewFrame,
+  Progress,
+  ReformatPlan,
+  ReformatRequestMessage,
+  StackSelection,
+  VolumeInfo
+} from '@shared/types'
 import { anonymiseStacks, summariseWarnings } from './anon'
 import { scanForBurnIn } from './burnInScan'
 import { RadiopaediaClient, type CaseDraft } from './api/client'
@@ -13,6 +24,7 @@ import { uploadStack } from './api/upload'
 import { ingest } from './ingest'
 import { MAX_PREVIEW_EDGE, MAX_VIEWER_EDGE, clearPreviewHeaders, readPreviewFrame } from './preview'
 import { session } from './session'
+import { closeVolume, commitReformat, openVolume, planCount, previewReformat } from './volume'
 import { planStudies, type StudyDraftInput } from './uploadPlan'
 
 let client: RadiopaediaClient | null = null
@@ -71,6 +83,16 @@ export function registerIpc(): void {
 
   // Runs on the selection as it stands, trim and masks included, so an area
   // already blanked is not reported back as something to blank.
+  // Reformatting. The volume itself never leaves the main process; the renderer
+  // asks for frames of it exactly as it asks for frames of a file.
+  ipcMain.handle('volume:open', async (_e, stackId: string): Promise<VolumeInfo> => openVolume(stackId))
+  ipcMain.handle('volume:frame', (_e, request: ReformatRequestMessage, maxEdge: number): PreviewFrame =>
+    previewReformat(request, Math.min(maxEdge, MAX_VIEWER_EDGE))
+  )
+  ipcMain.handle('volume:count', (_e, plan: ReformatPlan): number => planCount(plan))
+  ipcMain.handle('volume:commit', async (_e, plan: ReformatPlan) => commitReformat(plan))
+  ipcMain.handle('volume:close', () => closeVolume())
+
   ipcMain.handle('burnIn:scan', async (): Promise<BurnInFinding[]> => scanForBurnIn(session.selectedStacks()))
 
   // Preview pixels for the renderer. Only paths belonging to the current ingest

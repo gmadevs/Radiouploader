@@ -203,14 +203,18 @@ label.field { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
 .stack .trim-toggle:focus-visible,
 .stack .trim-toggle.on { opacity: 1; }
 
-/* The "Open for review" affordance is quiet until the card is hovered, like Trim. */
-.open-viewer {
+/* The buttons over the preview are quiet until the card is hovered, like Trim. */
+.stack-actions {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  white-space: nowrap; opacity: 0; transition: opacity 0.12s;
+  display: grid; gap: 6px; justify-items: center;
+  opacity: 0; transition: opacity 0.12s;
+}
+.stack-actions button {
+  white-space: nowrap;
   background: color-mix(in srgb, var(--bg) 78%, transparent);
 }
-.stack:hover .open-viewer,
-.stack .open-viewer:focus-visible { opacity: 1; }
+.stack:hover .stack-actions,
+.stack .stack-actions:focus-within { opacity: 1; }
 
 .viewer-backdrop {
   position: fixed; inset: 0; z-index: 50;
@@ -230,7 +234,9 @@ label.field { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
 }
 .viewer-head h2 { font-size: 14px; }
 .viewer-head .tools { display: flex; gap: 6px; }
-.viewer-head .tools button.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600; }
+/* Not scoped to the header: the reformat dialog puts a set of these by the
+   footer, and a chosen tool has to look chosen wherever it sits. */
+.tools button.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600; }
 
 .viewer-stage {
   flex: 1; min-height: 0; display: grid; place-items: center;

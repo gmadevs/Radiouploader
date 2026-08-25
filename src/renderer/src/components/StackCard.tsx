@@ -9,10 +9,12 @@ interface Props {
   onTrim: (id: string, trimStart: number, trimEnd: number) => void
   /** Open the full-size viewer, where text can be blanked and contrast set. */
   onOpen: (stack: Stack) => void
+  /** Cut this stack another way, if there is enough of it to cut. */
+  onReformat: (stack: Stack) => void
 }
 
 /** One stack: a scrubable preview, the trim range, and the include control. */
-export function StackCard({ stack, onToggle, onTrim, onOpen }: Props): React.JSX.Element {
+export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const [frame, setFrame] = useState<PreviewFrame | null>(null)
@@ -87,13 +89,24 @@ export function StackCard({ stack, onToggle, onTrim, onOpen }: Props): React.JSX
         )}
         {outsideTrim && <div className="dropped-tag">not uploaded</div>}
         {!error && (
-          <button
-            className="small open-viewer"
-            title="Open for review — blank out burnt-in text and set the contrast"
-            onClick={() => onOpen(stack)}
-          >
-            Open for review
-          </button>
+          <div className="stack-actions">
+            <button
+              className="small"
+              title="Open for review — blank out burnt-in text and set the contrast"
+              onClick={() => onOpen(stack)}
+            >
+              Open for review
+            </button>
+            {stack.slices.length > 2 && !stack.unsupported && (
+              <button
+                className="small"
+                title="Cut this series along another plane, or flatten slabs of it into MIP, MinIP or mean images"
+                onClick={() => onReformat(stack)}
+              >
+                Reformat
+              </button>
+            )}
+          </div>
         )}
         {stack.slices.length > 1 && (
           <input

@@ -129,6 +129,39 @@ export interface BurnInFinding {
   compared: number
 }
 
+/** The plane a stack is cut along. Named in the acquisition's own axes. */
+export type Plane = 'axial' | 'coronal' | 'sagittal'
+
+/** What a slab of the volume collapses to. `slice` takes one plane and no more. */
+export type Projection = 'slice' | 'mip' | 'minip' | 'mean'
+
+/** A reformat to build, as the dialog describes it. */
+export interface ReformatPlan {
+  plane: Plane
+  projection: Projection
+  /** Slab thickness in millimetres; ignored for a plain slice. */
+  thickness: number
+  /** Millimetres between the images that come out. */
+  spacing: number
+}
+
+/** One image of a reformat, which is a plan plus where along the normal it sits. */
+export interface ReformatRequestMessage extends ReformatPlan {
+  offset: number
+}
+
+/** What a stack can be reformatted into, measured once the volume is built. */
+export interface VolumeInfo {
+  columns: number
+  rows: number
+  depth: number
+  spacing: { x: number; y: number; z: number }
+  /** How far each plane's normal runs, in millimetres. */
+  extent: Record<Plane, number>
+  /** The in-plane pixel size, which is the finest a reformat is worth asking for. */
+  finestSpacing: number
+}
+
 /** Which build this is, for the home screen and for bug reports. */
 export interface AppInfo {
   version: string

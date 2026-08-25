@@ -7,6 +7,7 @@ import {
   downscaleGrey,
   frameByteLength,
   frameOffset,
+  frameSamples,
   parseHeader,
   type ImageHeader
 } from '@shared/dicomImage'
@@ -125,6 +126,37 @@ export async function readPreviewFrame(
       return { kind: 'colour', compressed: false, ...downscale(decodeFrame(header, bytes), maxEdge) }
     }
     return { kind: 'grey', compressed: false, ...downscaleGrey(decodeGreyFrame(header, bytes), maxEdge) }
+  } finally {
+    await handle.close()
+  }
+}
+
+/**
+ * One frame's stored samples, at the size they were written.
+ *
+ * This is what building a volume needs and what a preview must never ask for:
+ * a frame here is megabytes, and a stack of them is the reason only finished
+ * preview pixels cross the bridge.
+ */
+export async function readStoredSamples(
+  filePath: string,
+  frame: number
+): Promise<{ header: ImageHeader; samples: Int16Array | Uint16Array | Uint8Array }> {
+  const header = await imageHeader(filePath)
+
+  if (header.encapsulated) {
+    const encoded = await encapsulatedFrame(filePath, frame, header.frames)
+    const decoded = await decodeEncapsulatedFrame(encoded, header)
+    const asDecoded: ImageHeader = { ...header, ...decoded, encapsulated: false }
+    return { header: asDecoded, samples: frameSamples(asDecoded, decoded.bytes) }
+  }
+
+  const handle = await fs.open(filePath, 'r')
+  try {
+    const length = frameByteLength(header)
+    const buffer = Buffer.alloc(length)
+    const { bytesRead } = await handle.read(buffer, 0, length, frameOffset(header, frame))
+    return { header, samples: frameSamples(header, new Uint8Array(buffer.subarray(0, bytesRead))) }
   } finally {
     await handle.close()
   }

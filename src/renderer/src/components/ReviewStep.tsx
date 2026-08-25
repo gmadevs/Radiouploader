@@ -10,6 +10,8 @@ interface Props {
   onKeepOnePhase: (series: Series) => void
   /** Open one stack full size, to blank burnt-in text or set the contrast. */
   onOpen: (stack: Stack, series: Series, study: Study) => void
+  /** Open the reformat dialog on one stack. */
+  onReformat: (stack: Stack, series: Series, study: Study) => void
   onSelectAll: (series: Series, selected: boolean) => void
   /** Select or clear every stack in the import at once. */
   onSelectEverything: (selected: boolean) => void
@@ -29,6 +31,7 @@ export function ReviewStep({
   onTrim,
   onKeepOnePhase,
   onOpen,
+  onReformat,
   onSelectAll,
   onSelectEverything
 }: Props): React.JSX.Element {
@@ -121,6 +124,7 @@ export function ReviewStep({
                     onToggle={onToggle}
                     onTrim={onTrim}
                     onOpen={() => onOpen(stack, series, study)}
+                    onReformat={() => onReformat(stack, series, study)}
                   />
                 ))}
               </div>

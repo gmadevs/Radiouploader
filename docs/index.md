@@ -29,6 +29,9 @@ features:
   - title: Erasing that is really erasing
     details: A blanked region is painted into the pixel data of every image of a stack before upload. On a compressed image that means decoding it first and sending plain samples, because nothing can be painted into a bitstream.
     link: /guide/review
+  - title: Cuts the volume another way
+    details: Coronal and sagittal reformats, and MIP, MinIP or mean slabs of any thickness, added to the case as their own series — without opening a workstation.
+    link: /guide/reformat
   - title: Nothing leaves the machine until you press Upload
     details: Patient data lives only in the main process, in a temp directory removed on quit. Credentials are entered at runtime and kept in the OS keychain.
     link: /internals/architecture

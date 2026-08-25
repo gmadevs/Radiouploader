@@ -60,6 +60,9 @@ function synthetic(options: {
     transferSyntax: '1.2.840.10008.1.2.1',
     encapsulated: false,
     burnedInAnnotation: null,
+    pixelSpacing: null,
+    imagePosition: null,
+    imageOrientation: null,
     bigEndian: options.bigEndian ?? false,
     pixelDataOffset: 0
   }

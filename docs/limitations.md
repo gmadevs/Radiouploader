@@ -55,6 +55,16 @@ than being discovered during anonymisation, where the failure is per file and us
 the whole series out of the case behind "N file(s) could not be anonymised". Exporting the
 run uncompressed from the PACS is the way to publish it.
 
+## Reformatting is orthogonal, in the acquisition's own axes
+
+[Reformat](/guide/reformat) cuts axial, coronal and sagittal, and those are the axes of the
+acquisition rather than of the patient. On an axial study they are the same thing; on an
+oblique one — a tilted gantry, an angled shoulder — "coronal" means across the acquisition
+and may be nothing a reader would call coronal.
+
+There is no oblique plane and no curved reformat along a vessel. Both need a direction
+chosen in the image rather than a button, which is a different piece of work.
+
 ## Multiframe dynamic series are not split into phases
 
 The per-frame functional groups that carry the time axis are not unpacked yet.

@@ -6,6 +6,7 @@ import { describeInterval } from '@shared/interval'
 import { modalityFromDicom } from '@shared/radiopaedia'
 import { splitByReview, type StackEntry } from './burnIn'
 import { BurnInCheck } from './components/BurnInCheck'
+import { ReformatDialog } from './components/ReformatDialog'
 import { CaseStep, type CaseForm } from './components/CaseStep'
 import { InfoDialog } from './components/InfoDialog'
 import { ReviewStep } from './components/ReviewStep'
@@ -48,6 +49,10 @@ export function App(): React.JSX.Element {
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set())
   /** The burnt-in check, which stands between the review step and anonymisation. */
   const [confirming, setConfirming] = useState(false)
+  /** The stack whose reformat dialog is open, with the heading it shows. */
+  const [reformatting, setReformatting] = useState<{ stackId: string; seriesId: string; heading: string } | null>(
+    null
+  )
   /** What the pixel check noticed, or null while it is still looking. */
   const [findings, setFindings] = useState<BurnInFinding[] | null>(null)
   const [info, setInfo] = useState<AppInfo | null>(null)
@@ -108,6 +113,14 @@ export function App(): React.JSX.Element {
   const selectedImageCount = selectedStacks.reduce(
     (n, stack) => n + (stack.trimEnd - stack.trimStart + 1),
     0
+  )
+
+  const reformatStack = useMemo(
+    () =>
+      (ingest?.studies ?? [])
+        .flatMap((study) => study.series.flatMap((series) => series.stacks))
+        .find((stack) => stack.id === reformatting?.stackId) ?? null,
+    [ingest, reformatting]
   )
 
   const viewedStack = useMemo(
@@ -349,6 +362,13 @@ export function App(): React.JSX.Element {
             onOpen={(stack, series, study) =>
               openViewer(stack.id, `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`)
             }
+            onReformat={(stack, series, study) =>
+              setReformatting({
+                stackId: stack.id,
+                seriesId: series.id,
+                heading: `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`
+              })
+            }
             onKeepOnePhase={(series) => {
               // Keep the earliest phase and drop the rest; the user can re-tick any.
               const first = series.stacks.find((s) => s.selected)?.id ?? series.stacks[0]?.id
@@ -398,6 +418,31 @@ export function App(): React.JSX.Element {
           onOpen={(entry) => openViewer(entry.stack.id, entry.heading)}
           onBack={() => setConfirming(false)}
           onConfirm={() => void anonymiseAndContinue()}
+        />
+      )}
+
+      {reformatting && reformatStack && (
+        <ReformatDialog
+          stack={reformatStack}
+          heading={reformatting.heading}
+          onClose={() => setReformatting(null)}
+          // The main process has already put it in the tree it reads; this is
+          // the same insertion in the copy the picker draws from.
+          onAdded={(studyId, series) =>
+            setIngest((current) => {
+              if (current === null) return current
+              return {
+                ...current,
+                studies: current.studies.map((study) => {
+                  if (study.id !== studyId) return study
+                  const after = study.series.findIndex((existing) => existing.id === reformatting.seriesId)
+                  const next = [...study.series]
+                  next.splice(after < 0 ? next.length : after + 1, 0, series)
+                  return { ...study, series: next }
+                })
+              }
+            })
+          }
         />
       )}
 

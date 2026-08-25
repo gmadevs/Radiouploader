@@ -6,7 +6,11 @@ import type {
   IngestResult,
   PreviewFrame,
   Progress,
-  StackSelection
+  ReformatPlan,
+  ReformatRequestMessage,
+  Series,
+  StackSelection,
+  VolumeInfo
 } from '@shared/types'
 
 /** The only surface the renderer has onto the filesystem and the network. */
@@ -35,6 +39,18 @@ const api = {
    * was noticed in come back; silence about a stack is not a clean bill.
    */
   scanBurnIn: (): Promise<BurnInFinding[]> => ipcRenderer.invoke('burnIn:scan'),
+
+  /**
+   * Reformatting. The volume is built and held in the main process — a chest CT
+   * is hundreds of megabytes — and only preview-sized frames of it come back.
+   */
+  openVolume: (stackId: string): Promise<VolumeInfo> => ipcRenderer.invoke('volume:open', stackId),
+  reformatFrame: (request: ReformatRequestMessage, maxEdge: number): Promise<PreviewFrame> =>
+    ipcRenderer.invoke('volume:frame', request, maxEdge),
+  reformatCount: (plan: ReformatPlan): Promise<number> => ipcRenderer.invoke('volume:count', plan),
+  commitReformat: (plan: ReformatPlan): Promise<{ studyId: string; series: Series }> =>
+    ipcRenderer.invoke('volume:commit', plan),
+  closeVolume: (): Promise<void> => ipcRenderer.invoke('volume:close'),
   anonymise: (): Promise<AnonResult & { summary: { tag: string; text: string; level: number; count: number }[] }> =>
     ipcRenderer.invoke('anon:run'),
 

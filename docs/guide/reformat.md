@@ -1,0 +1,77 @@
+# Reformat, MIP, MinIP and mean
+
+**Reformat** on a stack of three images or more cuts it another way, and flattens slabs of
+it into projections.
+
+![A coronal MIP of the chest CT](/shots/09-reformat.png)
+
+The result is added to the case as its own series, beside the one it came from. It goes
+through anonymisation and upload like anything else, because that is what it is: real DICOM
+instances, written to the session's temp directory and removed with it.
+
+## The controls
+
+| | |
+|---|---|
+| **Axial / Coronal / Sagittal** | which way to cut |
+| **Slice / MIP / MinIP / Mean** | what a slab collapses to |
+| **Through** | where the slab sits |
+| **Slab** | how thick it is, in millimetres |
+| **Every** | how far apart the images that come out are |
+
+**MIP** takes the brightest sample through the slab — vessels, contrast, bone. **MinIP**
+takes the darkest — airways, emphysema, fat. **Mean** averages it, which quietens noise at
+the cost of detail. **Slice** is one plane and ignores the slab.
+
+The count beside the button says how many images the plan makes before you commit to it.
+Twenty-five coronals is a series a reader will scroll through; two hundred is a series they
+will scroll past.
+
+## What the planes mean
+
+They are the **acquisition's own axes**, not the patient's. On an axial study coronal and
+sagittal mean what they say. On an oblique acquisition — a tilted gantry, an angled
+shoulder — they mean "across the acquisition", which may be nothing a reader would call
+coronal. The dialog shows the result before it can be added for exactly this reason.
+
+Images are built from the last slice down, so the end of the stack ends up at the top of a
+coronal or sagittal image. On a study acquired feet-first that is upside down; look before
+you add.
+
+## The resolution is not a choice
+
+The result is square-pixelled at the finest spacing the volume has in plane — 0.7 mm pixels
+for a 0.7 mm CT, whatever the gap between its slices was. Anything coarser would throw away
+data that is already in memory and anything finer would invent it, so it is not offered.
+
+Between the slices it interpolates. A coronal of a 5 mm study is a real reformat of 5 mm
+data and looks like one; it does not become a 0.7 mm acquisition by being resampled.
+
+A projection is taken at the **image planes inside the slab**, not at even steps along it. A
+maximum of interpolated samples is not a maximum of the data — a step straddling the
+brightest voxel returns the average of it and its neighbour, and a vessel comes out half as
+bright as it is.
+
+## When it refuses
+
+A volume needs geometry that holds, and the dialog says which part did not:
+
+- **fewer than three images** — there is nothing to cut through
+- **gaps that vary** by more than a tenth — a reformat of them would be stretched where the
+  images are missing
+- **images of different sizes**, or in different units
+- **colour**, which has no single value to project
+- **no pixel spacing**, which leaves the result with no scale
+- **too large** — a volume over 512 MB is refused rather than allocated
+
+## What it carries over
+
+Areas you blanked on the parent are blanked in the volume **before** it is built, so a
+banner erased on the axial images cannot come back through a coronal of them. The window
+you chose comes with it. Rescale is preserved exactly: projections are taken on the stored
+values, and maximum, minimum and mean all commute with the linear rescale, so a MIP of a CT
+is still in Hounsfield units.
+
+The derived series carries `ImageType` `DERIVED\SECONDARY\MIP` (or `MINIP`, `MEAN`, `MPR`),
+its own series UID, and the geometry of the plane it was cut on — so a reader, or this app
+on a second import, can tell what it is and which way up it goes.

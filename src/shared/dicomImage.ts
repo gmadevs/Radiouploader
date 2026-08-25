@@ -96,6 +96,16 @@ export interface ImageHeader extends PixelGeometry {
    * raise suspicion and must never settle it.
    */
   burnedInAnnotation: string | null
+  /**
+   * PixelSpacing (0028,0030) as millimetres between rows and between columns,
+   * in that order — the order DICOM writes it in, which is the opposite of the
+   * one everything else here counts in.
+   */
+  pixelSpacing: { row: number; column: number } | null
+  /** ImagePositionPatient (0020,0032): where this image's first voxel is, in mm. */
+  imagePosition: [number, number, number] | null
+  /** ImageOrientationPatient (0020,0037): the row and column directions. */
+  imageOrientation: number[] | null
 }
 
 export interface DecodedFrame {
@@ -121,6 +131,23 @@ export interface GreyFrame {
   window: WindowLevel
   /** MONOCHROME1: low values are white. */
   invert: boolean
+}
+
+/** A backslash-separated DS value, as numbers, or null unless it has `count` of them. */
+function numbersOf(value: string | undefined, count: number): number[] | null {
+  if (value === undefined) return null
+  const parts = value.split('\\').map((part) => Number.parseFloat(part))
+  return parts.length === count && parts.every(Number.isFinite) ? parts : null
+}
+
+function pairOf(value: string | undefined): { row: number; column: number } | null {
+  const parts = numbersOf(value, 2)
+  return parts === null || parts[0] <= 0 || parts[1] <= 0 ? null : { row: parts[0], column: parts[1] }
+}
+
+function tripleOf(value: string | undefined): [number, number, number] | null {
+  const parts = numbersOf(value, 3)
+  return parts === null ? null : [parts[0], parts[1], parts[2]]
 }
 
 function firstNumber(value: string | undefined): number | null {
@@ -162,6 +189,9 @@ export function parseHeader(bytes: Uint8Array): ImageHeader {
     windowWidth: firstNumber(ds.string('x00281051')),
     frames: Math.max(1, Number.parseInt(ds.string('x00280008') ?? '1', 10) || 1),
     burnedInAnnotation: ds.string('x00280301') ?? null,
+    pixelSpacing: pairOf(ds.string('x00280030')),
+    imagePosition: tripleOf(ds.string('x00200032')),
+    imageOrientation: numbersOf(ds.string('x00200037'), 6),
     bigEndian: transferSyntax === EXPLICIT_VR_BIG_ENDIAN,
     pixelDataOffset: pixelData.dataOffset
   }

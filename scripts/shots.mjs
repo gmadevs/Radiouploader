@@ -83,6 +83,14 @@ async function run() {
   await click('Done')
   await sleep(400)
 
+  await openReformatOn('Chest 1.0 mm')
+  await settle(6000)
+  await click('MIP')
+  await sleep(1200)
+  await shot('09-reformat', 'a coronal MIP of the chest CT')
+  await click('Cancel')
+  await sleep(500)
+
   await openViewerOn('Upper abdomen')
   await settle(2500)
   await shot('04-viewer', 'the ultrasound, banner and all')
@@ -151,12 +159,27 @@ async function run() {
     await sleep(400)
   }
 
+  /** Open the reformat dialog on the series whose description contains `name`. */
+  async function openReformatOn(name) {
+    const result = await evaluate(`(() => {
+      const series = [...document.querySelectorAll('.series')]
+        .find((s) => s.querySelector('h3')?.textContent.includes(${JSON.stringify(name)}))
+      const button = [...(series?.querySelectorAll('.stack-actions button') ?? [])]
+        .find((b) => b.textContent.trim() === 'Reformat')
+      if (!button) return 'missing'
+      button.click()
+      return 'ok'
+    })()`)
+    if (result !== 'ok') problems.push(`reformat ${JSON.stringify(name)}: ${result}`)
+  }
+
   /** Open the viewer on the series whose description contains `name`. */
   async function openViewerOn(name) {
     const result = await evaluate(`(() => {
       const series = [...document.querySelectorAll('.series')]
         .find((s) => s.querySelector('h3')?.textContent.includes(${JSON.stringify(name)}))
-      const open = series?.querySelector('.open-viewer')
+      const open = [...(series?.querySelectorAll('.stack-actions button') ?? [])]
+        .find((b) => b.textContent.trim() === 'Open for review')
       if (!open) return 'missing'
       open.click()
       return 'ok'
