@@ -25,6 +25,18 @@ Neither list is served by the API — `/api/v1/systems` and `/api/v1/diagnostic_
 both 404 — so both are transcribed from the API reference in
 [`src/shared/radiopaedia.ts`](https://github.com/gmadevs/Radiouploader/blob/main/src/shared/radiopaedia.ts).
 
+**Age and sex arrive filled in** when the originals said so. `PatientAge` (0010,1010) is
+preferred, and `PatientBirthDate` (0010,0030) against the study date is the fallback; the
+result is rounded to the nearest value on the list, ties going to the younger one. Sex is
+offered only where Radiopaedia has the word: `M` and `F` become Male and Female, and `O`
+becomes nothing.
+
+Both are read at ingest, because anonymisation removes them — and both are only a
+suggestion. Change either and it stays changed; a case with several studies is filled from
+the earliest, since the age a case presents at is the age at baseline. Under a year the
+field is left empty rather than rounded up: the list has no way to say four months, and
+"1 year" would be a fact invented by arithmetic.
+
 ::: danger system_id is accepted but never applied
 Every case uploaded through this app arrives on Radiopaedia **without a system**, and it
 has to be set by hand on the case page. This is server-side, not a bug in this client: a

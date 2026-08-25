@@ -44,6 +44,12 @@ export interface InstanceMeta {
    * built, long before anything opens the pixel data.
    */
   transferSyntaxUid: string | null
+  /** PatientAge (0010,1010) as the exporter wrote it, e.g. "045Y". */
+  patientAge: string | null
+  /** PatientBirthDate (0010,0030) as ISO, which is what is left when age is absent. */
+  patientBirthDate: string | null
+  /** PatientSex (0010,0040): M, F, or O for anything else. */
+  patientSex: string | null
 }
 
 type DataSet = dicomParser.DataSet
@@ -166,6 +172,45 @@ function readDate(ds: DataSet, ...tags: string[]): string | null {
   return null
 }
 
+/**
+ * How old the patient was at this study, in years.
+ *
+ * PatientAge is preferred because it is what the scanner recorded on the day.
+ * Its VR is three digits and a unit, so a two-week-old and a two-year-old are
+ * told apart properly rather than both reading as "2". Failing that, the birth
+ * date against the study date says the same thing.
+ *
+ * Both are identifying and both are removed by anonymisation, which is why this
+ * runs at ingest and not later.
+ */
+export function ageInYears(
+  patientAge: string | null,
+  birthDate: string | null,
+  studyDate: string | null
+): number | null {
+  const written = /^0*(\d{1,3})\s*([DWMY])$/i.exec(patientAge?.trim() ?? '')
+  if (written) {
+    const count = Number(written[1])
+    switch (written[2].toUpperCase()) {
+      case 'Y':
+        return count
+      case 'M':
+        return count / 12
+      case 'W':
+        return count / 52.1775
+      case 'D':
+        return count / 365.25
+    }
+  }
+
+  if (birthDate !== null && studyDate !== null) {
+    const days = (Date.parse(`${studyDate}T00:00:00Z`) - Date.parse(`${birthDate}T00:00:00Z`)) / 86_400_000
+    // A birth date after the study is a typo or a placeholder, not a fact.
+    if (Number.isFinite(days) && days >= 0) return days / 365.25
+  }
+  return null
+}
+
 /** Parse one file. Throws if it is not a readable DICOM object. */
 export async function readInstance(filePath: string): Promise<InstanceMeta> {
   const buf = await fs.readFile(filePath)
@@ -215,6 +260,11 @@ export async function readInstance(filePath: string): Promise<InstanceMeta> {
     acquisitionTime: str(ds, 'x00080032') ?? str(ds, 'x00080033'),
     bValue: readBValue(ds),
     numberOfFrames: num(ds, 'x00280008') ?? 1,
-    transferSyntaxUid: str(ds, 'x00020010')
+    transferSyntaxUid: str(ds, 'x00020010'),
+    // Identifying, and gone after anonymisation. Read here so the case form can
+    // offer them back as the two fields Radiopaedia asks for.
+    patientAge: str(ds, 'x00101010'),
+    patientBirthDate: readDate(ds, 'x00100030'),
+    patientSex: str(ds, 'x00100040')
   }
 }

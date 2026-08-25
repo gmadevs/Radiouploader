@@ -1,7 +1,8 @@
 import { compressionOf } from '@shared/dicomImage'
+import { nearestAgeOption } from '@shared/radiopaedia'
 import { canDecode } from '../codecs/decode'
 import type { ImageComponent, Series, SliceRef, Stack, StackKind, Study } from '@shared/types'
-import type { InstanceMeta } from './dicom'
+import { ageInYears, type InstanceMeta } from './dicom'
 
 const COMPONENT_LABELS: Record<ImageComponent, string> = {
   magnitude: 'Magnitude',
@@ -294,6 +295,32 @@ function applyDefaultSelection(stacks: Stack[], varying: Set<StackKind>): void {
   }
 }
 
+/**
+ * The patient as the case form will offer them: an age from the list, and a sex
+ * only where Radiopaedia has a word for it.
+ *
+ * Instances of one study can disagree — a series re-sent from a different
+ * workstation, an exporter that fills one tag and not another — so the first
+ * instance that says anything is taken rather than an average of a handful of
+ * values that should have been identical.
+ */
+function patientOf(instances: InstanceMeta[], studyDate: string | null): {
+  age: string | null
+  sex: 'Male' | 'Female' | null
+} {
+  let age: string | null = null
+  for (const instance of instances) {
+    const years = ageInYears(instance.patientAge, instance.patientBirthDate, studyDate)
+    if (years !== null) {
+      age = nearestAgeOption(years)
+      break
+    }
+  }
+
+  const sex = instances.find((instance) => instance.patientSex !== null)?.patientSex?.trim().toUpperCase()
+  return { age, sex: sex === 'M' ? 'Male' : sex === 'F' ? 'Female' : null }
+}
+
 /** Whole days from `from` to `to`, both ISO yyyy-mm-dd. */
 function daysBetween(from: string, to: string): number {
   const ms = Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)
@@ -357,14 +384,19 @@ export function buildStudies(instances: InstanceMeta[]): Study[] {
     }
     series.sort((a, b) => (a.seriesNumber ?? 0) - (b.seriesNumber ?? 0))
 
+    // Some instances of a study may lack the date; take the first that has one.
+    const studyDate = studyInstances.find((i) => i.studyDate !== null)?.studyDate ?? null
+    const patient = patientOf(studyInstances, studyDate)
+
     studies.push({
       id: studyUid,
       studyInstanceUid: studyUid,
       studyDescription: studyInstances[0].studyDescription,
       modality: studyInstances[0].modality,
-      // Some instances of a study may lack the date; take the first that has one.
-      studyDate: studyInstances.find((i) => i.studyDate !== null)?.studyDate ?? null,
+      studyDate,
       intervalDays: null,
+      patientAge: patient.age,
+      patientSex: patient.sex,
       series
     })
   }

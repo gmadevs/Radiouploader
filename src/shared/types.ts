@@ -173,6 +173,14 @@ export interface Study {
    * follow-up case needs to preserve.
    */
   intervalDays: number | null
+  /**
+   * The patient's age at this study, already rounded to one of the values the
+   * case form offers, or null when the originals do not say or the list cannot
+   * express it. Read before anonymisation, which removes what it came from.
+   */
+  patientAge: string | null
+  /** Male or Female as Radiopaedia words it; null for anything else, O included. */
+  patientSex: 'Male' | 'Female' | null
   series: Series[]
 }
 

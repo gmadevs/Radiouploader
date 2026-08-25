@@ -10,6 +10,8 @@ function study(id: string, intervalDays: number | null): Study {
     studyDescription: null,
     modality: 'MR',
     studyDate: null,
+    patientAge: null,
+    patientSex: null,
     intervalDays,
     series: []
   }

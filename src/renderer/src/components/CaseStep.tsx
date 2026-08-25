@@ -120,6 +120,13 @@ export function CaseStep({ form, onChange, studies, warnings }: Props): React.JS
             </select>
           </label>
         </div>
+        {(studies[0]?.patientAge !== null || studies[0]?.patientSex !== null) && (
+          <p className="muted small" style={{ margin: '-6px 0 0' }}>
+            Age and sex were read from the original files, before anonymisation removed them. The age is the nearest
+            value on Radiopaedia's list to the one the files gave.
+          </p>
+        )}
+
         <label className="field tall">
           Case discussion
           <textarea value={form.body} onChange={(e) => set('body', e.target.value)} />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyComponent } from './dicom'
+import { ageInYears, classifyComponent } from './dicom'
 import type { InstanceMeta } from './dicom'
 import { buildStacks, buildStudies } from './series'
 
@@ -31,6 +31,9 @@ function inst(overrides: Partial<InstanceMeta> = {}): InstanceMeta {
     bValue: null,
     numberOfFrames: 1,
     transferSyntaxUid: '1.2.840.10008.1.2.1',
+    patientAge: null,
+    patientBirthDate: null,
+    patientSex: null,
     ...overrides
   }
 }
@@ -220,6 +223,80 @@ describe('buildStacks — plain series', () => {
   it('does not mistake a two-slice localiser for a dynamic series', () => {
     const { stacks } = buildStacks('s', [inst({ sliceLocation: 0 }), inst({ sliceLocation: 0 })])
     expect(stacks).toHaveLength(1)
+  })
+})
+
+describe('ageInYears', () => {
+  it('reads the unit rather than assuming years', () => {
+    expect(ageInYears('045Y', null, null)).toBe(45)
+    expect(ageInYears('018M', null, null)).toBeCloseTo(1.5)
+    expect(ageInYears('006W', null, null)).toBeCloseTo(0.115, 3)
+    expect(ageInYears('010D', null, null)).toBeCloseTo(0.027, 3)
+  })
+
+  it('tolerates the ways exporters write it', () => {
+    expect(ageInYears('45Y', null, null)).toBe(45)
+    expect(ageInYears('0045y', null, null)).toBe(45)
+    expect(ageInYears(' 045Y ', null, null)).toBe(45)
+  })
+
+  it('falls back to the birth date against the study date', () => {
+    expect(ageInYears(null, '1970-01-01', '2020-01-01')).toBeCloseTo(50, 1)
+    expect(ageInYears(null, '2019-07-01', '2020-01-01')).toBeCloseTo(0.5, 1)
+  })
+
+  it('prefers the recorded age, which is what the scanner knew on the day', () => {
+    expect(ageInYears('030Y', '1970-01-01', '2020-01-01')).toBe(30)
+  })
+
+  it('says nothing when the dates cannot mean what they say', () => {
+    expect(ageInYears(null, '2021-01-01', '2020-01-01')).toBeNull()
+    expect(ageInYears(null, null, '2020-01-01')).toBeNull()
+    expect(ageInYears('', null, null)).toBeNull()
+    expect(ageInYears('045X', null, null)).toBeNull()
+  })
+})
+
+describe('buildStudies — the patient', () => {
+  it('offers an age from the list and a sex the case form has a word for', () => {
+    const [study] = buildStudies([
+      inst({ patientAge: '047Y', patientSex: 'F', studyDate: '2020-01-01' })
+    ])
+    expect(study.patientAge).toBe('45 years')
+    expect(study.patientSex).toBe('Female')
+  })
+
+  it('works out the age from the birth date when the tag is absent', () => {
+    const [study] = buildStudies([
+      inst({ patientBirthDate: '1970-01-01', patientSex: 'M', studyDate: '2020-01-01' })
+    ])
+    expect(study.patientAge).toBe('50 years')
+    expect(study.patientSex).toBe('Male')
+  })
+
+  it('leaves both alone when the originals do not say', () => {
+    const [study] = buildStudies([inst()])
+    expect(study.patientAge).toBeNull()
+    expect(study.patientSex).toBeNull()
+  })
+
+  it('has no word for a sex that is neither, so it offers none', () => {
+    // O is what the sample study carries, and the case form has two choices.
+    const [study] = buildStudies([inst({ patientSex: 'O' })])
+    expect(study.patientSex).toBeNull()
+  })
+
+  it('does not turn a baby into a one-year-old', () => {
+    const [study] = buildStudies([inst({ patientAge: '004M', studyDate: '2020-01-01' })])
+    expect(study.patientAge).toBeNull()
+  })
+
+  it('takes the age at each study, so a follow-up is not aged at baseline', () => {
+    const studies = buildStudies([
+      inst({ studyInstanceUid: 'a', patientBirthDate: '1970-01-01', studyDate: '2010-01-01' }),
+      inst({ studyInstanceUid: 'b', patientBirthDate: '1970-01-01', studyDate: '2020-01-01' })
+    ])
+    expect(studies.map((s) => s.patientAge)).toEqual(['40 years', '50 years'])
   })
 })
 

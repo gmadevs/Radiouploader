@@ -15,6 +15,10 @@ scan → read metadata → group into studies/series/stacks → you choose → a
 
 Get that order wrong and the app can no longer tell a b=0 image from a b=1000 one.
 
+The same order is why the case form can offer an age and a sex at all: `PatientAge`,
+`PatientBirthDate` and `PatientSex` are identifying, the anonymiser removes them, and they
+are read on the way in like everything else that has to survive it.
+
 ## How series are split
 
 A series is split along every dimension that actually varies inside it, because they

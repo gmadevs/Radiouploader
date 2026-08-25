@@ -220,8 +220,16 @@ export function App(): React.JSX.Element {
       // Seed one form per study, keeping anything already typed. Captions are
       // pre-filled with the interval read from the originals.
       const multiple = studiesToUpload.length > 1
+      // Age and sex belong to the case, not to a study, so they come from the
+      // earliest one: the age a case is presented at is the age at baseline.
+      const baseline = studiesToUpload[0]
       setForm((current) => ({
         ...current,
+        // Only where nothing has been chosen. These are read off the originals,
+        // which makes them a suggestion and not something to overwrite an
+        // answer with.
+        age: current.age || baseline?.patientAge || '',
+        gender: current.gender || baseline?.patientSex || '',
         studies: Object.fromEntries(
           studiesToUpload.map((study) => [
             study.id,

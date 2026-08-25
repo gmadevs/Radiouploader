@@ -51,6 +51,31 @@ export const AGE_OPTIONS: string[] = [
 ]
 
 /**
+ * The listed age nearest to a real one, or null when the list cannot say it.
+ *
+ * Nearest rather than rounded down, and ties go to the younger value: an age is
+ * quasi-identifying, so where the list forces a choice it makes the one that
+ * claims less. Below a year there is nothing to choose — the list starts at one
+ * — and a six-month-old written as "1 year" would be a fact invented by
+ * arithmetic, so it comes back null and the field is left for the user.
+ */
+export function nearestAgeOption(years: number): string | null {
+  if (!Number.isFinite(years) || years < 1) return null
+
+  let best: string | null = null
+  let closest = Infinity
+  for (const option of AGE_OPTIONS) {
+    const value = Number.parseInt(option, 10)
+    const distance = Math.abs(value - years)
+    if (distance < closest) {
+      closest = distance
+      best = option
+    }
+  }
+  return best
+}
+
+/**
  * The modality values the study endpoint accepts. Anything outside this list is
  * rejected; a blank value is also allowed.
  */

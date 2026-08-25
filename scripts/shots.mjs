@@ -224,7 +224,9 @@ async function run() {
         set('Presentation', 'Incidental finding on a staging CT, reviewed at follow-up.'),
         set('System', '4'),
         set('Diagnostic certainty', '3'),
-        set('Age', '61 years'),
+        // Age and gender are not set here: the app fills them from the sample
+        // study's own patient tags, and the screenshot should show that.
+
         set('Findings', 'A subpleural nodule in the left upper lobe, larger than on the baseline study.')
       ].filter(Boolean)
       return missing.length ? 'missing: ' + missing.join(', ') : 'ok'
