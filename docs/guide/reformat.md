@@ -18,6 +18,7 @@ instances, written to the session's temp directory and removed with it.
 | **Through** | where the slab sits |
 | **Slab** | how thick it is, in millimetres |
 | **Every** | how far apart the images that come out are |
+| **Level / Window** | the contrast, which is also a drag on the image |
 
 **MIP** takes the brightest sample through the slab — vessels, contrast, bone. **MinIP**
 takes the darkest — airways, emphysema, fat. **Mean** averages it, which quietens noise at
@@ -26,6 +27,25 @@ the cost of detail. **Slice** is one plane and ignores the slab.
 The count beside the button says how many images the plan makes before you commit to it.
 Twenty-five coronals is a series a reader will scroll through; two hundred is a series they
 will scroll past.
+
+## The contrast
+
+Drag on the image, or use the **Level** and **Window** sliders — right widens, down raises
+the centre, the same as everywhere else. Whatever is on screen when you press **Add to the
+case** is written to the derived images.
+
+The window it opens with is the file's own `WindowCenter` / `WindowWidth`, but **only if
+that window shows the data**. Some series carry one that describes something else: a 3D
+FLAIR came through with a window sitting far below its own values, so every voxel of brain
+was above the top of it and the reformat was a white cut-out of a head on black. When the
+stated window covers less than a fifth of what the volume actually spans, the volume's own
+first-to-ninety-ninth percentile is used instead.
+
+A window you chose in [Open for review](/guide/review) is a decision rather than a
+suggestion, and is used as it stands.
+
+The window is worked out once, when the volume is built, and then stays put: recomputing it
+per image would make every step through the stack a different picture.
 
 ## What the planes mean
 

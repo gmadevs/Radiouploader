@@ -12,6 +12,7 @@ import type {
 } from '@shared/types'
 import { session } from '../session'
 import { buildVolume, pixelSpacingOf, VolumeError, type BuiltVolume } from './build'
+import { defaultWindow } from './window'
 import { extent, reformatSlice, slabOffsets } from './reformat'
 import { describePlan, writeReformatted } from './write'
 
@@ -28,6 +29,8 @@ interface OpenVolume {
   stackId: string
   built: BuiltVolume
   parent: { study: Study; series: Series; stack: Stack }
+  /** Worked out on first use and kept, so it does not move between images. */
+  window?: WindowLevel
 }
 
 let open: OpenVolume | null = null
@@ -67,21 +70,16 @@ export async function openVolume(stackId: string): Promise<VolumeInfo> {
   }
 }
 
-/** The window a reformat is shown and written with. */
-function windowFor(built: BuiltVolume, stack: Stack, values: Float32Array): WindowLevel {
-  if (stack.window) return stack.window
-  const { windowCentre, windowWidth } = built.header
-  if (windowCentre !== null && windowWidth !== null && windowWidth > 0) {
-    return { centre: windowCentre, width: windowWidth }
-  }
-  let min = Infinity
-  let max = -Infinity
-  for (const value of values) {
-    if (value < min) min = value
-    if (value > max) max = value
-  }
-  if (!Number.isFinite(min) || min === max) return { centre: 128, width: 256 }
-  return { centre: (min + max) / 2, width: max - min }
+/**
+ * The window a reformat opens with, worked out once when the volume is built.
+ *
+ * Once, because it must not move under the user: recomputing it per image would
+ * make every step through the stack a different picture.
+ */
+function openingWindow(): WindowLevel {
+  if (open === null) throw new VolumeError('No volume is open to reformat')
+  open.window ??= defaultWindow(open.built.volume, open.built.header, open.parent.stack.window)
+  return open.window
 }
 
 /** One reformatted image, at preview size. */
@@ -98,7 +96,7 @@ export function previewReformat(request: ReformatRequestMessage, maxEdge: number
     width: image.width,
     height: image.height,
     values,
-    window: windowFor(open.built, open.parent.stack, values),
+    window: openingWindow(),
     invert: photometric === 'MONOCHROME1'
   }
   return { kind: 'grey', compressed: false, ...downscaleGrey(frame, maxEdge) }
@@ -127,7 +125,7 @@ export async function commitReformat(plan: ReformatPlan): Promise<{ studyId: str
     seriesNumber: open.parent.series.seriesNumber,
     description: open.parent.series.description,
     modality: open.parent.series.modality,
-    window: open.parent.stack.window
+    window: plan.window ?? openingWindow()
   })
 
   const study = open.parent.study

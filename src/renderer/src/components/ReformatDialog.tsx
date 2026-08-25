@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Plane, PreviewFrame, Projection, ReformatPlan, Series, Stack, VolumeInfo } from '@shared/types'
+import type {
+  Plane,
+  PreviewFrame,
+  Projection,
+  ReformatPlan,
+  Series,
+  Stack,
+  VolumeInfo,
+  WindowLevel
+} from '@shared/types'
 import { paintFrame, previewErrorText } from '../dicomPreview'
 import { useWheelScrub } from '../wheelScrub'
 
@@ -55,6 +64,13 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
   })
   const [offset, setOffset] = useState(0)
   const [stage, setStage] = useState<{ width: number; height: number } | null>(null)
+  /**
+   * The window, once the user has touched it. Until then the frame's own is
+   * used — worked out from the volume rather than taken from a tag that may
+   * describe something else, which is how a FLAIR reformat came out as a white
+   * cut-out of a head.
+   */
+  const [window_, setWindow] = useState<WindowLevel | null>(null)
 
   const span = info?.extent[plan.plane] ?? 0
 
@@ -124,13 +140,58 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (canvas && frame) paintFrame(canvas, frame)
-  }, [frame])
+    if (canvas && frame) paintFrame(canvas, frame, { window: window_ })
+  }, [frame, window_])
 
   // Keep the position inside the plane that is showing now.
   useEffect(() => {
     setOffset((current) => Math.min(current, span))
   }, [span])
+
+  const level = window_ ?? (frame?.kind === 'grey' ? frame.window : null)
+
+  /** The spread of the image, which is what the window sliders have to cover. */
+  const bounds = useMemo(() => {
+    if (frame?.kind !== 'grey') return null
+    let min = Infinity
+    let max = -Infinity
+    for (const value of frame.values) {
+      if (value < min) min = value
+      if (value > max) max = value
+    }
+    return Number.isFinite(min) && max > min ? { min, max } : null
+  }, [frame])
+
+  const setLevel = (next: Partial<WindowLevel>): void => {
+    if (!level) return
+    setWindow({ centre: next.centre ?? level.centre, width: Math.max(next.width ?? level.width, 1) })
+  }
+
+  /**
+   * Drag on the image to window it: right widens, down raises the centre. The
+   * same directions as the viewer, and as every other DICOM viewer.
+   */
+  const drag = useRef<{ from: { x: number; y: number }; level: WindowLevel } | null>(null)
+
+  const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>): void => {
+    if (!level) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    drag.current = { from: { x: event.clientX, y: event.clientY }, level }
+  }
+
+  const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>): void => {
+    const active = drag.current
+    if (!active) return
+    const step = Math.max(active.level.width, 1) / 300
+    setWindow({
+      centre: active.level.centre + (event.clientY - active.from.y) * step,
+      width: Math.max(active.level.width + (event.clientX - active.from.x) * step, 1)
+    })
+  }
+
+  const endDrag = (): void => {
+    drag.current = null
+  }
 
   useWheelScrub(stageRef, (steps) =>
     setOffset((current) => Math.min(Math.max(current + steps * plan.spacing, 0), span))
@@ -148,7 +209,7 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
     setBusy(true)
     setError(null)
     try {
-      const { studyId, series } = await window.api.commitReformat(plan)
+      const { studyId, series } = await window.api.commitReformat({ ...plan, window: level })
       onAdded(studyId, series)
       onClose()
     } catch (err) {
@@ -196,7 +257,13 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
             </div>
           ) : frame ? (
             <div className="image-box" style={fitted}>
-              <canvas ref={canvasRef} />
+              <canvas
+                ref={canvasRef}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+              />
             </div>
           ) : (
             <div className="placeholder">Reading the images into a volume…</div>
@@ -249,6 +316,37 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
             <span className="n">{step(plan.spacing)} mm</span>
           </div>
 
+          {level && bounds && (
+            <>
+              <div className="viewer-slider">
+                <span>Level</span>
+                <input
+                  type="range"
+                  min={bounds.min}
+                  max={bounds.max}
+                  step={Math.max((bounds.max - bounds.min) / 500, 0.01)}
+                  value={level.centre}
+                  aria-label="Window centre"
+                  onChange={(e) => setLevel({ centre: Number(e.target.value) })}
+                />
+                <span className="n">{step(level.centre)}</span>
+              </div>
+              <div className="viewer-slider">
+                <span>Window</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={Math.max((bounds.max - bounds.min) * 2, 2)}
+                  step={Math.max((bounds.max - bounds.min) / 500, 0.01)}
+                  value={level.width}
+                  aria-label="Window width"
+                  onChange={(e) => setLevel({ width: Number(e.target.value) })}
+                />
+                <span className="n">{step(level.width)}</span>
+              </div>
+            </>
+          )}
+
           <div className="viewer-actions">
             <div className="tools">
               {PROJECTIONS.map((option) => (
@@ -263,6 +361,11 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
                 </button>
               ))}
             </div>
+            {window_ && (
+              <button className="small ghost" onClick={() => setWindow(null)}>
+                Reset contrast
+              </button>
+            )}
             <div className="spacer" />
             <span className="muted small">
               {info === null

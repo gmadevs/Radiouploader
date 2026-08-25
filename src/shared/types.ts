@@ -143,6 +143,11 @@ export interface ReformatPlan {
   thickness: number
   /** Millimetres between the images that come out. */
   spacing: number
+  /**
+   * The window to write on the derived images. Absent means the one the dialog
+   * opened with, which is what the user saw if they never touched it.
+   */
+  window?: WindowLevel | null
 }
 
 /** One image of a reformat, which is a plan plus where along the normal it sits. */
