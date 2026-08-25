@@ -5,6 +5,14 @@ it into projections.
 
 ![A coronal MIP of the chest CT](/shots/09-reformat.png)
 
+Three panes are navigators — axial, coronal and sagittal — and the fourth is the image that
+will actually be added. **Drag the crosshair** in any navigator and the other two follow it:
+the question this view exists to answer is not what the reformat looks like but where it is
+being taken from. The wheel steps through whichever pane it is over.
+
+The result pane is the one you window: **drag on it**, right to widen and down to raise the
+centre. All four panes share that window, since they are four views of one volume.
+
 The result is added to the case as its own series, beside the one it came from. It goes
 through anonymisation and upload like anything else, because that is what it is: real DICOM
 instances, written to the session's temp directory and removed with it.
@@ -15,7 +23,7 @@ instances, written to the session's temp directory and removed with it.
 |---|---|
 | **Axial / Coronal / Sagittal** | which way to cut |
 | **Slice / MIP / MinIP / Mean** | what a slab collapses to |
-| **Through** | where the slab sits |
+| **Through** | where the slab sits — the crosshair moves this too |
 | **Slab** | how thick it is, in millimetres |
 | **Every** | how far apart the images that come out are |
 | **Level / Window** | the contrast, which is also a drag on the image |
@@ -30,7 +38,7 @@ will scroll past.
 
 ## The contrast
 
-Drag on the image, or use the **Level** and **Window** sliders — right widens, down raises
+Drag on the result pane, or use the **Level** and **Window** sliders — right widens, down raises
 the centre, the same as everywhere else. Whatever is on screen when you press **Add to the
 case** is written to the derived images.
 

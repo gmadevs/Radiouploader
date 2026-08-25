@@ -9,8 +9,8 @@ import type {
   VolumeInfo,
   WindowLevel
 } from '@shared/types'
-import { paintFrame, previewErrorText } from '../dicomPreview'
-import { useWheelScrub } from '../wheelScrub'
+import { previewErrorText } from '../dicomPreview'
+import { ReformatPanel } from './ReformatPanel'
 
 interface Props {
   stack: Stack
@@ -20,11 +20,20 @@ interface Props {
   onClose: () => void
 }
 
-const PLANES: { id: Plane; label: string }[] = [
-  { id: 'axial', label: 'Axial' },
-  { id: 'coronal', label: 'Coronal' },
-  { id: 'sagittal', label: 'Sagittal' }
-]
+type Axis = 'x' | 'y' | 'z'
+
+/**
+ * How each plane lies against the volume's own axes.
+ *
+ * The same table as the reformatter's in the main process, and it has to stay
+ * the same: this is what turns a click in a pane into a position in the volume,
+ * and the two disagreeing would put the crosshair somewhere the image is not.
+ */
+const PANES: Record<Plane, { u: Axis; v: Axis; n: Axis; flipV: boolean; label: string }> = {
+  axial: { u: 'x', v: 'y', n: 'z', flipV: false, label: 'Axial' },
+  coronal: { u: 'x', v: 'z', n: 'y', flipV: true, label: 'Coronal' },
+  sagittal: { u: 'y', v: 'z', n: 'x', flipV: true, label: 'Sagittal' }
+}
 
 const PROJECTIONS: { id: Projection; label: string; title: string }[] = [
   { id: 'slice', label: 'Slice', title: 'One plane through the volume' },
@@ -36,61 +45,39 @@ const PROJECTIONS: { id: Projection; label: string; title: string }[] = [
 /** Round to something a slider can land on and a person can read. */
 const step = (value: number): number => Math.round(value * 10) / 10
 
+/** Navigator panes are small; the one being built is looked at. */
+const PANE_EDGE = 512
+const RESULT_EDGE = 1024
+
 /**
  * Cutting a stack another way, and flattening slabs of it.
  *
- * The volume this works on stays in the main process — a chest CT is hundreds
- * of megabytes — so everything here is a request for one preview-sized image at
- * a time, exactly like the viewer's.
+ * Laid out the way a workstation lays it out: the three orthogonal planes as
+ * navigators with a shared crosshair, and the image that will actually be added
+ * to the case in the fourth corner. Drag the crosshair in any pane and the
+ * other two follow it, because the question this view exists to answer is not
+ * "what does this reformat look like" but "where is it being taken from".
  *
- * The planes are the acquisition's own, not the patient's: on an axial study
- * coronal and sagittal mean what they say, and on an oblique one they mean
- * "across the acquisition". Which is the reason this shows the result before
- * anything can be added to a case.
+ * The volume itself stays in the main process — a chest CT is hundreds of
+ * megabytes — so all of this is four requests for four preview-sized images.
  */
 export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): React.JSX.Element {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const stageRef = useRef<HTMLDivElement>(null)
   const [info, setInfo] = useState<VolumeInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [frame, setFrame] = useState<PreviewFrame | null>(null)
+  const [frames, setFrames] = useState<Record<string, PreviewFrame | null>>({})
   const [count, setCount] = useState(0)
-  const [plan, setPlan] = useState<ReformatPlan>({
-    plane: 'coronal',
-    projection: 'slice',
-    thickness: 5,
-    spacing: 5
-  })
-  const [offset, setOffset] = useState(0)
-  const [stage, setStage] = useState<{ width: number; height: number } | null>(null)
-  /**
-   * The window, once the user has touched it. Until then the frame's own is
-   * used — worked out from the volume rather than taken from a tag that may
-   * describe something else, which is how a FLAIR reformat came out as a white
-   * cut-out of a head.
-   */
+  const [plan, setPlan] = useState<ReformatPlan>({ plane: 'coronal', projection: 'slice', thickness: 5, spacing: 5 })
+  /** Where the three planes cross, in millimetres along each of the volume's axes. */
+  const [at, setAt] = useState<Record<Axis, number>>({ x: 0, y: 0, z: 0 })
   const [window_, setWindow] = useState<WindowLevel | null>(null)
 
-  const span = info?.extent[plan.plane] ?? 0
-
-  // A coronal of a 5 mm study is a wide, shallow picture; it has to be scaled to
-  // the window like any other image, or it sits in the middle at its own size.
-  useEffect(() => {
-    const element = stageRef.current
-    if (!element) return
-    const observer = new ResizeObserver(([entry]) =>
-      setStage({ width: entry.contentRect.width, height: entry.contentRect.height })
-    )
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [])
-
-  const fitted = useMemo(() => {
-    if (!frame || !stage || stage.width === 0 || stage.height === 0) return undefined
-    const scale = Math.min(stage.width / frame.width, stage.height / frame.height)
-    return { width: `${frame.width * scale}px`, height: `${frame.height * scale}px` }
-  }, [frame, stage])
+  /** The extent of each axis, which is what a fraction of a pane means in millimetres. */
+  const size: Record<Axis, number> = useMemo(
+    () => ({ x: info?.extent.sagittal ?? 0, y: info?.extent.coronal ?? 0, z: info?.extent.axial ?? 0 }),
+    [info]
+  )
+  const offset = at[PANES[plan.plane].n]
 
   useEffect(() => {
     let cancelled = false
@@ -100,11 +87,14 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
       .then((opened) => {
         if (cancelled) return
         setInfo(opened)
-        // Aim at something a reader would scroll through rather than a whole
-        // acquisition's worth of reformats.
+        // Aim at a series a reader would scroll through, not a whole acquisition.
         const wanted = Math.max(opened.finestSpacing, step(opened.extent.coronal / 24))
         setPlan((current) => ({ ...current, spacing: wanted, thickness: wanted }))
-        setOffset(opened.extent.coronal / 2)
+        setAt({
+          x: opened.extent.sagittal / 2,
+          y: opened.extent.coronal / 2,
+          z: opened.extent.axial / 2
+        })
       })
       .catch((err: unknown) => !cancelled && setError(previewErrorText(err)))
       .finally(() => !cancelled && setBusy(false))
@@ -115,19 +105,33 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
     }
   }, [stack.id])
 
-  // Every control change is one round trip for one image. The volume is already
-  // in memory over there, so this is a resample and not a read.
+  // Four images per change of anything. They are resamples of a volume that is
+  // already in memory over there, so this is arithmetic rather than reading.
+  const request = useRef(0)
   useEffect(() => {
     if (info === null) return
-    let cancelled = false
-    window.api
-      .reformatFrame({ ...plan, offset }, 1024)
-      .then((next) => !cancelled && setFrame(next))
-      .catch((err: unknown) => !cancelled && setError(previewErrorText(err)))
-    return () => {
-      cancelled = true
-    }
-  }, [info, plan, offset])
+    const ticket = ++request.current
+
+    const wanted: [string, Promise<PreviewFrame>][] = [
+      ...(Object.keys(PANES) as Plane[]).map(
+        (plane): [string, Promise<PreviewFrame>] => [
+          plane,
+          window.api.reformatFrame(
+            { plane, projection: 'slice', thickness: 0, spacing: plan.spacing, offset: at[PANES[plane].n] },
+            PANE_EDGE
+          )
+        ]
+      ),
+      ['result', window.api.reformatFrame({ ...plan, offset }, RESULT_EDGE)]
+    ]
+
+    void Promise.all(wanted.map(async ([key, promise]) => [key, await promise] as const))
+      .then((pairs) => {
+        // A drag fires faster than these come back; only the newest is drawn.
+        if (ticket === request.current) setFrames(Object.fromEntries(pairs))
+      })
+      .catch((err: unknown) => ticket === request.current && setError(previewErrorText(err)))
+  }, [info, plan, at, offset])
 
   useEffect(() => {
     if (info === null) return
@@ -139,71 +143,48 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
   }, [info, plan])
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (canvas && frame) paintFrame(canvas, frame, { window: window_ })
-  }, [frame, window_])
-
-  // Keep the position inside the plane that is showing now.
-  useEffect(() => {
-    setOffset((current) => Math.min(current, span))
-  }, [span])
-
-  const level = window_ ?? (frame?.kind === 'grey' ? frame.window : null)
-
-  /** The spread of the image, which is what the window sliders have to cover. */
-  const bounds = useMemo(() => {
-    if (frame?.kind !== 'grey') return null
-    let min = Infinity
-    let max = -Infinity
-    for (const value of frame.values) {
-      if (value < min) min = value
-      if (value > max) max = value
-    }
-    return Number.isFinite(min) && max > min ? { min, max } : null
-  }, [frame])
-
-  const setLevel = (next: Partial<WindowLevel>): void => {
-    if (!level) return
-    setWindow({ centre: next.centre ?? level.centre, width: Math.max(next.width ?? level.width, 1) })
-  }
-
-  /**
-   * Drag on the image to window it: right widens, down raises the centre. The
-   * same directions as the viewer, and as every other DICOM viewer.
-   */
-  const drag = useRef<{ from: { x: number; y: number }; level: WindowLevel } | null>(null)
-
-  const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>): void => {
-    if (!level) return
-    event.currentTarget.setPointerCapture(event.pointerId)
-    drag.current = { from: { x: event.clientX, y: event.clientY }, level }
-  }
-
-  const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>): void => {
-    const active = drag.current
-    if (!active) return
-    const step = Math.max(active.level.width, 1) / 300
-    setWindow({
-      centre: active.level.centre + (event.clientY - active.from.y) * step,
-      width: Math.max(active.level.width + (event.clientX - active.from.x) * step, 1)
-    })
-  }
-
-  const endDrag = (): void => {
-    drag.current = null
-  }
-
-  useWheelScrub(stageRef, (steps) =>
-    setOffset((current) => Math.min(Math.max(current + steps * plan.spacing, 0), span))
-  )
-
-  useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') onClose()
     }
     globalThis.addEventListener('keydown', onKey)
     return () => globalThis.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  const result = frames.result ?? null
+  const level = window_ ?? (result?.kind === 'grey' ? result.window : null)
+
+  /** The spread of the image, which is what the window sliders have to cover. */
+  const bounds = useMemo(() => {
+    if (result?.kind !== 'grey') return null
+    let min = Infinity
+    let max = -Infinity
+    for (const value of result.values) {
+      if (value < min) min = value
+      if (value > max) max = value
+    }
+    return Number.isFinite(min) && max > min ? { min, max } : null
+  }, [result])
+
+  const setLevel = (next: Partial<WindowLevel>): void => {
+    if (!level) return
+    setWindow({ centre: next.centre ?? level.centre, width: Math.max(next.width ?? level.width, 1) })
+  }
+
+  /** Windowing by drag: right widens, down raises the centre, as everywhere else. */
+  const dragFrom = useRef<WindowLevel | null>(null)
+  const onWindowDrag = (dx: number, dy: number, first: boolean): void => {
+    if (first) {
+      dragFrom.current = level
+      return
+    }
+    const from = dragFrom.current
+    if (!from) return
+    const unit = Math.max(from.width, 1) / 300
+    setWindow({ centre: from.centre + dy * unit, width: Math.max(from.width + dx * unit, 1) })
+  }
+
+  const move = (axis: Axis, millimetres: number): void =>
+    setAt((current) => ({ ...current, [axis]: Math.min(Math.max(millimetres, 0), size[axis]) }))
 
   const add = async (): Promise<void> => {
     setBusy(true)
@@ -220,6 +201,20 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
 
   const set = (patch: Partial<ReformatPlan>): void => setPlan((current) => ({ ...current, ...patch }))
 
+  /** Where the other two planes cross this one, as fractions of its image. */
+  const crosshair = (plane: Plane): { u: number; v: number } => {
+    const pane = PANES[plane]
+    const u = size[pane.u] > 0 ? at[pane.u] / size[pane.u] : 0.5
+    const v = size[pane.v] > 0 ? at[pane.v] / size[pane.v] : 0.5
+    return { u, v: pane.flipV ? 1 - v : v }
+  }
+
+  const pick = (plane: Plane) => (u: number, v: number) => {
+    const pane = PANES[plane]
+    move(pane.u, u * size[pane.u])
+    move(pane.v, (pane.flipV ? 1 - v : v) * size[pane.v])
+  }
+
   return (
     <div className="viewer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="viewer" role="dialog" aria-label={`Reformat ${stack.label}`}>
@@ -231,44 +226,54 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
             </div>
           </div>
           <div className="tools">
-            {PLANES.map((option) => (
+            {(Object.keys(PANES) as Plane[]).map((plane) => (
               <button
-                key={option.id}
-                className={plan.plane === option.id ? 'small on' : 'small'}
+                key={plane}
+                className={plan.plane === plane ? 'small on' : 'small'}
                 disabled={info === null}
-                onClick={() => {
-                  set({ plane: option.id })
-                  setOffset((info?.extent[option.id] ?? 0) / 2)
-                }}
+                title={`Build the series from the ${PANES[plane].label.toLowerCase()} plane`}
+                onClick={() => set({ plane })}
               >
-                {option.label}
+                {PANES[plane].label}
               </button>
             ))}
           </div>
           <button onClick={onClose}>Cancel</button>
         </header>
 
-        <div className="viewer-stage" ref={stageRef}>
-          {error ? (
+        {error ? (
+          <div className="viewer-stage">
             <div className="placeholder">
               This stack cannot be reformatted
               <br />
               {error}
             </div>
-          ) : frame ? (
-            <div className="image-box" style={fitted}>
-              <canvas
-                ref={canvasRef}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={endDrag}
-                onPointerCancel={endDrag}
+          </div>
+        ) : (
+          <div className="reformat-grid">
+            {(Object.keys(PANES) as Plane[]).map((plane) => (
+              <ReformatPanel
+                key={plane}
+                label={PANES[plane].label}
+                title="Drag to move the crosshair; the wheel steps through this plane"
+                frame={frames[plane] ?? null}
+                window={level}
+                lines={crosshair(plane)}
+                onPick={pick(plane)}
+                onScroll={(steps) => move(PANES[plane].n, at[PANES[plane].n] + steps * plan.spacing)}
               />
-            </div>
-          ) : (
-            <div className="placeholder">Reading the images into a volume…</div>
-          )}
-        </div>
+            ))}
+            <ReformatPanel
+              result
+              label={`${PANES[plan.plane].label} · ${PROJECTIONS.find((p) => p.id === plan.projection)?.label ?? ''}`}
+              title="The image that will be added. Drag to window it; the wheel steps through the series"
+              frame={result}
+              window={level}
+              onWindow={onWindowDrag}
+              onScroll={(steps) => move(PANES[plan.plane].n, offset + steps * plan.spacing)}
+            />
+          </div>
+        )}
 
         <div className="viewer-controls">
           <div className="viewer-slider">
@@ -276,12 +281,12 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
             <input
               type="range"
               min={0}
-              max={Math.max(span, 1)}
+              max={Math.max(size[PANES[plan.plane].n], 1)}
               step={0.5}
               value={offset}
               disabled={info === null}
               aria-label="Position through the volume"
-              onChange={(e) => setOffset(Number(e.target.value))}
+              onChange={(e) => move(PANES[plan.plane].n, Number(e.target.value))}
             />
             <span className="n">{step(offset)} mm</span>
           </div>
@@ -291,7 +296,7 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
             <input
               type="range"
               min={info?.finestSpacing ?? 1}
-              max={Math.max(Math.min(span, 100), 2)}
+              max={Math.max(Math.min(size[PANES[plan.plane].n], 100), 2)}
               step={0.5}
               value={plan.thickness}
               disabled={info === null || plan.projection === 'slice'}
@@ -306,7 +311,7 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
             <input
               type="range"
               min={info?.finestSpacing ?? 1}
-              max={Math.max(Math.min(span / 2, 20), 2)}
+              max={Math.max(Math.min(size[PANES[plan.plane].n] / 2, 20), 2)}
               step={0.5}
               value={plan.spacing}
               disabled={info === null}

@@ -47,3 +47,62 @@ export function paintFrame(canvas: HTMLCanvasElement, frame: PreviewFrame, optio
     ctx.fillRect(mask.x * frame.width, mask.y * frame.height, mask.width * frame.width, mask.height * frame.height)
   }
 }
+
+/** Where a frame lands inside a canvas that is not its shape, in canvas pixels. */
+export interface FitRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * Fit a frame into a box, keeping its proportions.
+ *
+ * Returned rather than applied, because whatever draws on top of the image —
+ * a crosshair — and whatever reads a position back out of it have to agree
+ * with the drawing about where the image actually is.
+ */
+export function fitRect(boxWidth: number, boxHeight: number, frameWidth: number, frameHeight: number): FitRect {
+  const scale = Math.min(boxWidth / frameWidth, boxHeight / frameHeight)
+  const width = frameWidth * scale
+  const height = frameHeight * scale
+  return { x: (boxWidth - width) / 2, y: (boxHeight - height) / 2, width, height }
+}
+
+/**
+ * Paint a frame to fill a canvas of its own size, letterboxed.
+ *
+ * The panelled reformat view needs this rather than `paintFrame`: four images
+ * of four different shapes share a grid, so each canvas is the cell and the
+ * image is drawn into it rather than the other way round.
+ */
+export function paintFitted(
+  canvas: HTMLCanvasElement,
+  frame: PreviewFrame,
+  window?: WindowLevel | null
+): FitRect | null {
+  const box = canvas.getBoundingClientRect()
+  if (box.width === 0 || box.height === 0) return null
+
+  // Draw at the screen's own resolution: a reformat is looked at closely.
+  const ratio = globalThis.devicePixelRatio || 1
+  canvas.width = Math.round(box.width * ratio)
+  canvas.height = Math.round(box.height * ratio)
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+
+  const rgba = frame.kind === 'grey' ? applyWindow(frame, window ?? frame.window).rgba : frame.rgba
+  const source = new OffscreenCanvas(frame.width, frame.height)
+  const sourceCtx = source.getContext('2d')
+  if (!sourceCtx) return null
+  sourceCtx.putImageData(new ImageData(new Uint8ClampedArray(rgba), frame.width, frame.height), 0, 0)
+
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  const fit = fitRect(canvas.width, canvas.height, frame.width, frame.height)
+  ctx.imageSmoothingEnabled = true
+  ctx.drawImage(source, fit.x, fit.y, fit.width, fit.height)
+  return fit
+}
