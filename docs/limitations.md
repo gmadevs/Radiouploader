@@ -1,6 +1,6 @@
 # Known limitations
 
-The app is alpha. These are the things it does not do, written down so nobody has to
+The app is beta. These are the things it does not do, written down so nobody has to
 discover them mid-upload.
 
 ## Burnt-in text is only partly detected

@@ -1,6 +1,6 @@
 # Install and sign in
 
-::: danger These are alpha builds
+::: danger These are beta builds
 Every release so far is a pre-release. The app has been run on its author's machine and
 nowhere else — not on another computer, not on another operating system version, not
 against anybody else's studies. Read [known limitations](/limitations) before you point it

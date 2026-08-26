@@ -97,7 +97,7 @@ jobs:
           files: artifacts/**/*
           generate_release_notes: true
           body: |
-            > ### Alpha — work in progress
+            > ### Beta — work in progress
             >
             > This build has been run on the author's machine and nowhere else. It
             > has never been tested on another computer, on another operating system
@@ -108,11 +108,13 @@ jobs:
             `chmod +x` on the AppImage. See
             [Install and sign in](https://gmadevs.github.io/Radiouploader/guide/install).
 
-            **The app never tells you your images are clean.** No part of it looks at
-            pixels for burnt-in text: it reports what it did not check, never that a
-            study is safe. Look at every frame yourself before uploading, and read
-            [Known limitations](https://gmadevs.github.io/Radiouploader/limitations)
-            first — compressed multiframe runs, in particular, are known to fail.
+            **The app never tells you your images are clean.** It does look through the
+            images for burnt-in text before anonymising, and rings what it finds — but it
+            finds obvious banners and misses small print, text written over anatomy, and
+            anything on the images it did not read. A series it says nothing about is a
+            series nothing was noticed in, which is not the same thing. Look at every frame
+            yourself before uploading, and read
+            [Known limitations](https://gmadevs.github.io/Radiouploader/limitations) first.
 
             Uploads land as **draft** cases on Radiopaedia, so nothing goes public
             without you publishing it. Please report anything that breaks in

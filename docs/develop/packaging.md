@@ -12,12 +12,14 @@ release with them attached.
 
 The release is drafted rather than published, and marked a pre-release. Nobody can download
 an installer until the draft is published by hand, which is the point: the binaries get
-opened once before they are offered to anyone. The warning that heads every release — alpha,
+opened once before they are offered to anyone. The warning that heads every release — beta,
 tested on one machine, unsigned, never says your images are clean — is the `body:` of the
 release step, so it is the same on every tag and cannot be forgotten while writing notes.
+It is prose about what the app does, so it goes stale the way prose does: check it says
+something still true before tagging.
 
-Versions carry the pre-release suffix, `0.1.0-alpha.1`, and it reaches the filenames: the
-dmg, the deb and the installer all say `alpha` before anyone runs them.
+Versions carry the pre-release suffix, `0.1.0-beta.1`, and it reaches the filenames: the
+dmg, the deb and the installer all say `beta` before anyone runs them.
 
 It is triggered manually or by a tag rather than on every push, because macOS and Windows
 runners bill at 10x and 2x — a habit worth keeping even now the repository is public and
