@@ -531,3 +531,105 @@ describe('anonymiseFile — crop', () => {
     expect(ds.uint16('x00280010')).toBe(Math.round((before.uint16('x00280010') ?? 0) / 2))
   })
 })
+
+describe('anonymiseFile — enhanced multiframe', () => {
+  type Dict = Record<string, { vr: string; Value: unknown[] }>
+  const ds = (...values: number[]): { vr: string; Value: string[] } => ({ vr: 'DS', Value: values.map(String) })
+
+  /**
+   * An enhanced object built from the 8x8 fixture: geometry, pixel size and
+   * rescale stated in the functional groups and nowhere else, which is what
+   * makes lifting a frame out of one different from splitting a cine.
+   */
+  async function enhanced(name: string, zs: number[]): Promise<string> {
+    const buf = await fs.readFile(path.join(fixtures, '01_ras_physician.dcm'))
+    const message = dcmio.Message.readFile(
+      buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+    )
+    const dict = message.dict as unknown as Dict
+
+    const one = dict['7FE00010'].Value[0] as ArrayBuffer
+    const all = new Uint8Array(one.byteLength * zs.length)
+    for (let i = 0; i < zs.length; i++) all.set(new Uint8Array(one), i * one.byteLength)
+    dict['7FE00010'] = { vr: 'OW', Value: [all.buffer as ArrayBuffer] }
+    dict['00280008'] = { vr: 'IS', Value: [String(zs.length)] }
+
+    // The top level says none of it, which is the point.
+    delete dict['00200032']
+    delete dict['00200037']
+    delete dict['00280030']
+    delete dict['00281052']
+    delete dict['00281053']
+
+    dict['52009229'] = {
+      vr: 'SQ',
+      Value: [
+        {
+          '00209116': { vr: 'SQ', Value: [{ '00200037': ds(1, 0, 0, 0, 1, 0) }] },
+          '00289110': { vr: 'SQ', Value: [{ '00280030': ds(0.5, 0.5), '00180050': ds(3) }] },
+          '00289145': { vr: 'SQ', Value: [{ '00281052': ds(-1024), '00281053': ds(2) }] }
+        }
+      ]
+    }
+    dict['52009230'] = {
+      vr: 'SQ',
+      Value: zs.map((z) => ({ '00209113': { vr: 'SQ', Value: [{ '00200032': ds(0, 0, z) }] } }))
+    }
+
+    const outputPath = path.join(outDir, name)
+    await fs.writeFile(outputPath, Buffer.from(message.write()))
+    return outputPath
+  }
+
+  it('gives a frame lifted out the tags it needs to stand on its own', async () => {
+    const file = await enhanced('enhanced.dcm', [0, 3, 6])
+    const results = await anonymiseFile(
+      file,
+      outDir,
+      [0, 1, 2].map((frame) => ({ frame, outputName: `enh-${frame}.dcm`, instanceNumber: frame + 1 }))
+    )
+    expect(results).toHaveLength(3)
+
+    const ds2 = await tagsOf(results[2].outputPath)
+    // The frame's own position, not the object's — it had none.
+    expect(ds2.string('x00200032')).toBe('0\\0\\6')
+    // Stated once for every frame, so it comes from the shared group.
+    expect(ds2.string('x00200037')).toBe('1\\0\\0\\0\\1\\0')
+    expect(ds2.string('x00280030')).toBe('0.5\\0.5')
+    expect(ds2.string('x00180050')).toBe('3')
+    // Without these the Hounsfield units quietly become stored values.
+    expect(ds2.string('x00281052')).toBe('-1024')
+    expect(ds2.string('x00281053')).toBe('2')
+
+    expect(ds2.string('x00280008')).toBe('1')
+    // The sequences themselves cannot come along: they describe three frames
+    // and this file holds one. The anonymiser drops them.
+    expect(ds2.elements['x52009229']).toBeUndefined()
+    expect(ds2.elements['x52009230']).toBeUndefined()
+  })
+
+  it('does not carry one frame’s position into the next', async () => {
+    const file = await enhanced('enhanced-2.dcm', [0, 3, 6])
+    const results = await anonymiseFile(
+      file,
+      outDir,
+      [0, 1, 2].map((frame) => ({ frame, outputName: `enh2-${frame}.dcm`, instanceNumber: frame + 1 }))
+    )
+    const positions = await Promise.all(results.map(async (r) => (await tagsOf(r.outputPath)).string('x00200032')))
+    expect(positions).toEqual(['0\\0\\0', '0\\0\\3', '0\\0\\6'])
+  })
+
+  it('crops a promoted position rather than the one the file never had', async () => {
+    // The corner has to be promoted before the crop reads it, or the crop finds
+    // nothing to move and deletes a position it could have kept.
+    const file = await enhanced('enhanced-crop.dcm', [0, 3])
+    const [, second] = await anonymiseFile(file, outDir, [
+      { frame: 0, outputName: 'enh-crop-0.dcm', instanceNumber: 1, crop: { x: 0.5, y: 0, width: 0.5, height: 1 } },
+      { frame: 1, outputName: 'enh-crop-1.dcm', instanceNumber: 2, crop: { x: 0.5, y: 0, width: 0.5, height: 1 } }
+    ])
+    const tags = await tagsOf(second.outputPath)
+    expect(tags.uint16('x00280011')).toBe(4)
+    // Four columns in at half a millimetre each, along the row direction.
+    expect(tags.string('x00200032')).toBe('2\\0\\3')
+  })
+})

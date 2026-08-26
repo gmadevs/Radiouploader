@@ -38,6 +38,38 @@ not expand them server-side: a run sent whole would be published as its first fr
 compressed run has to be decoded before its frames can be separated at all, so one in a
 format with no decoder is refused by name in the picker.
 
+### An enhanced object is split by its own frames
+
+A legacy exporter writes a dynamic acquisition as hundreds of instances; an enhanced MR or
+CT writes the same thing as **one file**, and what separates the phases is not in the header
+at all. It is in `PerFrameFunctionalGroupsSequence` (5200,9230), one item per frame, with
+whatever the frames have in common in `SharedFunctionalGroupsSequence` (5200,9229).
+
+Both are read at ingest, and the table above is then applied per frame rather than per file:
+
+| Read per frame | From |
+|---|---|
+| Time point | `TemporalPositionIndex` (0020,9128), in `FrameContentSequence` |
+| b-value | `DiffusionBValue` (0018,9087), in `MRDiffusionSequence` |
+| Echo | `EffectiveEchoTime` (0018,9082), in `MREchoSequence` — numbered here, since the file states only times |
+| Magnitude / phase / … | `FrameType` (0008,9007), in the MR or CT frame-type sequence |
+| Position | `ImagePositionPatient` in `PlanePositionSequence`, projected on the shared orientation |
+
+So a dynamic enhanced series arrives as one stack per phase, the same as it would from a
+legacy exporter, and the phases can be ticked and dropped individually.
+
+`StackID` (0020,9056) is read too. An object can hold several volumes — three orthogonal
+localisers is the usual case — and frames of different ones are kept apart when the stack is
+ordered, so they cannot interleave into a volume that is no volume.
+
+Lifting one frame out of an enhanced object takes more than copying its pixels. Everything
+that describes an image in DICOM — where it sits, how big its pixels are, what their values
+mean — is stated **per frame** in those sequences rather than at the top level, and the
+anonymiser drops both sequences. So the frame's own `ImagePositionPatient`,
+`ImageOrientationPatient`, `PixelSpacing`, `SliceThickness`, rescale and window are promoted
+to the top level before anonymisation runs. Without that the upload would be an image with
+no geometry and Hounsfield units that had quietly become stored values.
+
 Objects with no pixel data are rejected at ingest so they never appear as series to upload.
 
 ## Why UIDs matter later

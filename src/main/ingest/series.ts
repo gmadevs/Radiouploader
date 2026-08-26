@@ -38,12 +38,76 @@ interface Dimensions {
   temporalIndex: number | null
 }
 
-function dimensionsOf(meta: InstanceMeta): Dimensions {
+/**
+ * What the grouping actually works on: one image, which is usually one file and
+ * sometimes one frame of one.
+ *
+ * A legacy exporter writes a dynamic series as hundreds of instances and this
+ * is one per file. An enhanced MR or CT writes the same acquisition as a single
+ * object and says what separates its frames in the per-frame functional groups
+ * — so when a file describes its frames one by one, this is one per frame and
+ * everything downstream groups, orders and labels them without knowing the
+ * difference.
+ */
+interface Unit {
+  instance: InstanceMeta
+  /** Frame within the file; null when the whole instance is one unit. */
+  frame: number | null
+  component: ImageComponent
+  bValue: number | null
+  echoNumber: number | null
+  echoTime: number | null
+  temporalIndex: number | null
+  sliceLocation: number | null
+  triggerTime: number | null
+  acquisitionTime: string | null
+  stackId: string | null
+  inStackPosition: number | null
+}
+
+function unitsOf(instances: InstanceMeta[]): Unit[] {
+  return instances.flatMap((instance): Unit[] => {
+    const whole: Unit = {
+      instance,
+      frame: null,
+      component: instance.component,
+      bValue: instance.bValue,
+      echoNumber: instance.echoNumber,
+      echoTime: instance.echoTime,
+      temporalIndex: instance.temporalPositionIdentifier,
+      sliceLocation: instance.sliceLocation,
+      triggerTime: instance.triggerTime,
+      acquisitionTime: instance.acquisitionTime,
+      stackId: null,
+      inStackPosition: null
+    }
+    if (instance.frames === null) return [whole]
+
+    // The header of an enhanced object still carries what the frames have in
+    // common, so anything a frame does not say for itself falls back to it.
+    return instance.frames.map((f) => ({
+      ...whole,
+      frame: f.frame,
+      component: f.component,
+      bValue: f.bValue ?? instance.bValue,
+      echoNumber: f.echoNumber ?? instance.echoNumber,
+      echoTime: f.echoTime ?? instance.echoTime,
+      temporalIndex: f.temporalIndex ?? instance.temporalPositionIdentifier,
+      sliceLocation: f.sliceLocation ?? instance.sliceLocation,
+      triggerTime: f.triggerTime ?? instance.triggerTime,
+      acquisitionTime: f.acquisitionTime ?? instance.acquisitionTime,
+      stackId: f.stackId,
+      inStackPosition: f.inStackPosition
+    }))
+  })
+}
+
+function dimensionsOf(unit: Unit): Dimensions {
   return {
-    component: meta.component,
-    bValue: meta.bValue,
-    echoNumber: meta.echoNumber,
-    temporalIndex: meta.temporalPositionIdentifier
+    component: unit.component,
+    bValue: unit.bValue,
+    echoNumber: unit.echoNumber,
+    temporalIndex: unit.temporalIndex
   }
 }
 
@@ -52,27 +116,40 @@ function dimensionKey(d: Dimensions): string {
 }
 
 /**
- * Order instances within a stack. ImagePositionPatient projected on the slice
+ * Order images within a stack. ImagePositionPatient projected on the slice
  * normal is preferred; InstanceNumber is the fallback for non-volumetric data.
+ *
+ * StackID comes first, and only enhanced objects have one. A file that holds
+ * three orthogonal localisers holds three volumes, and ordering their frames
+ * against each other by position interleaves them into one that is no volume
+ * at all — keeping them apart is the least this can do about that.
  */
-function sortSlices(instances: InstanceMeta[]): InstanceMeta[] {
-  return [...instances].sort((a, b) => {
+function sortSlices(units: Unit[]): Unit[] {
+  return [...units].sort((a, b) => {
+    if (a.stackId !== b.stackId) {
+      return (a.stackId ?? '').localeCompare(b.stackId ?? '', undefined, { numeric: true })
+    }
     if (a.sliceLocation !== null && b.sliceLocation !== null && a.sliceLocation !== b.sliceLocation) {
       return a.sliceLocation - b.sliceLocation
     }
-    return (a.instanceNumber ?? 0) - (b.instanceNumber ?? 0)
+    const byInstance = (a.instance.instanceNumber ?? 0) - (b.instance.instanceNumber ?? 0)
+    if (byInstance !== 0) return byInstance
+    if (a.inStackPosition !== null && b.inStackPosition !== null && a.inStackPosition !== b.inStackPosition) {
+      return a.inStackPosition - b.inStackPosition
+    }
+    return (a.frame ?? 0) - (b.frame ?? 0)
   })
 }
 
 /** Time key for ordering repeats of the same slice in a dynamic acquisition. */
-function temporalSortKey(meta: InstanceMeta): number {
-  if (meta.triggerTime !== null) return meta.triggerTime
-  if (meta.acquisitionTime !== null) {
+function temporalSortKey(unit: Unit): number {
+  if (unit.triggerTime !== null) return unit.triggerTime
+  if (unit.acquisitionTime !== null) {
     // DICOM TM is HHMMSS.FFFFFF — parse to seconds since midnight.
-    const m = /^(\d{2})(\d{2})(\d{2}(?:\.\d+)?)$/.exec(meta.acquisitionTime)
+    const m = /^(\d{2})(\d{2})(\d{2}(?:\.\d+)?)$/.exec(unit.acquisitionTime)
     if (m) return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3])
   }
-  return meta.instanceNumber ?? 0
+  return unit.frame ?? unit.instance.instanceNumber ?? 0
 }
 
 /**
@@ -85,15 +162,15 @@ function temporalSortKey(meta: InstanceMeta): number {
  *
  * Returns null when the series does not look like a repeated acquisition.
  */
-function splitByRepetition(instances: InstanceMeta[]): InstanceMeta[][] | null {
-  const byLocation = new Map<string, InstanceMeta[]>()
-  for (const inst of instances) {
-    if (inst.sliceLocation === null) return null
+function splitByRepetition(units: Unit[]): Unit[][] | null {
+  const byLocation = new Map<string, Unit[]>()
+  for (const unit of units) {
+    if (unit.sliceLocation === null) return null
     // Round to 0.01 mm so float noise does not fragment the groups.
-    const key = inst.sliceLocation.toFixed(2)
+    const key = unit.sliceLocation.toFixed(2)
     const bucket = byLocation.get(key)
-    if (bucket) bucket.push(inst)
-    else byLocation.set(key, [inst])
+    if (bucket) bucket.push(unit)
+    else byLocation.set(key, [unit])
   }
 
   const counts = [...byLocation.values()].map((v) => v.length)
@@ -102,10 +179,10 @@ function splitByRepetition(instances: InstanceMeta[]): InstanceMeta[][] | null {
   if (repeats < 2 || !counts.every((c) => c === repeats)) return null
   if (byLocation.size < 2) return null
 
-  const phases: InstanceMeta[][] = Array.from({ length: repeats }, () => [])
+  const phases: Unit[][] = Array.from({ length: repeats }, () => [])
   for (const bucket of byLocation.values()) {
     const ordered = [...bucket].sort((a, b) => temporalSortKey(a) - temporalSortKey(b))
-    ordered.forEach((inst, i) => phases[i].push(inst))
+    ordered.forEach((unit, i) => phases[i].push(unit))
   }
   return phases
 }
@@ -118,14 +195,28 @@ function splitByRepetition(instances: InstanceMeta[]): InstanceMeta[][] | null {
  * a single unscrubbable image. Anonymisation and upload deduplicate by path, so
  * the file is still processed and sent once.
  */
-function toSliceRefs(meta: InstanceMeta): SliceRef[] {
-  const frames = Math.max(1, Math.floor(meta.numberOfFrames))
+function toSliceRefs(unit: Unit): SliceRef[] {
+  const { instance } = unit
+  // A frame that described itself is already one unit, and expanding it again
+  // would put every frame of the file into every stack it was split into.
+  if (unit.frame !== null) {
+    return [
+      {
+        path: instance.path,
+        frame: unit.frame,
+        instanceNumber: instance.instanceNumber,
+        sliceLocation: unit.sliceLocation,
+        sopInstanceUid: instance.sopInstanceUid
+      }
+    ]
+  }
+  const frames = Math.max(1, Math.floor(instance.numberOfFrames))
   return Array.from({ length: frames }, (_, frame) => ({
-    path: meta.path,
+    path: instance.path,
     frame,
-    instanceNumber: meta.instanceNumber,
-    sliceLocation: meta.sliceLocation,
-    sopInstanceUid: meta.sopInstanceUid
+    instanceNumber: instance.instanceNumber,
+    sliceLocation: instance.sliceLocation,
+    sopInstanceUid: instance.sopInstanceUid
   }))
 }
 
@@ -140,13 +231,13 @@ function toSliceRefs(meta: InstanceMeta): SliceRef[] {
  * says so here rather than during anonymisation, where the failure is per file
  * and takes the whole series out of the case behind a count of errors.
  */
-function unsupportedReason(instances: InstanceMeta[]): string | null {
-  const blocked = instances.find(
-    (m) =>
+function unsupportedReason(units: Unit[]): string | null {
+  const blocked = units.find(
+    ({ instance: m }) =>
       m.numberOfFrames > 1 &&
       compressionOf(m.transferSyntaxUid) !== null &&
       !canDecode(m.transferSyntaxUid ?? '')
-  )
+  )?.instance
   if (blocked === undefined) return null
   const codec = compressionOf(blocked.transferSyntaxUid)
   return `${codec} multiframe — this app has no decoder for it, so the run cannot be split or uploaded`
@@ -173,21 +264,26 @@ function buildLabel(d: Dimensions, phaseIndex: number | null, echoTime: number |
  * for display.
  */
 export function buildStacks(seriesId: string, instances: InstanceMeta[]): { stacks: Stack[]; splitReason: StackKind | null } {
-  const groups = new Map<string, InstanceMeta[]>()
-  for (const inst of instances) {
-    const key = dimensionKey(dimensionsOf(inst))
+  // One unit per image, which for an enhanced object is one per frame: the
+  // whole of a dynamic acquisition can arrive as a single file, and what
+  // separates its phases is written per frame rather than per instance.
+  const units = unitsOf(instances)
+
+  const groups = new Map<string, Unit[]>()
+  for (const unit of units) {
+    const key = dimensionKey(dimensionsOf(unit))
     const bucket = groups.get(key)
-    if (bucket) bucket.push(inst)
-    else groups.set(key, [inst])
+    if (bucket) bucket.push(unit)
+    else groups.set(key, [unit])
   }
 
   // Which dimensions actually vary across the series?
   const varying = new Set<StackKind>()
-  const distinct = <T>(pick: (m: InstanceMeta) => T): number => new Set(instances.map(pick)).size
-  if (distinct((m) => m.component) > 1) varying.add('component')
-  if (distinct((m) => m.bValue) > 1) varying.add('diffusion')
-  if (distinct((m) => m.echoNumber) > 1) varying.add('echo')
-  if (distinct((m) => m.temporalPositionIdentifier) > 1) varying.add('phase')
+  const distinct = <T>(pick: (u: Unit) => T): number => new Set(units.map(pick)).size
+  if (distinct((u) => u.component) > 1) varying.add('component')
+  if (distinct((u) => u.bValue) > 1) varying.add('diffusion')
+  if (distinct((u) => u.echoNumber) > 1) varying.add('echo')
+  if (distinct((u) => u.temporalIndex) > 1) varying.add('phase')
 
   const stacks: Stack[] = []
   for (const [, group] of groups) {
@@ -197,8 +293,8 @@ export function buildStacks(seriesId: string, instances: InstanceMeta[]): { stac
 
     if (repeated) {
       varying.add('phase')
-      repeated.forEach((phaseInstances, i) => {
-        stacks.push(makeStack(seriesId, stacks.length, dims, i + 1, phaseInstances, varying))
+      repeated.forEach((phaseUnits, i) => {
+        stacks.push(makeStack(seriesId, stacks.length, dims, i + 1, phaseUnits, varying))
       })
     } else {
       const phaseIndex = dims.temporalIndex
@@ -240,21 +336,21 @@ function makeStack(
   index: number,
   dims: Dimensions,
   phaseIndex: number | null,
-  instances: InstanceMeta[],
+  units: Unit[],
   varying: Set<StackKind>
 ): Stack {
-  const sorted = sortSlices(instances)
+  const sorted = sortSlices(units)
   const slices = sorted.flatMap(toSliceRefs)
-  const unsupported = unsupportedReason(instances)
+  const unsupported = unsupportedReason(units)
   return {
     id: `${seriesId}::stack-${index}`,
     kind: primaryKind(varying),
-    label: buildLabel(dims, phaseIndex, instances[0].echoTime, varying),
+    label: buildLabel(dims, phaseIndex, units[0].echoTime, varying),
     component: dims.component,
     bValue: dims.bValue,
     echoNumber: dims.echoNumber,
     phaseIndex,
-    acquisitionTime: instances[0].acquisitionTime,
+    acquisitionTime: units[0].acquisitionTime,
     slices,
     selected: unsupported === null,
     trimStart: 0,

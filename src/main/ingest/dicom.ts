@@ -10,6 +10,43 @@ import type { ImageComponent } from '@shared/types'
  * most vendors keep diffusion b-values. Series structure is therefore derived
  * from the originals and carried forward as an in-memory grouping.
  */
+/**
+ * One frame of an enhanced multiframe object, as its own functional groups
+ * describe it.
+ *
+ * An enhanced MR or CT keeps in a single file what a legacy exporter wrote as
+ * hundreds: the whole dynamic series, every b-value, every echo. What separates
+ * them is not in the header — it is in PerFrameFunctionalGroupsSequence
+ * (5200,9230), one item per frame, and without reading it a dynamic study
+ * arrives as one undivided stack.
+ */
+export interface FrameMeta {
+  /** Index within the file, 0-based. */
+  frame: number
+  sliceLocation: number | null
+  component: ImageComponent
+  bValue: number | null
+  echoTime: number | null
+  /**
+   * Which echo this is, counted from the effective echo times present in the
+   * file. Enhanced objects carry the time rather than the number, so the number
+   * is made here — it is what the grouping and the labels are written in.
+   */
+  echoNumber: number | null
+  temporalIndex: number | null
+  triggerTime: number | null
+  /** The time part of FrameAcquisitionDateTime, in the form a TM would be. */
+  acquisitionTime: string | null
+  /**
+   * StackID (0020,9056). One enhanced object can hold several volumes — three
+   * orthogonal localisers is the usual case — and frames of different ones must
+   * not be ordered against each other by position.
+   */
+  stackId: string | null
+  /** InStackPositionNumber (0020,9057): where this frame sits in its own volume. */
+  inStackPosition: number | null
+}
+
 export interface InstanceMeta {
   path: string
   studyInstanceUid: string
@@ -50,6 +87,12 @@ export interface InstanceMeta {
   patientBirthDate: string | null
   /** PatientSex (0010,0040): M, F, or O for anything else. */
   patientSex: string | null
+  /**
+   * What each frame of an enhanced multiframe object says about itself, or null
+   * when the file does not describe its frames one by one — a legacy image, or
+   * a cine whose frames differ only in time and say nothing about it.
+   */
+  frames: FrameMeta[] | null
 }
 
 type DataSet = dicomParser.DataSet
@@ -140,23 +183,113 @@ export function classifyComponent(imageType: string[], complexComponent: string 
   return 'unknown'
 }
 
+/** Where a position sits along the normal of an orientation, both as read. */
+function projectOnNormal(pos: number[], orient: number[]): number | null {
+  if (pos.length !== 3 || orient.length !== 6 || ![...pos, ...orient].every(Number.isFinite)) return null
+  const normal = [
+    orient[1] * orient[5] - orient[2] * orient[4],
+    orient[2] * orient[3] - orient[0] * orient[5],
+    orient[0] * orient[4] - orient[1] * orient[3]
+  ]
+  return pos[0] * normal[0] + pos[1] * normal[1] + pos[2] * normal[2]
+}
+
 /**
  * Project ImagePositionPatient onto the slice normal derived from
  * ImageOrientationPatient. This is more reliable than SliceLocation, which many
  * vendors leave absent or inconsistent.
  */
 function computeSliceLocation(ds: DataSet): number | null {
-  const pos = multiValue(ds, 'x00200032').map(Number)
-  const orient = multiValue(ds, 'x00200037').map(Number)
-  if (pos.length === 3 && orient.length === 6 && [...pos, ...orient].every(Number.isFinite)) {
-    const normal = [
-      orient[1] * orient[5] - orient[2] * orient[4],
-      orient[2] * orient[3] - orient[0] * orient[5],
-      orient[0] * orient[4] - orient[1] * orient[3]
-    ]
-    return pos[0] * normal[0] + pos[1] * normal[1] + pos[2] * normal[2]
+  const projected = projectOnNormal(multiValue(ds, 'x00200032').map(Number), multiValue(ds, 'x00200037').map(Number))
+  return projected ?? num(ds, 'x00201041')
+}
+
+/** The first item of a nested sequence, or null when there is not one. */
+function item(ds: DataSet | null, tag: string): DataSet | null {
+  return ds?.elements[tag]?.items?.[0]?.dataSet ?? null
+}
+
+/** A US or UL value, whichever width the element turns out to be. */
+function intOf(ds: DataSet | null, tag: string): number | null {
+  const el = ds?.elements[tag]
+  if (!ds || !el) return null
+  try {
+    if (el.length === 2) return ds.uint16(tag) ?? null
+    if (el.length === 4) return ds.uint32(tag) ?? null
+  } catch {
+    return null
   }
-  return num(ds, 'x00201041')
+  return num(ds, tag)
+}
+
+/** The time of day out of a DT, in the form a TM would have been written in. */
+function timeOfDateTime(value: string | null): string | null {
+  if (value === null || value.length < 14) return null
+  const time = value.slice(8)
+  return /^\d{6}(\.\d+)?$/.test(time) ? time : null
+}
+
+/**
+ * What each frame of an enhanced multiframe object says about itself.
+ *
+ * The whole of a dynamic acquisition can live in one file, and what separates
+ * its phases — or its b-values, or its echoes — is not in the header but in
+ * PerFrameFunctionalGroupsSequence, one item per frame. An attribute the file
+ * states once for every frame is in the shared sequence instead, so both are
+ * consulted and the per-frame one wins.
+ *
+ * Null when the file does not describe its frames one by one, and null when it
+ * describes a different number of them than it says it has: dropping frames on
+ * the strength of a malformed sequence would lose images silently, and the
+ * fallback — one stack of everything — is what this app did before.
+ */
+function readFrames(ds: DataSet, numberOfFrames: number, imageType: string[]): FrameMeta[] | null {
+  const perFrame = ds.elements['x52009230']?.items
+  if (!perFrame?.length || perFrame.length !== numberOfFrames) return null
+  const shared = ds.elements['x52009229']?.items?.[0]?.dataSet ?? null
+
+  const frames = perFrame.map((entry, frame): FrameMeta => {
+    const f = entry.dataSet ?? null
+    const content = item(f, 'x00209111') ?? item(shared, 'x00209111')
+    const plane = item(f, 'x00209113') ?? item(shared, 'x00209113') ?? ds
+    const orientation = item(f, 'x00209116') ?? item(shared, 'x00209116') ?? ds
+    const diffusion = item(f, 'x00189117') ?? item(shared, 'x00189117')
+    const echo = item(f, 'x00189114') ?? item(shared, 'x00189114')
+    // MR and CT name their frame-type sequence differently and say the same thing.
+    const frameType =
+      item(f, 'x00189226') ?? item(f, 'x00189329') ?? item(shared, 'x00189226') ?? item(shared, 'x00189329')
+
+    const bValue = diffusion === null ? null : binaryFloat(diffusion, 'x00189087')
+    return {
+      frame,
+      sliceLocation: projectOnNormal(
+        multiValue(plane, 'x00200032').map(Number),
+        multiValue(orientation, 'x00200037').map(Number)
+      ),
+      component: classifyComponent(
+        frameType === null ? imageType : multiValue(frameType, 'x00089007'),
+        frameType === null ? null : str(frameType, 'x00089208')
+      ),
+      bValue: bValue !== null && bValue >= 0 ? bValue : null,
+      echoTime: echo === null ? null : binaryFloat(echo, 'x00189082'),
+      echoNumber: null,
+      temporalIndex: intOf(content, 'x00209128'),
+      triggerTime: content === null ? null : binaryFloat(content, 'x00209153'),
+      acquisitionTime: timeOfDateTime(content === null ? null : str(content, 'x00189074')),
+      stackId: content === null ? null : str(content, 'x00209056'),
+      inStackPosition: intOf(content, 'x00209057')
+    }
+  })
+
+  // An enhanced object states the echo time, never the echo number, and the
+  // number is what the grouping and the labels are written in.
+  const times = [...new Set(frames.map((f) => f.echoTime).filter((t): t is number => t !== null))].sort(
+    (a, b) => a - b
+  )
+  if (times.length > 1) {
+    for (const f of frames) f.echoNumber = f.echoTime === null ? null : times.indexOf(f.echoTime) + 1
+  }
+  return frames
 }
 
 /**
@@ -235,6 +368,7 @@ export async function readInstance(filePath: string): Promise<InstanceMeta> {
   }
 
   const imageType = multiValue(ds, 'x00080008')
+  const numberOfFrames = num(ds, 'x00280008') ?? 1
 
   return {
     path: filePath,
@@ -259,12 +393,13 @@ export async function readInstance(filePath: string): Promise<InstanceMeta> {
     triggerTime: num(ds, 'x00181060'),
     acquisitionTime: str(ds, 'x00080032') ?? str(ds, 'x00080033'),
     bValue: readBValue(ds),
-    numberOfFrames: num(ds, 'x00280008') ?? 1,
+    numberOfFrames,
     transferSyntaxUid: str(ds, 'x00020010'),
     // Identifying, and gone after anonymisation. Read here so the case form can
     // offer them back as the two fields Radiopaedia asks for.
     patientAge: str(ds, 'x00101010'),
     patientBirthDate: readDate(ds, 'x00100030'),
-    patientSex: str(ds, 'x00100040')
+    patientSex: str(ds, 'x00100040'),
+    frames: readFrames(ds, numberOfFrames, imageType)
   }
 }

@@ -49,6 +49,21 @@ const WINDOW_TAGS = ['00281050', '00281051', '00281055', '00283010']
 /** Tags rewritten by a crop: the size of the grid, and where its corner is. */
 const CROP_TAGS = ['00280010', '00280011', '00200032']
 
+/**
+ * Tags an enhanced object states once per frame rather than once per file, and
+ * that a frame lifted out of one has to carry itself.
+ */
+const FRAME_TAGS = [
+  '00200032', // ImagePositionPatient
+  '00200037', // ImageOrientationPatient
+  '00280030', // PixelSpacing
+  '00180050', // SliceThickness
+  '00180088', // SpacingBetweenSlices
+  '00281052', // RescaleIntercept
+  '00281053', // RescaleSlope
+  '00281054' // RescaleType
+]
+
 const EXPLICIT_VR_BIG_ENDIAN = '1.2.840.10008.1.2.2'
 const EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1'
 
@@ -110,6 +125,61 @@ function decimalListOf(dict: Dict, tag: string, count: number): number[] | null 
   if (parts.length !== count) return null
   const numbers = parts.map((part) => Number.parseFloat(String(part)))
   return numbers.every(Number.isFinite) ? numbers : null
+}
+
+/** The items of a sequence element, which dcmio holds as plain dicts. */
+function itemsOf(dict: Dict | null, tag: string): Dict[] {
+  const value = dict?.[tag]?.Value
+  return Array.isArray(value) ? (value as Dict[]) : []
+}
+
+/** The single item of a nested sequence — a functional group is always one. */
+function group(item: Dict | null, tag: string): Dict | null {
+  return itemsOf(item, tag)[0] ?? null
+}
+
+function copyTag(from: Dict | null, to: Dict, tag: string): void {
+  const element = from?.[tag]
+  if (element !== undefined) to[tag] = element
+}
+
+/**
+ * Give one frame of an enhanced object the tags it needs to stand on its own.
+ *
+ * An enhanced MR or CT states where each frame sits, how big its pixels are and
+ * what they mean **per frame**, in the functional groups — not at the top level,
+ * where every other image in DICOM says it and where everything downstream
+ * looks. Lift one frame out without moving those up and what is uploaded is an
+ * image with no geometry and no rescale: not wrong about itself, but silent,
+ * and Hounsfield units that have quietly become stored values.
+ *
+ * The anonymiser then drops both sequences — checked, not assumed — so what is
+ * promoted here is all that survives, and a per-frame sequence describing a
+ * thousand frames cannot be left behind on a file that now holds one.
+ *
+ * Returns the window this frame asks for, which lives per frame too.
+ */
+function promoteFrameTags(dict: Dict, frame: Dict | null, shared: Dict | null): WindowLevel | null {
+  if (frame === null && shared === null) return null
+  // A value the file states once for every frame is in the shared sequence;
+  // the per-frame one wins where both say something.
+  const of = (tag: string): Dict | null => group(frame, tag) ?? group(shared, tag)
+
+  copyTag(of('00209113'), dict, '00200032')
+  copyTag(of('00209116'), dict, '00200037')
+
+  const measures = of('00289110')
+  copyTag(measures, dict, '00280030')
+  copyTag(measures, dict, '00180050')
+  copyTag(measures, dict, '00180088')
+
+  const transformation = of('00289145')
+  copyTag(transformation, dict, '00281052')
+  copyTag(transformation, dict, '00281053')
+  copyTag(transformation, dict, '00281054')
+
+  const voi = of('00289132')
+  return voi === null ? null : windowOf(voi)
 }
 
 function collectWarnings(dict: Dict, sourcePath: string, frame: number): AnonWarning[] {
@@ -270,34 +340,42 @@ export async function anonymiseFile(
     bigEndian: transferSyntax === EXPLICIT_VR_BIG_ENDIAN
   }
   const storedPhotometric = firstValue(dict, '00280004') ?? 'MONOCHROME2'
-  const rescale = { slope: decimalOf(dict, '00281053', 1), intercept: decimalOf(dict, '00281052', 0) }
   const fileWindow = windowOf(dict)
 
-  /** Where the file says its pixels are, read before a crop moves them. */
-  const placement = {
-    imagePosition: decimalListOf(dict, '00200032', 3) as [number, number, number] | null,
-    imageOrientation: decimalListOf(dict, '00200037', 6),
-    pixelSpacing: (() => {
-      const pair = decimalListOf(dict, '00280030', 2)
-      return pair === null || pair[0] <= 0 || pair[1] <= 0 ? null : { row: pair[0], column: pair[1] }
-    })()
-  }
+  // What an enhanced object says per frame rather than per file.
+  const perFrameGroups = itemsOf(dict, '52009230')
+  const sharedGroup = itemsOf(dict, '52009229')[0] ?? null
 
-  // The window and crop tags are rewritten per task, so their originals are kept
-  // to put back — for a task that asked for no window of its own, and because
-  // one dict serves every frame of the file and must start each one unmodified.
-  const originalWindow = WINDOW_TAGS.map((tag) => [tag, dict[tag]] as const)
-  const originalCrop = CROP_TAGS.map((tag) => [tag, dict[tag]] as const)
+  // The window, crop and per-frame tags are all rewritten per task, so their
+  // originals are kept to put back: one dict serves every frame of the file and
+  // has to start each one exactly as the file wrote it.
+  const restore = [...new Set([...WINDOW_TAGS, ...CROP_TAGS, ...FRAME_TAGS])].map(
+    (tag) => [tag, dict[tag]] as const
+  )
 
   const results: AnonymisedFile[] = []
 
   for (const task of tasks) {
     const masks = task.masks ?? []
-    // One dict serves every frame of the file, so the grid a previous task
-    // cropped must be back to the file's own before this one reads it.
-    for (const [tag, original] of originalCrop) {
+    // Back to the file's own tags: the grid a previous task cropped, and the
+    // frame a previous task promoted, are both still in this dict.
+    for (const [tag, original] of restore) {
       if (original === undefined) delete dict[tag]
       else dict[tag] = original
+    }
+    // Before anything reads geometry or rescale, since on an enhanced object
+    // this is where both come from.
+    const frameWindow = promoteFrameTags(dict, perFrameGroups[task.frame] ?? null, sharedGroup)
+    const rescale = { slope: decimalOf(dict, '00281053', 1), intercept: decimalOf(dict, '00281052', 0) }
+
+    /** Where the file says these pixels are, read before a crop moves them. */
+    const placement = {
+      imagePosition: decimalListOf(dict, '00200032', 3) as [number, number, number] | null,
+      imageOrientation: decimalListOf(dict, '00200037', 6),
+      pixelSpacing: (() => {
+        const pair = decimalListOf(dict, '00280030', 2)
+        return pair === null || pair[0] <= 0 || pair[1] <= 0 ? null : { row: pair[0], column: pair[1] }
+      })()
     }
     // What the pixels are once this task has had its way with them. For a file
     // left as it was stored that is what the header said; for a decoded one it
@@ -341,7 +419,7 @@ export async function anonymiseFile(
     if (masks.length > 0) {
       const element = dict['7FE00010']
       const bytes = new Uint8Array(element.Value[0] as ArrayBuffer)
-      const window = task.window ?? fileWindow
+      const window = task.window ?? frameWindow ?? fileWindow
       const fill = blackSamples(
         {
           photometric,
@@ -400,13 +478,14 @@ export async function anonymiseFile(
       }
     }
 
-    for (const [tag, original] of originalWindow) {
-      if (original === undefined) delete dict[tag]
-      else dict[tag] = original
-    }
-    if (task.window) {
-      dict['00281050'] = { vr: 'DS', Value: [decimalString(task.window.centre)] }
-      dict['00281051'] = { vr: 'DS', Value: [decimalString(task.window.width)] }
+    // The window the file itself asks for is left alone unless one was chosen
+    // in the viewer — except on an enhanced frame, whose own window is in a
+    // functional group that does not survive anonymisation and so is written
+    // out here or lost.
+    const written = task.window ?? frameWindow
+    if (written) {
+      dict['00281050'] = { vr: 'DS', Value: [decimalString(written.centre)] }
+      dict['00281051'] = { vr: 'DS', Value: [decimalString(written.width)] }
       // An explanation or a VOI LUT left behind would contradict, or override,
       // the window just chosen.
       delete dict['00281055']

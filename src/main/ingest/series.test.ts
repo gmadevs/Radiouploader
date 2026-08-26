@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ageInYears, classifyComponent } from './dicom'
-import type { InstanceMeta } from './dicom'
+import type { FrameMeta, InstanceMeta } from './dicom'
 import { buildStacks, buildStudies } from './series'
 
 let counter = 0
@@ -34,6 +34,7 @@ function inst(overrides: Partial<InstanceMeta> = {}): InstanceMeta {
     patientAge: null,
     patientBirthDate: null,
     patientSex: null,
+    frames: null,
     ...overrides
   }
 }
@@ -344,5 +345,139 @@ describe('buildStudies — multi-study cases', () => {
   it('gives a single-study import a zero interval', () => {
     const studies = buildStudies(study('1.2.3.A', '2024-01-15'))
     expect(studies[0].intervalDays).toBe(0)
+  })
+})
+
+describe('buildStacks — enhanced multiframe', () => {
+  /** One frame of an enhanced object, as its functional groups describe it. */
+  const frame = (o: Partial<FrameMeta> & { frame: number }): FrameMeta => ({
+    sliceLocation: null,
+    component: 'magnitude',
+    bValue: null,
+    echoTime: null,
+    echoNumber: null,
+    temporalIndex: null,
+    triggerTime: null,
+    acquisitionTime: null,
+    stackId: null,
+    inStackPosition: null,
+    ...o
+  })
+
+  const enhanced = (frames: FrameMeta[]): InstanceMeta[] => [
+    inst({ numberOfFrames: frames.length, frames, sliceLocation: null })
+  ]
+
+  it('splits one file into a stack per phase', () => {
+    // The whole of a dynamic acquisition in a single object, which is what an
+    // enhanced MR writes and what used to arrive as one undivided stack.
+    const { stacks, splitReason } = buildStacks(
+      's',
+      enhanced([
+        frame({ frame: 0, temporalIndex: 1, sliceLocation: 0 }),
+        frame({ frame: 1, temporalIndex: 1, sliceLocation: 5 }),
+        frame({ frame: 2, temporalIndex: 2, sliceLocation: 0 }),
+        frame({ frame: 3, temporalIndex: 2, sliceLocation: 5 })
+      ])
+    )
+    expect(splitReason).toBe('phase')
+    expect(stacks).toHaveLength(2)
+    expect(stacks.map((s) => s.slices.map((slice) => slice.frame))).toEqual([
+      [0, 1],
+      [2, 3]
+    ])
+    expect(stacks.map((s) => s.phaseIndex)).toEqual([1, 2])
+    // Every slice still points at the one file it all came from.
+    expect(new Set(stacks.flatMap((s) => s.slices.map((slice) => slice.path))).size).toBe(1)
+  })
+
+  it('gives each frame one slice when nothing about them varies', () => {
+    // The trap: a frame that described itself is already one unit, and
+    // expanding it again would put all four frames into all four stacks.
+    const { stacks } = buildStacks(
+      's',
+      enhanced([0, 1, 2, 3].map((i) => frame({ frame: i, sliceLocation: i })))
+    )
+    expect(stacks).toHaveLength(1)
+    expect(stacks[0].slices.map((slice) => slice.frame)).toEqual([0, 1, 2, 3])
+  })
+
+  it('splits an enhanced diffusion object by b-value', () => {
+    const { stacks, splitReason } = buildStacks(
+      's',
+      enhanced([
+        frame({ frame: 0, bValue: 0, sliceLocation: 0 }),
+        frame({ frame: 1, bValue: 0, sliceLocation: 5 }),
+        frame({ frame: 2, bValue: 1000, sliceLocation: 0 }),
+        frame({ frame: 3, bValue: 1000, sliceLocation: 5 })
+      ])
+    )
+    expect(splitReason).toBe('diffusion')
+    expect(stacks.map((s) => s.bValue)).toEqual([0, 1000])
+    expect(stacks.map((s) => s.slices.length)).toEqual([2, 2])
+  })
+
+  it('splits by the echo number made from the effective echo times', () => {
+    const { stacks, splitReason } = buildStacks(
+      's',
+      enhanced([
+        frame({ frame: 0, echoNumber: 1, echoTime: 10, sliceLocation: 0 }),
+        frame({ frame: 1, echoNumber: 2, echoTime: 80, sliceLocation: 0 }),
+        frame({ frame: 2, echoNumber: 1, echoTime: 10, sliceLocation: 5 }),
+        frame({ frame: 3, echoNumber: 2, echoTime: 80, sliceLocation: 5 })
+      ])
+    )
+    expect(splitReason).toBe('echo')
+    expect(stacks.map((s) => s.slices.map((slice) => slice.frame))).toEqual([
+      [0, 2],
+      [1, 3]
+    ])
+  })
+
+  it('finds the phases of an enhanced object that does not number them', () => {
+    // No temporal index, but each position recurs — the same repetition the
+    // legacy path looks for, now visible inside a single file.
+    const { stacks, splitReason } = buildStacks(
+      's',
+      enhanced([
+        frame({ frame: 0, sliceLocation: 0, acquisitionTime: '100000' }),
+        frame({ frame: 1, sliceLocation: 5, acquisitionTime: '100000' }),
+        frame({ frame: 2, sliceLocation: 0, acquisitionTime: '100030' }),
+        frame({ frame: 3, sliceLocation: 5, acquisitionTime: '100030' })
+      ])
+    )
+    expect(splitReason).toBe('phase')
+    expect(stacks.map((s) => s.slices.map((slice) => slice.frame))).toEqual([
+      [0, 1],
+      [2, 3]
+    ])
+  })
+
+  it('keeps the frames of different StackIDs from interleaving', () => {
+    // Three orthogonal localisers in one object are three volumes. Ordering
+    // their frames against each other by position makes one that is no volume.
+    const { stacks } = buildStacks(
+      's',
+      enhanced([
+        frame({ frame: 0, stackId: '1', sliceLocation: 0 }),
+        frame({ frame: 1, stackId: '2', sliceLocation: 2 }),
+        frame({ frame: 2, stackId: '1', sliceLocation: 10 }),
+        frame({ frame: 3, stackId: '2', sliceLocation: 12 })
+      ])
+    )
+    expect(stacks).toHaveLength(1)
+    expect(stacks[0].slices.map((slice) => slice.frame)).toEqual([0, 2, 1, 3])
+  })
+
+  it('still refuses an enhanced run in a format it cannot decode', () => {
+    const { stacks } = buildStacks('s', [
+      inst({
+        numberOfFrames: 2,
+        transferSyntaxUid: '1.2.840.10008.1.2.4.102',
+        frames: [frame({ frame: 0, temporalIndex: 1 }), frame({ frame: 1, temporalIndex: 2 })]
+      })
+    ])
+    expect(stacks.every((s) => s.unsupported !== null)).toBe(true)
+    expect(stacks.every((s) => !s.selected)).toBe(true)
   })
 })

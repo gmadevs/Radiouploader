@@ -68,6 +68,11 @@ plain MPR is what a case needs to show a finding in another plane.
 Files that do not carry `ImageOrientationPatient` fall back to the acquisition's own axes,
 which on anything but an axial study is a guess. The dialog says when it has had to.
 
-## Multiframe dynamic series are not split into phases
+## An enhanced object cannot be reformatted
 
-The per-frame functional groups that carry the time axis are not unpacked yet.
+A dynamic enhanced MR or CT is [split by its own frames](/internals/splitting) now, so its
+phases arrive as separate stacks. What [Reformat](/guide/reformat) still cannot do is build a
+volume out of one: an enhanced object states how big its pixels are inside a functional
+group rather than at the top level, and the preview reads only the top level. The dialog
+says so — *"These images do not say how big a pixel is"* — rather than reformatting on a
+guess.
