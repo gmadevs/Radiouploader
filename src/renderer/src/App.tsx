@@ -424,17 +424,6 @@ export function App(): React.JSX.Element {
                 ? 'The case was created as a draft. Open it on Radiopaedia to review the images and publish it.'
                 : 'The studies were added to the draft. Open it on Radiopaedia to review the images and publish it.'}
             </p>
-            {/* system_id is sent exactly as documented and accepted, but never
-                applied — diagnostic_certainty_id in the same request is. Tried
-                as JSON, as a form body and as a query parameter, all identical.
-                Only a case this app created can be missing one; a draft it
-                added to has whatever system it already had. */}
-            {form.existingCaseId === null && (
-              <div className="notice warn" style={{ textAlign: 'left', marginTop: 14 }}>
-                <strong>Set the System on the case.</strong> Radiopaedia's API accepts <code>system_id</code> but does
-                not apply it, so every case arrives without one.
-              </div>
-            )}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16 }}>
               <a href={`${result.url}/edit`} target="_blank" rel="noreferrer">
                 <button className="primary">Open case for editing</button>

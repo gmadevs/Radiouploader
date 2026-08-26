@@ -89,7 +89,3 @@ which on anything but an axial study is a guess. The dialog says when it has had
 ## Multiframe dynamic series are not split into phases
 
 The per-frame functional groups that carry the time axis are not unpacked yet.
-
-## system_id is accepted but never applied
-
-Server-side, and not only here. [The investigation](/notes/system-id-not-applied).

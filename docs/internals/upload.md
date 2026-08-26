@@ -35,10 +35,10 @@ finished'."*
 
 It is left alone on purpose, for two reasons.
 
-Every case this app uploads **has** to be edited on Radiopaedia afterwards, because
-[`system_id` is accepted and never applied](/notes/system-id-not-applied) and the system has
-to be set by hand. That editing has worked on every case, so whatever the flag guards, it is
-not stopping the one thing this app depends on.
+Every case this app uploads **has** to be edited on Radiopaedia afterwards, because plane
+and sequence type have no API parameter at all and are tagged on the site. That editing has
+worked on every case, unmarked, so whatever the flag guards, it is not stopping the one
+thing this app depends on.
 
 And a case that is never marked stays a **draft**, which is what
 [adding images to it later](/guide/upload) requires. Marking it might do more than unlock

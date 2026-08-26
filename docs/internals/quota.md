@@ -34,9 +34,6 @@ Two things to know about that transcription:
 
 ## What cannot be set through the API
 
-`system_id` is accepted and never applied — see
-[the investigation](/notes/system-id-not-applied).
-
 Plane and sequence type have no parameter at all. The series payload accepts only
 `image_format`, `series.root_index` and `stack_upload.uploaded_data`. Tag those on the
 website after uploading.

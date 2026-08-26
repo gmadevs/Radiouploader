@@ -58,13 +58,6 @@ the earliest, since the age a case presents at is the age at baseline. Under a y
 field is left empty rather than rounded up: the list has no way to say four months, and
 "1 year" would be a fact invented by arithmetic.
 
-::: danger system_id is accepted but never applied
-Every case uploaded through this app arrives on Radiopaedia **without a system**, and it
-has to be set by hand on the case page. This is server-side, not a bug in this client: a
-case uploaded through Radiopaedia's own OsiriX/Horos plugin arrives without one too. The
-full investigation is in [system_id is never applied](/notes/system-id-not-applied).
-:::
-
 **Plane and sequence type are not settable through the API** either. The series payload
 accepts only `image_format`, `series.root_index` and `stack_upload.uploaded_data`. Tag
 those on the website afterwards.
@@ -82,8 +75,8 @@ an invented interval.
 ![The confirmation](/shots/08-done.png)
 
 The case is created as a **draft**, so nothing is published until you say so on
-Radiopaedia. The confirmation links straight to the case editor, which is also where you
-have to set the system.
+Radiopaedia. The confirmation links straight to the case editor, which is where the plane and
+sequence tags go — the API cannot set those.
 
 Under the hood the upload does not use the zip endpoint — it would merge the stacks back
 together and undo the point of the app. See

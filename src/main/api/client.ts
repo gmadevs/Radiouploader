@@ -237,8 +237,7 @@ export class RadiopaediaClient {
   /** Create a draft case and return its id. */
   async createCase(draft: CaseDraft): Promise<string> {
     // The reference calls system_id required and the picker enforces it, so it
-    // is refused here too — even though the server currently ignores the value
-    // and the system has to be set on the website.
+    // is refused here too rather than sent as null for the server to reject.
     if (draft.systemId === null) {
       throw new Error('Choose a system before uploading — Radiopaedia requires one on every case')
     }

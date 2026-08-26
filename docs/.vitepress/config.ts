@@ -71,8 +71,7 @@ export default withMermaid(
         {
           text: 'Reference',
           items: [
-            { text: 'Known limitations', link: '/limitations' },
-            { text: 'system_id is never applied', link: '/notes/system-id-not-applied' }
+            { text: 'Known limitations', link: '/limitations' }
           ]
         }
       ],
