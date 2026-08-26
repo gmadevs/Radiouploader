@@ -30,6 +30,8 @@ export default withMermaid(
     },
 
     themeConfig: {
+      logo: '/favicon.png',
+
       nav: [
         { text: 'Guide', link: '/guide/install' },
         { text: 'How it works', link: '/internals/architecture' },

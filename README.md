@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="resources/icon.png" alt="" width="128" height="128">
+</p>
+
 # Radiouploader
 
 [![Licence: AGPL-3.0-only](https://img.shields.io/badge/licence-AGPL--3.0--only-blue?style=flat-square)](LICENSE)
