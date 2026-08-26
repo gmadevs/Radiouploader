@@ -32,10 +32,15 @@ jobs:
             script: dist:win
             artifacts: release/*.exe
 
+    # Every action here is on its current major. They were all moved at once
+    # when GitHub deprecated Node 20 and started forcing these onto Node 24;
+    # what the majors in between changed does not reach this workflow — the
+    # download is of every artifact rather than one by id, which is the case
+    # download-artifact v5 changed, and nothing here uploads a file unzipped.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -43,7 +48,7 @@ jobs:
       # Electron ships a ~100 MB binary per platform; caching it saves most of
       # the install time on repeat runs.
       - name: Cache Electron download
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/electron
@@ -68,7 +73,7 @@ jobs:
           # electron-builder still tries, and fails asking for the token — so
           # `--publish never` is on each dist script.
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: radiouploader-${{ matrix.name }}
           path: ${{ matrix.artifacts }}
@@ -83,14 +88,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 
       # Drafted rather than published, so the installers can be checked before
       # anyone can download them, and flagged as a pre-release so that whoever
       # does download one is told what they are getting before they open it.
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           draft: true
           prerelease: true
