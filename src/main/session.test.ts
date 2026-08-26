@@ -27,6 +27,7 @@ function stack(id: string, sliceCount: number): Stack {
     trimStart: 0,
     trimEnd: sliceCount - 1,
     masks: [],
+    crop: null,
     window: null,
     unsupported: null
   }
@@ -75,30 +76,33 @@ describe('applySelection', () => {
     // The renderer disables the tick, but this tree is the one that reaches the
     // anonymiser — where a compressed run fails per file and loses the stack.
     session.ingest = ingestWith([{ ...stack('cine', 40), unsupported: 'JPEG baseline multiframe' }])
-    session.applySelection([{ id: 'cine', trimStart: 0, trimEnd: 39 }])
+    session.applySelection([{ id: 'cine', selected: true, trimStart: 0, trimEnd: 39 }])
     expect(session.selectedStacks()).toEqual([])
   })
 
-  it('keeps only the stacks named in the selection', () => {
-    session.applySelection([{ id: 'a', trimStart: 0, trimEnd: 9 }])
+  it('keeps only the stacks the renderer ticked', () => {
+    session.applySelection([
+      { id: 'a', selected: true, trimStart: 0, trimEnd: 9 },
+      { id: 'b', selected: false, trimStart: 0, trimEnd: 4 }
+    ])
     expect(session.selectedStacks().map((s) => s.id)).toEqual(['a'])
   })
 
   it('applies the trim so anonymisation never sees the dropped images', () => {
-    session.applySelection([{ id: 'a', trimStart: 2, trimEnd: 5 }])
+    session.applySelection([{ id: 'a', selected: true, trimStart: 2, trimEnd: 5 }])
     const [selected] = session.selectedStacks()
     expect(selected.slices).toHaveLength(4)
     expect(selected.slices.map((s) => s.instanceNumber)).toEqual([2, 3, 4, 5])
   })
 
   it('clamps a range that runs past the end of the stack', () => {
-    session.applySelection([{ id: 'b', trimStart: -3, trimEnd: 99 }])
+    session.applySelection([{ id: 'b', selected: true, trimStart: -3, trimEnd: 99 }])
     const [selected] = session.selectedStacks()
     expect(selected.slices).toHaveLength(5)
   })
 
   it('refuses an inverted range rather than producing an empty upload', () => {
-    session.applySelection([{ id: 'a', trimStart: 7, trimEnd: 2 }])
+    session.applySelection([{ id: 'a', selected: true, trimStart: 7, trimEnd: 2 }])
     const [selected] = session.selectedStacks()
     // trimEnd is pulled up to trimStart, leaving a single image.
     expect(selected.slices.map((s) => s.instanceNumber)).toEqual([7])
@@ -106,23 +110,23 @@ describe('applySelection', () => {
 
   it('leaves the untrimmed stack whole', () => {
     session.applySelection([
-      { id: 'a', trimStart: 0, trimEnd: 9 },
-      { id: 'b', trimStart: 1, trimEnd: 3 }
+      { id: 'a', selected: true, trimStart: 0, trimEnd: 9 },
+      { id: 'b', selected: true, trimStart: 1, trimEnd: 3 }
     ])
     const byId = Object.fromEntries(session.selectedStacks().map((s) => [s.id, s.slices.length]))
     expect(byId).toEqual({ a: 10, b: 3 })
   })
 
   it('does not mutate the stored slices, so the trim stays adjustable', () => {
-    session.applySelection([{ id: 'a', trimStart: 4, trimEnd: 6 }])
+    session.applySelection([{ id: 'a', selected: true, trimStart: 4, trimEnd: 6 }])
     expect(session.selectedStacks()[0].slices).toHaveLength(3)
-    session.applySelection([{ id: 'a', trimStart: 0, trimEnd: 9 }])
+    session.applySelection([{ id: 'a', selected: true, trimStart: 0, trimEnd: 9 }])
     expect(session.selectedStacks()[0].slices).toHaveLength(10)
   })
 })
 
-describe('applySelection — masks and window', () => {
-  const full = { id: 'a', trimStart: 0, trimEnd: 9 }
+describe('applySelection — masks, crop and window', () => {
+  const full = { id: 'a', selected: true, trimStart: 0, trimEnd: 9 }
 
   it('carries the viewer’s edits through to the stacks that get anonymised', () => {
     session.applySelection([
@@ -152,6 +156,28 @@ describe('applySelection — masks and window', () => {
     const [selected] = session.selectedStacks()
     expect(selected.masks).toEqual([{ x: 0, y: 0, width: 0.2, height: 0.2 }])
     expect(selected.window).toBeNull()
+  })
+
+  it('keeps the edits on an unticked stack, which can still be reformatted', () => {
+    // The volume is built from this tree, so a mask drawn on a stack that is
+    // not itself going up still has to reach it.
+    session.applySelection([
+      { ...full, selected: false, masks: [{ x: 0, y: 0, width: 0.5, height: 0.5 }], crop: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }
+    ])
+    const [stack] = session.ingest!.studies[0].series[0].stacks
+    expect(stack.selected).toBe(false)
+    expect(stack.masks).toEqual([{ x: 0, y: 0, width: 0.5, height: 0.5 }])
+    expect(stack.crop).toEqual({ x: 0.1, y: 0.1, width: 0.5, height: 0.5 })
+  })
+
+  it('clips a crop to the image and drops one that keeps all of it', () => {
+    session.applySelection([{ ...full, crop: { x: -0.2, y: 0.25, width: 2, height: 0.5 } }])
+    expect(session.selectedStacks()[0].crop).toEqual({ x: 0, y: 0.25, width: 1, height: 0.5 })
+
+    // A crop of the whole image would decode and rewrite every compressed file
+    // in the stack to produce the bytes it already had.
+    session.applySelection([{ ...full, crop: { x: 0, y: 0, width: 1, height: 1 } }])
+    expect(session.selectedStacks()[0].crop).toBeNull()
   })
 
   it('forgets edits made to a stack that was then deselected and re-selected', () => {

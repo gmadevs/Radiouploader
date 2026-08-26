@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
-import type { AnonResult, IngestResult, MaskRect, Stack, StackSelection, WindowLevel } from '@shared/types'
+import type { AnonResult, CropRect, IngestResult, MaskRect, Stack, StackSelection, WindowLevel } from '@shared/types'
 import { cleanupTempDir } from './ingest'
 
 /**
@@ -21,6 +21,22 @@ function sanitiseMasks(masks: MaskRect[] | undefined): MaskRect[] {
       return { x, y, width: Math.min(unit(mask.width), 1 - x), height: Math.min(unit(mask.height), 1 - y) }
     })
     .filter((mask) => mask.width > 0 && mask.height > 0)
+}
+
+/**
+ * Keep a crop inside the image, and treat one that keeps everything as no crop
+ * at all — a whole-image crop would otherwise decode and rewrite every
+ * compressed file in the stack to produce the bytes it already had.
+ */
+function sanitiseCrop(crop: CropRect | null | undefined): CropRect | null {
+  if (!crop) return null
+  const unit = (v: number): number => (Number.isFinite(v) ? Math.min(Math.max(v, 0), 1) : 0)
+  const x = unit(crop.x)
+  const y = unit(crop.y)
+  const width = Math.min(unit(crop.width), 1 - x)
+  const height = Math.min(unit(crop.height), 1 - y)
+  if (width <= 0 || height <= 0) return null
+  return x === 0 && y === 0 && width === 1 && height === 1 ? null : { x, y, width, height }
 }
 
 function sanitiseWindow(window: WindowLevel | null | undefined): WindowLevel | null {
@@ -56,7 +72,7 @@ class Session {
   }
 
   /**
-   * Apply the renderer's selection, trim, masks and window back onto the tree
+   * Apply the renderer's selection, trim, masks, crop and window back onto the tree
    * held here. Everything is re-checked rather than trusted: these values reach
    * the anonymiser, and a mask that lands outside the image would silently
    * leave burnt-in text on the upload.
@@ -69,13 +85,17 @@ class Session {
           const chosen = byId.get(stack.id)
           // A stack the app cannot upload stays untickable here too: the
           // renderer's copy is a suggestion, and this is the tree that is read.
-          stack.selected = chosen !== undefined && stack.unsupported === null
-          if (!chosen || !stack.selected) continue
+          stack.selected = chosen?.selected === true && stack.unsupported === null
+          // The edits are kept whether or not the stack is going up: an
+          // unticked one can still be reformatted, and the volume is built from
+          // the pixels as the viewer left them.
+          if (!chosen) continue
           // Clamp against the real length; the renderer's copy could be stale.
           const last = stack.slices.length - 1
           stack.trimStart = Math.min(Math.max(chosen.trimStart, 0), last)
           stack.trimEnd = Math.min(Math.max(chosen.trimEnd, stack.trimStart), last)
           stack.masks = sanitiseMasks(chosen.masks)
+          stack.crop = sanitiseCrop(chosen.crop)
           stack.window = sanitiseWindow(chosen.window)
         }
       }

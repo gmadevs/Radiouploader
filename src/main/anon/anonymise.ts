@@ -3,8 +3,19 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as dcmio from 'dicomanon'
 import dicomParser from 'dicom-parser'
-import { blackSamples, compressionOf, fillMasks, frameSamples, parseHeader, type PixelGeometry } from '@shared/dicomImage'
-import type { AnonWarning, MaskRect, WindowLevel } from '@shared/types'
+import {
+  blackSamples,
+  compressionOf,
+  cropBoundsOf,
+  cropFrameBytes,
+  croppedPosition,
+  fillMasks,
+  frameSamples,
+  keepsWholeImage,
+  parseHeader,
+  type PixelGeometry
+} from '@shared/dicomImage'
+import type { AnonWarning, CropRect, MaskRect, WindowLevel } from '@shared/types'
 import { canDecode, decodeEncapsulatedFrame, type DecodedSamples } from '../codecs/decode'
 import { encodedFrame } from '../codecs/frames'
 
@@ -26,12 +37,17 @@ export interface FrameTask {
   instanceNumber: number
   /** Regions to blank out of the pixel data, in fractions of the image. */
   masks?: MaskRect[]
+  /** The part of the image to keep; null or absent keeps all of it. */
+  crop?: CropRect | null
   /** Window to write to WindowCenter/WindowWidth; null leaves the file's own. */
   window?: WindowLevel | null
 }
 
 /** Tags rewritten when the user picks a window in the viewer. */
 const WINDOW_TAGS = ['00281050', '00281051', '00281055', '00283010']
+
+/** Tags rewritten by a crop: the size of the grid, and where its corner is. */
+const CROP_TAGS = ['00280010', '00280011', '00200032']
 
 const EXPLICIT_VR_BIG_ENDIAN = '1.2.840.10008.1.2.2'
 const EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1'
@@ -65,6 +81,35 @@ function decimalOf(dict: Dict, tag: string, fallback: number): number {
 function decimalString(value: number): string {
   const text = String(Math.round(value * 100) / 100)
   return text.length <= 16 ? text : value.toPrecision(9)
+}
+
+/**
+ * A list of decimals, one DS value each rather than one backslashed string —
+ * a position written as a single value is three long and refused.
+ *
+ * Kept finer than `decimalString`: this is a position in the patient, and
+ * rounding it to hundredths of a millimetre would show up as a wobble in the
+ * gaps between slices on a study cut thinner than that.
+ */
+function decimals(values: number[]): string[] {
+  return values.map((value) => {
+    const text = String(Math.round(value * 1e6) / 1e6)
+    return text.length <= 16 ? text : value.toPrecision(9)
+  })
+}
+
+/**
+ * A tag that may have arrived as separate values or as one backslashed string,
+ * as `count` numbers. Null unless there are exactly that many and all are real.
+ */
+function decimalListOf(dict: Dict, tag: string, count: number): number[] | null {
+  const raw = dict[tag]?.Value
+  if (raw === undefined) return null
+  const parts =
+    raw.length === 1 && typeof raw[0] === 'string' && raw[0].includes('\\') ? raw[0].split('\\') : raw
+  if (parts.length !== count) return null
+  const numbers = parts.map((part) => Number.parseFloat(String(part)))
+  return numbers.every(Number.isFinite) ? numbers : null
 }
 
 function collectWarnings(dict: Dict, sourcePath: string, frame: number): AnonWarning[] {
@@ -153,10 +198,11 @@ function writeDecodedFrame(
  * and Radiopaedia's re-run of it is a no-op — it rejects a file if any tag would
  * change.
  *
- * Masks and the chosen window are applied here too, and for the same reason:
- * both have to be in place before `Anonymize` runs, so the bytes written are
- * final. A mask is painted into the stored samples — after this the burnt-in
- * text is gone from the file, not merely hidden by a viewer.
+ * Masks, the crop and the chosen window are applied here too, and for the same
+ * reason: all three have to be in place before `Anonymize` runs, so the bytes
+ * written are final. A mask is painted into the stored samples and a crop
+ * throws the rest away — after this the burnt-in text is gone from the file,
+ * not merely hidden by a viewer.
  *
  * The source is read and parsed once however many frames are wanted from it.
  */
@@ -177,15 +223,32 @@ export async function anonymiseFile(
   const pixelElement = dict['7FE00010']
   const allPixels = pixelElement?.Value?.[0] as ArrayBuffer | undefined
 
+  // Frame size from the geometry, so a frame can be sliced without decoding.
+  const rows = numberOf(dict, '00280010', 0)
+  const columns = numberOf(dict, '00280011', 0)
+  const samples = numberOf(dict, '00280002', 1)
+  const bitsAllocated = numberOf(dict, '00280100', 16)
+  const frameLength = rows * columns * samples * (bitsAllocated <= 8 ? 1 : 2)
+
+  /** The crop as whole pixels of this file, or null when it keeps everything. */
+  const cropOf = (task: FrameTask): ReturnType<typeof cropBoundsOf> | null => {
+    if (!task.crop || rows === 0 || columns === 0) return null
+    const bounds = cropBoundsOf(task.crop, columns, rows)
+    return keepsWholeImage(bounds, columns, rows) ? null : bounds
+  }
+
   /**
-   * Painting a mask writes over the stored samples, and splitting a run cuts
-   * them by byte offset. Neither means anything on a bitstream, so a compressed
-   * file that needs either is decoded and written back out as plain samples.
+   * Painting a mask writes over the stored samples, cutting a frame out of a
+   * crop copies rows out of them, and splitting a run cuts them by byte offset.
+   * None of the three means anything on a bitstream, so a compressed file that
+   * needs any of them is decoded and written back out as plain samples.
    *
-   * A compressed file that needs neither — a single frame with nothing to blank
-   * — is passed through untouched, which keeps it small and keeps it lossless.
+   * A compressed file that needs none — a single frame with nothing to blank
+   * and nothing to cut away — is passed through untouched, which keeps it small
+   * and keeps it lossless.
    */
-  const changingPixels = totalFrames > 1 || tasks.some((task) => (task.masks?.length ?? 0) > 0)
+  const changingPixels =
+    totalFrames > 1 || tasks.some((task) => (task.masks?.length ?? 0) > 0 || cropOf(task) !== null)
   const rewriting = compression !== null && changingPixels
   if (rewriting && !canDecode(transferSyntax ?? '')) {
     throw new Error(
@@ -196,13 +259,6 @@ export async function anonymiseFile(
   // dicom-parser is what knows how to find them.
   const encapsulated = rewriting ? dicomParser.parseDicom(new Uint8Array(buf)) : null
   const header = rewriting ? parseHeader(new Uint8Array(buf)) : null
-
-  // Frame size from the geometry, so a frame can be sliced without decoding.
-  const rows = numberOf(dict, '00280010', 0)
-  const columns = numberOf(dict, '00280011', 0)
-  const samples = numberOf(dict, '00280002', 1)
-  const bitsAllocated = numberOf(dict, '00280100', 16)
-  const frameLength = rows * columns * samples * (bitsAllocated <= 8 ? 1 : 2)
 
   const storedGeometry: PixelGeometry = {
     rows,
@@ -217,14 +273,32 @@ export async function anonymiseFile(
   const rescale = { slope: decimalOf(dict, '00281053', 1), intercept: decimalOf(dict, '00281052', 0) }
   const fileWindow = windowOf(dict)
 
-  // The window tags are rewritten per task, so their originals are kept to put
-  // back for a task that asked for no window of its own.
+  /** Where the file says its pixels are, read before a crop moves them. */
+  const placement = {
+    imagePosition: decimalListOf(dict, '00200032', 3) as [number, number, number] | null,
+    imageOrientation: decimalListOf(dict, '00200037', 6),
+    pixelSpacing: (() => {
+      const pair = decimalListOf(dict, '00280030', 2)
+      return pair === null || pair[0] <= 0 || pair[1] <= 0 ? null : { row: pair[0], column: pair[1] }
+    })()
+  }
+
+  // The window and crop tags are rewritten per task, so their originals are kept
+  // to put back — for a task that asked for no window of its own, and because
+  // one dict serves every frame of the file and must start each one unmodified.
   const originalWindow = WINDOW_TAGS.map((tag) => [tag, dict[tag]] as const)
+  const originalCrop = CROP_TAGS.map((tag) => [tag, dict[tag]] as const)
 
   const results: AnonymisedFile[] = []
 
   for (const task of tasks) {
     const masks = task.masks ?? []
+    // One dict serves every frame of the file, so the grid a previous task
+    // cropped must be back to the file's own before this one reads it.
+    for (const [tag, original] of originalCrop) {
+      if (original === undefined) delete dict[tag]
+      else dict[tag] = original
+    }
     // What the pixels are once this task has had its way with them. For a file
     // left as it was stored that is what the header said; for a decoded one it
     // is what the codec handed back, which is not the same thing.
@@ -281,6 +355,49 @@ export async function anonymiseFile(
         window === null && geometry.samplesPerPixel === 1 ? frameSamples(geometry, bytes) : undefined
       )
       fillMasks(bytes, geometry, masks, fill)
+    }
+
+    /**
+     * Cut the image down, after the masks and never before them: both
+     * rectangles are fractions of the image as it arrived, which is the picture
+     * they were drawn on. A mask that falls outside the crop then goes the way
+     * of everything else out there, which is the answer that needs no rule.
+     *
+     * Three tags describe the grid and all three have to move with it. Rows and
+     * Columns are the obvious pair; ImagePositionPatient is the one that is
+     * quietly wrong if it is left, because it names the corner of an image that
+     * no longer starts there — and this app reads it back to stack a volume.
+     *
+     * Nothing else needs adjusting, which is worth saying because it is not
+     * obvious: PixelSpacing is unchanged (the pixels are the same size), and
+     * SequenceOfUltrasoundRegions — the one place a calibration is written in
+     * pixel coordinates — is dropped by the anonymiser a few lines below.
+     */
+    const bounds = cropOf(task)
+    if (bounds) {
+      const element = dict['7FE00010']
+      const stored = element?.Value?.[0] as ArrayBuffer | undefined
+      if (!stored) throw new Error(`Cannot crop ${path.basename(sourcePath)}: pixel data is not addressable`)
+      const cut = cropFrameBytes(new Uint8Array(stored), geometry, bounds)
+      element.Value = [cut.buffer.slice(cut.byteOffset, cut.byteOffset + cut.byteLength) as ArrayBuffer]
+
+      dict['00280010'] = { vr: 'US', Value: [bounds.rows] }
+      dict['00280011'] = { vr: 'US', Value: [bounds.columns] }
+      geometry = { ...geometry, rows: bounds.rows, columns: bounds.columns }
+
+      // Only a crop that moved the corner moves the position. Trimming the
+      // right and bottom edges leaves it exactly where it was, and rewriting an
+      // unchanged value would round it for nothing.
+      if (bounds.x > 0 || bounds.y > 0) {
+        const moved = croppedPosition(placement, bounds)
+        // A file that does not say which way it is pointing, or how big a pixel
+        // is, cannot have its corner moved — and a position that describes a
+        // grid the pixels are no longer on is worse than none. Order survives
+        // it: the upload sends the slices in the order they were shown, and
+        // this app read where they sat from the originals before any of this.
+        if (moved) dict['00200032'] = { vr: 'DS', Value: decimals(moved) }
+        else delete dict['00200032']
+      }
     }
 
     for (const [tag, original] of originalWindow) {

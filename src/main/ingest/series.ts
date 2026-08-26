@@ -260,6 +260,7 @@ function makeStack(
     trimStart: 0,
     trimEnd: slices.length - 1,
     masks: [],
+    crop: null,
     window: null,
     unsupported
   }

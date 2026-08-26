@@ -1,5 +1,5 @@
 import dicomParser from 'dicom-parser'
-import type { MaskRect, WindowLevel } from './types'
+import type { CropRect, MaskRect, WindowLevel } from './types'
 
 /**
  * Preview decoder for uncompressed DICOM.
@@ -421,6 +421,110 @@ export function fillMasks(
       }
     }
   }
+}
+
+/** A crop as whole pixels: where it starts, and how big what is kept is. */
+export interface CropBounds {
+  x: number
+  y: number
+  columns: number
+  rows: number
+}
+
+/**
+ * A crop rectangle as whole pixels of a particular image.
+ *
+ * Never empty. A rectangle rounds to nothing when it is dragged smaller than a
+ * pixel, and an image of no pixels is not something the rest of this can carry
+ * — one row and one column is the floor, absurd but writable.
+ */
+export function cropBoundsOf(crop: CropRect, columns: number, rows: number): CropBounds {
+  const x0 = Math.min(edge(crop.x, columns), columns - 1)
+  const y0 = Math.min(edge(crop.y, rows), rows - 1)
+  const x1 = Math.max(edge(crop.x + crop.width, columns), x0 + 1)
+  const y1 = Math.max(edge(crop.y + crop.height, rows), y0 + 1)
+  return { x: x0, y: y0, columns: x1 - x0, rows: y1 - y0 }
+}
+
+/** Whether a crop would leave the image exactly as it is, and can be skipped. */
+export function keepsWholeImage(bounds: CropBounds, columns: number, rows: number): boolean {
+  return bounds.x === 0 && bounds.y === 0 && bounds.columns === columns && bounds.rows === rows
+}
+
+/**
+ * Cut a frame down to the kept rectangle.
+ *
+ * The samples are copied, never interpreted, so this is blind to byte order and
+ * to what the values mean — a big-endian sixteen-bit CT and an RGB ultrasound
+ * go through the same loop. Planar colour is the one layout that needs saying:
+ * its three colours are three whole images, so each is cropped in turn.
+ */
+export function cropFrameBytes(frameBytes: Uint8Array, geometry: PixelGeometry, bounds: CropBounds): Uint8Array {
+  const { columns, samplesPerPixel, bitsAllocated } = geometry
+  const bytesPerSample = bitsAllocated <= 8 ? 1 : 2
+  const planar = samplesPerPixel > 1 && geometry.planarConfiguration === 1
+
+  const out = new Uint8Array(bounds.rows * bounds.columns * samplesPerPixel * bytesPerSample)
+  const planes = planar ? samplesPerPixel : 1
+  const perPixel = planar ? 1 : samplesPerPixel
+  const sourcePlane = geometry.rows * columns * perPixel * bytesPerSample
+  const targetPlane = bounds.rows * bounds.columns * perPixel * bytesPerSample
+  const sourceStride = columns * perPixel * bytesPerSample
+  const targetStride = bounds.columns * perPixel * bytesPerSample
+
+  for (let plane = 0; plane < planes; plane++) {
+    for (let y = 0; y < bounds.rows; y++) {
+      const from = plane * sourcePlane + (bounds.y + y) * sourceStride + bounds.x * perPixel * bytesPerSample
+      if (from + targetStride > frameBytes.length) break
+      out.set(frameBytes.subarray(from, from + targetStride), plane * targetPlane + y * targetStride)
+    }
+  }
+  return out
+}
+
+/** The same cut, on samples that have already been read out of their bytes. */
+export function cropSamples<T extends Int16Array | Uint16Array | Uint8Array>(
+  samples: T,
+  columns: number,
+  bounds: CropBounds
+): T {
+  const out = new (samples.constructor as new (length: number) => T)(bounds.rows * bounds.columns)
+  for (let y = 0; y < bounds.rows; y++) {
+    const from = (bounds.y + y) * columns + bounds.x
+    out.set(samples.subarray(from, from + bounds.columns) as T, y * bounds.columns)
+  }
+  return out
+}
+
+/**
+ * Where the cropped image's first voxel is, in the patient.
+ *
+ * Cropping moves the corner the header points at, and nothing else: the pixels
+ * are the same size, pointing the same way, in the same place. So the new
+ * position is the old one walked `x` columns along the row direction and `y`
+ * rows along the column direction, in millimetres.
+ *
+ * PixelSpacing is written the other way round from everything that uses it —
+ * spacing between rows first, which is the step *down* a column — and getting
+ * that pair the wrong way round on a study with rectangular pixels moves the
+ * image by the difference without ever failing.
+ *
+ * Null when the file does not say enough to work it out. A caller that has
+ * moved the corner must then drop the position rather than keep one that
+ * describes a grid the pixels no longer sit on.
+ */
+export function croppedPosition(
+  header: Pick<ImageHeader, 'imagePosition' | 'imageOrientation' | 'pixelSpacing'>,
+  bounds: Pick<CropBounds, 'x' | 'y'>
+): [number, number, number] | null {
+  const { imagePosition, imageOrientation, pixelSpacing } = header
+  if (imagePosition === null || imageOrientation === null || pixelSpacing === null) return null
+
+  const across = bounds.x * pixelSpacing.column
+  const down = bounds.y * pixelSpacing.row
+  return [0, 1, 2].map(
+    (axis) => imagePosition[axis] + imageOrientation[axis] * across + imageOrientation[axis + 3] * down
+  ) as [number, number, number]
 }
 
 /**

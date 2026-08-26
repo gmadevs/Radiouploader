@@ -47,10 +47,10 @@ The preview decodes JPEG, lossless JPEG, JPEG-LS, JPEG 2000 and HTJ2K as well as
 uncompressed DICOM. RLE is the one that is left: it shows the reason it cannot be drawn
 rather than being mis-rendered.
 
-A compressed image can be reviewed, windowed and erased like any other. It is sent untouched
-unless something has to change its pixels — a blanked area, or a cine run being split — in
-which case it is decoded and uploaded uncompressed, which makes a larger file. See
-[known limitations](/limitations).
+A compressed image can be reviewed, windowed, erased and cropped like any other. It is sent
+untouched unless something has to change its pixels — a blanked area, a crop, or a cine run
+being split — in which case it is decoded and uploaded uncompressed, which makes a larger
+file. See [known limitations](/limitations).
 
 A cine in a format with no decoder — RLE — is the one case that cannot be uploaded at all,
 because its frames cannot be read to be split. That card says so in place of the tick, and

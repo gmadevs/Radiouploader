@@ -1,5 +1,5 @@
-import { applyWindow } from '@shared/dicomImage'
-import type { MaskRect, PreviewFrame, WindowLevel } from '@shared/types'
+import { applyWindow, cropBoundsOf } from '@shared/dicomImage'
+import type { CropRect, MaskRect, PreviewFrame, WindowLevel } from '@shared/types'
 
 /**
  * Painting only. Decoding happens in the main process, which reads a single
@@ -30,22 +30,41 @@ export interface PaintOptions {
   window?: WindowLevel | null
   /** Drawn as solid black, the same regions the upload will have blanked. */
   masks?: MaskRect[]
+  /**
+   * Draw only this part of the frame, so the canvas shows what is going to be
+   * uploaded rather than what the file holds. The viewer does not pass it: an
+   * editor that hides what is being cut away cannot be used to aim the cut.
+   */
+  crop?: CropRect | null
 }
 
 export function paintFrame(canvas: HTMLCanvasElement, frame: PreviewFrame, options: PaintOptions = {}): void {
-  canvas.width = frame.width
-  canvas.height = frame.height
+  const rgba = frame.kind === 'grey' ? applyWindow(frame, options.window ?? frame.window).rgba : frame.rgba
+
+  // The whole frame is drawn first, masks and all, and the crop then takes a
+  // rectangle out of it — because a mask is a fraction of the uncropped image,
+  // which is the picture it was drawn on.
+  const source = new OffscreenCanvas(frame.width, frame.height)
+  const sourceCtx = source.getContext('2d')
+  if (!sourceCtx) throw new Error('Could not get a 2D context')
+  // The bridge hands back a plain array-like; ImageData needs a clamped array.
+  sourceCtx.putImageData(new ImageData(new Uint8ClampedArray(rgba), frame.width, frame.height), 0, 0)
+  sourceCtx.fillStyle = '#000'
+  for (const mask of options.masks ?? []) {
+    sourceCtx.fillRect(
+      mask.x * frame.width,
+      mask.y * frame.height,
+      mask.width * frame.width,
+      mask.height * frame.height
+    )
+  }
+
+  const crop = options.crop ? cropBoundsOf(options.crop, frame.width, frame.height) : null
+  canvas.width = crop ? crop.columns : frame.width
+  canvas.height = crop ? crop.rows : frame.height
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Could not get a 2D context')
-
-  const rgba = frame.kind === 'grey' ? applyWindow(frame, options.window ?? frame.window).rgba : frame.rgba
-  // The bridge hands back a plain array-like; ImageData needs a clamped array.
-  ctx.putImageData(new ImageData(new Uint8ClampedArray(rgba), frame.width, frame.height), 0, 0)
-
-  ctx.fillStyle = '#000'
-  for (const mask of options.masks ?? []) {
-    ctx.fillRect(mask.x * frame.width, mask.y * frame.height, mask.width * frame.width, mask.height * frame.height)
-  }
+  ctx.drawImage(source, crop?.x ?? 0, crop?.y ?? 0, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height)
 }
 
 /** Where a frame lands inside a canvas that is not its shape, in canvas pixels. */

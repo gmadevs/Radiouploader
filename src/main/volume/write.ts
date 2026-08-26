@@ -217,6 +217,7 @@ export async function writeReformatted(
         trimStart: 0,
         trimEnd: slices.length - 1,
         masks: [],
+        crop: null,
         window: parent.window,
         unsupported: null
       }

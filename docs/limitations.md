@@ -19,27 +19,6 @@ noticed in, which is not the same as a series that is clean**, and nowhere in th
 say otherwise. Finding the text is still your job; this only makes the obvious cases harder
 to walk past.
 
-## Images cannot be cropped
-
-You can black out a rectangle and you can [trim](/guide/choose#trimming) a stack at its
-ends, but nothing takes the edge off an image. A banner in the black margin of an
-ultrasound is [erased](/guide/review#erase) where it stands, and the margin is uploaded
-with it.
-
-As a redaction the two are the same — a blanked box really is blank pixels, not an overlay,
-so nothing is hidden that a crop would have removed. What a crop would buy is framing and a
-smaller file.
-
-What makes it more than a mask with the pixels thrown away is the geometry. Cropping
-changes `Rows` and `Columns`, so `ImagePositionPatient` has to move by the offset in
-**patient millimetres** or the volume behind [Reformat](/guide/reformat), and every plane
-taken off it, points somewhere the image is not. The rectangle has to be the same on every
-image of the stack for that volume to stay a box, and it has to be applied while the volume
-is built, or a strip cropped off the axials comes back through a coronal of them. On a
-compressed image it costs the same decode and rewrite that a blanked box already does.
-
-It is on the list.
-
 ## RLE is the one format that is not decoded
 
 JPEG, lossless JPEG, JPEG-LS, JPEG 2000 and HTJ2K all decode, through the standalone

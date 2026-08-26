@@ -88,8 +88,6 @@ export function registerIpc(): void {
     session.applySelection(selection)
   })
 
-  // Runs on the selection as it stands, trim and masks included, so an area
-  // already blanked is not reported back as something to blank.
   // Reformatting. The volume itself never leaves the main process; the renderer
   // asks for frames of it exactly as it asks for frames of a file.
   ipcMain.handle('volume:open', async (_e, stackId: string): Promise<VolumeInfo> => openVolume(stackId))
@@ -100,6 +98,9 @@ export function registerIpc(): void {
   ipcMain.handle('volume:commit', async (_e, plan: ReformatPlan) => commitReformat(plan))
   ipcMain.handle('volume:close', () => closeVolume())
 
+  // Runs on the selection as it stands — trim, masks and crop included — so an
+  // area already blanked, or about to be cut off, is not reported back as
+  // something to deal with.
   ipcMain.handle('burnIn:scan', async (): Promise<BurnInFinding[]> => scanForBurnIn(session.selectedStacks()))
 
   // Preview pixels for the renderer. Only paths belonging to the current ingest

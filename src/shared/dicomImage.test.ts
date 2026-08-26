@@ -6,6 +6,10 @@ import {
   applyWindow,
   blackSamples,
   compressionOf,
+  cropBoundsOf,
+  cropFrameBytes,
+  croppedPosition,
+  cropSamples,
   decodeFrame,
   decodeGreyFrame,
   downscale,
@@ -13,6 +17,7 @@ import {
   fillMasks,
   frameByteLength,
   frameOffset,
+  keepsWholeImage,
   parseHeader,
   type ImageHeader
 } from './dicomImage'
@@ -427,5 +432,116 @@ describe('downscaleGrey', () => {
 
   it('leaves a frame that already fits untouched', () => {
     expect(downscaleGrey(frame, 8)).toBe(frame)
+  })
+})
+
+describe('cropBoundsOf', () => {
+  it('rounds a fraction to whole pixels', () => {
+    expect(cropBoundsOf({ x: 0.25, y: 0.5, width: 0.5, height: 0.25 }, 8, 8)).toEqual({
+      x: 2,
+      y: 4,
+      columns: 4,
+      rows: 2
+    })
+  })
+
+  it('clamps a rectangle that runs off the image', () => {
+    expect(cropBoundsOf({ x: -1, y: -1, width: 4, height: 4 }, 6, 4)).toEqual({ x: 0, y: 0, columns: 6, rows: 4 })
+  })
+
+  it('never comes out empty, however small the drag was', () => {
+    // An image of no pixels is not something the rest of this can carry, and
+    // rounding a thin rectangle to nothing is how one would arrive.
+    const bounds = cropBoundsOf({ x: 0.999, y: 0.999, width: 0.0001, height: 0.0001 }, 100, 100)
+    expect(bounds.columns).toBe(1)
+    expect(bounds.rows).toBe(1)
+    expect(bounds.x).toBeLessThan(100)
+    expect(bounds.y).toBeLessThan(100)
+  })
+
+  it('knows a crop that keeps everything, which is no crop at all', () => {
+    expect(keepsWholeImage(cropBoundsOf({ x: 0, y: 0, width: 1, height: 1 }, 5, 5), 5, 5)).toBe(true)
+    expect(keepsWholeImage(cropBoundsOf({ x: 0, y: 0, width: 1, height: 0.5 }, 5, 6), 5, 6)).toBe(false)
+  })
+})
+
+describe('cropFrameBytes', () => {
+  it('takes the rectangle asked for, row by row', () => {
+    const header = synthetic({ columns: 4, rows: 3, bitsAllocated: 8 })
+    // 0  1  2  3
+    // 4  5  6  7
+    // 8  9 10 11
+    const bytes = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    const cut = cropFrameBytes(bytes, header, { x: 1, y: 1, columns: 2, rows: 2 })
+    expect([...cut]).toEqual([5, 6, 9, 10])
+  })
+
+  it('copies wide samples without reading them, so byte order does not matter', () => {
+    // The bytes of a big-endian image mean something different from the same
+    // bytes little-endian, and a crop must not care which it was handed.
+    const header = synthetic({ columns: 2, rows: 2, bigEndian: true })
+    const bytes = bytesFor(header, [1, 2, 3, 4])
+    const cut = cropFrameBytes(bytes, header, { x: 1, y: 0, columns: 1, rows: 2 })
+    expect([...cut]).toEqual([...bytes.subarray(2, 4), ...bytes.subarray(6, 8)])
+  })
+
+  it('keeps the three channels of an interleaved colour image together', () => {
+    const header = synthetic({ columns: 2, rows: 2, bitsAllocated: 8, samplesPerPixel: 3 })
+    const bytes = new Uint8Array([1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4])
+    const cut = cropFrameBytes(bytes, header, { x: 0, y: 1, columns: 2, rows: 1 })
+    expect([...cut]).toEqual([3, 3, 3, 4, 4, 4])
+  })
+
+  it('crops each plane of a planar colour image in turn', () => {
+    // Planar colour is three whole images end to end, so a crop that walked the
+    // buffer as if it were interleaved would return red where blue belongs.
+    const header = synthetic({ columns: 2, rows: 2, bitsAllocated: 8, samplesPerPixel: 3, planarConfiguration: 1 })
+    const bytes = new Uint8Array([1, 2, 3, 4, 11, 12, 13, 14, 21, 22, 23, 24])
+    const cut = cropFrameBytes(bytes, header, { x: 0, y: 1, columns: 2, rows: 1 })
+    expect([...cut]).toEqual([3, 4, 13, 14, 23, 24])
+  })
+})
+
+describe('cropSamples', () => {
+  it('cuts values that have already been read out of their bytes', () => {
+    const samples = new Uint16Array([0, 1, 2, 3, 4, 5, 6, 7, 8])
+    const cut = cropSamples(samples, 3, { x: 0, y: 1, columns: 2, rows: 2 })
+    expect([...cut]).toEqual([3, 4, 6, 7])
+    expect(cut).toBeInstanceOf(Uint16Array)
+  })
+
+  it('keeps a signed stack signed, since a CT that came back unsigned is air at 3000', () => {
+    const cut = cropSamples(new Int16Array([-1000, -2, 5, 40]), 2, { x: 0, y: 0, columns: 1, rows: 2 })
+    expect(cut).toBeInstanceOf(Int16Array)
+    expect([...cut]).toEqual([-1000, 5])
+  })
+})
+
+describe('croppedPosition', () => {
+  const placed = (spacing: { row: number; column: number }, orientation: number[]): ImageHeader => ({
+    ...synthetic({ columns: 10, rows: 10 }),
+    imagePosition: [0, 0, 0],
+    imageOrientation: orientation,
+    pixelSpacing: spacing
+  })
+
+  it('walks the corner along the row direction and down the column one', () => {
+    // PixelSpacing is written the other way round from everything that uses it:
+    // between rows first, which is the step *down* a column. Swapping the pair
+    // moves the image by the difference and never fails.
+    const header = placed({ row: 2, column: 0.5 }, [1, 0, 0, 0, 1, 0])
+    expect(croppedPosition(header, { x: 10, y: 3 })).toEqual([5, 6, 0])
+  })
+
+  it('follows the directions the file actually points in', () => {
+    // A sagittal image: columns run along +y, rows run down -z.
+    const header = placed({ row: 1, column: 1 }, [0, 1, 0, 0, 0, -1])
+    expect(croppedPosition(header, { x: 4, y: 6 })).toEqual([0, 4, -6])
+  })
+
+  it('says nothing when the file does not say where it is', () => {
+    expect(croppedPosition(synthetic({ columns: 4, rows: 4 }), { x: 1, y: 1 })).toBeNull()
+    const noSpacing = { ...placed({ row: 1, column: 1 }, [1, 0, 0, 0, 1, 0]), pixelSpacing: null }
+    expect(croppedPosition(noSpacing, { x: 1, y: 1 })).toBeNull()
   })
 })

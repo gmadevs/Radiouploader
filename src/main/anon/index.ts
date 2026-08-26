@@ -34,9 +34,10 @@ export async function anonymiseStacks(
         frame: slice.frame,
         outputName,
         instanceNumber: sliceIndex + 1,
-        // Masks and window belong to the stack, so every one of its slices
-        // carries the same pair through to the file that gets written.
+        // Masks, crop and window belong to the stack, so every one of its
+        // slices carries the same three through to the file that gets written.
         masks: stack.masks,
+        crop: stack.crop,
         window: stack.window
       }
       if (tasks) tasks.push(task)

@@ -317,3 +317,134 @@ describe('anonymiseFile — redaction and window', () => {
     expect(ds.string('x00280004')).toBe('YBR_FULL')
   })
 })
+
+describe('anonymiseFile — crop', () => {
+  const source = () => path.join(fixtures, '01_ras_physician.dcm')
+  /** The right half of the 8x8 fixture. */
+  const rightHalf = { x: 0.5, y: 0, width: 0.5, height: 1 }
+
+  async function pixelsOf(file: string): Promise<number[]> {
+    const ds = await tagsOf(file)
+    const element = ds.elements['x7fe00010']
+    return Array.from({ length: element.length / 2 }, (_, i) => ds.uint16('x7fe00010', i) ?? 0)
+  }
+
+  type Dict = Record<string, { vr: string; Value: unknown[] }>
+
+  /**
+   * The fixture with a place in the patient, which it does not otherwise have.
+   * Deliberately not square: PixelSpacing is written between rows first, and a
+   * crop that pairs it the other way round moves the image by the difference.
+   */
+  async function placed(name: string, extra: Dict = {}): Promise<string> {
+    const bytes = new Uint8Array(await fs.readFile(source()))
+    const message = dcmio.Message.readFile(bytes.buffer.slice(0) as ArrayBuffer)
+    const dict = message.dict as unknown as Dict
+    dict['00200032'] = { vr: 'DS', Value: ['0', '0', '0'] }
+    dict['00200037'] = { vr: 'DS', Value: ['1', '0', '0', '0', '1', '0'] }
+    dict['00280030'] = { vr: 'DS', Value: ['2', '0.5'] }
+    Object.assign(dict, extra)
+    const outputPath = path.join(outDir, name)
+    await fs.writeFile(outputPath, Buffer.from(message.write()))
+    return outputPath
+  }
+
+  it('cuts the image down and rewrites the size to match', async () => {
+    const [result] = await anonymiseFile(source(), outDir, [
+      { frame: 0, outputName: 'cropped.dcm', instanceNumber: 1, crop: rightHalf }
+    ])
+    const ds = await tagsOf(result.outputPath)
+    expect(ds.uint16('x00280011')).toBe(4)
+    expect(ds.uint16('x00280010')).toBe(8)
+
+    const original = await pixelsOf(source())
+    const pixels = await pixelsOf(result.outputPath)
+    expect(pixels).toHaveLength(32)
+    for (let row = 0; row < 8; row++) {
+      for (let column = 0; column < 4; column++) {
+        expect(pixels[row * 4 + column]).toBe(original[row * 8 + column + 4])
+      }
+    }
+  })
+
+  it('moves ImagePositionPatient to the corner that is left', async () => {
+    // Two columns in at 0.5 mm between columns, four rows down at 2 mm between
+    // rows: the tag has to name the pixel that is now first, or a volume built
+    // from these images sits where the discarded corner used to be.
+    const [result] = await anonymiseFile(await placed('placed.dcm'), outDir, [
+      { frame: 0, outputName: 'placed-cropped.dcm', instanceNumber: 1, crop: { x: 0.25, y: 0.5, width: 0.5, height: 0.5 } }
+    ])
+    const ds = await tagsOf(result.outputPath)
+    expect(ds.string('x00200032')).toBe('1\\8\\0')
+  })
+
+  it('leaves the position alone when only the far edges came off', async () => {
+    const [result] = await anonymiseFile(await placed('placed-2.dcm'), outDir, [
+      { frame: 0, outputName: 'corner-kept.dcm', instanceNumber: 1, crop: { x: 0, y: 0, width: 0.5, height: 0.5 } }
+    ])
+    expect((await tagsOf(result.outputPath)).string('x00200032')).toBe('0\\0\\0')
+  })
+
+  it('drops a position it has no way to move', async () => {
+    // Without an orientation there is no direction to walk the corner along.
+    // A position describing a grid the pixels are no longer on is worse than
+    // none: order survives it, since the upload sends them as they were shown.
+    const file = await placed('unpointed.dcm', { '00200037': { vr: 'DS', Value: [] } })
+    const [result] = await anonymiseFile(file, outDir, [
+      { frame: 0, outputName: 'unpointed-cropped.dcm', instanceNumber: 1, crop: { x: 0.5, y: 0.5, width: 0.5, height: 0.5 } }
+    ])
+    expect((await tagsOf(result.outputPath)).elements['x00200032']).toBeUndefined()
+  })
+
+  it('blanks before it cuts, so a mask outside the crop goes with everything else', async () => {
+    const original = await pixelsOf(source())
+    const [result] = await anonymiseFile(source(), outDir, [
+      {
+        frame: 0,
+        outputName: 'masked-cropped.dcm',
+        instanceNumber: 1,
+        masks: [{ x: 0, y: 0, width: 0.5, height: 1 }],
+        crop: rightHalf
+      }
+    ])
+    const pixels = await pixelsOf(result.outputPath)
+    for (let row = 0; row < 8; row++) {
+      for (let column = 0; column < 4; column++) {
+        expect(pixels[row * 4 + column]).toBe(original[row * 8 + column + 4])
+      }
+    }
+  })
+
+  it('does not carry one task’s crop into the next task from the same file', async () => {
+    const [, second] = await anonymiseFile(source(), outDir, [
+      { frame: 0, outputName: 'crop-a.dcm', instanceNumber: 1, crop: rightHalf },
+      { frame: 0, outputName: 'crop-b.dcm', instanceNumber: 2 }
+    ])
+    const ds = await tagsOf(second.outputPath)
+    expect(ds.uint16('x00280011')).toBe(8)
+    expect((await pixelsOf(second.outputPath))).toHaveLength(64)
+  })
+
+  it('leaves a compressed file compressed when the crop keeps the whole image', async () => {
+    // Otherwise a rectangle dragged out to the edges would decode and rewrite
+    // every file in the stack to produce the bytes it already had.
+    const [result] = await anonymiseFile(
+      path.join(fixtures, 'TestPattern_JPEG-Baseline_YBRFull.dcm'),
+      outDir,
+      [{ frame: 0, outputName: 'jpeg-whole.dcm', instanceNumber: 1, crop: { x: 0, y: 0, width: 1, height: 1 } }]
+    )
+    expect((await tagsOf(result.outputPath)).string('x00020010')).toBe('1.2.840.10008.1.2.4.50')
+  })
+
+  it('crops a compressed image by decoding it, and says so in the transfer syntax', async () => {
+    const source = path.join(fixtures, 'TestPattern_JPEG-Baseline_YBRFull.dcm')
+    const before = await tagsOf(source)
+    const [result] = await anonymiseFile(source, outDir, [
+      { frame: 0, outputName: 'jpeg-cropped.dcm', instanceNumber: 1, crop: { x: 0, y: 0, width: 0.5, height: 0.5 } }
+    ])
+    const ds = await tagsOf(result.outputPath)
+    expect(ds.string('x00020010')).toBe('1.2.840.10008.1.2.1')
+    expect(ds.uint16('x00280011')).toBe(Math.round((before.uint16('x00280011') ?? 0) / 2))
+    expect(ds.uint16('x00280010')).toBe(Math.round((before.uint16('x00280010') ?? 0) / 2))
+  })
+})

@@ -121,12 +121,14 @@ export function App(): React.JSX.Element {
     0
   )
 
+  const allStacks = useMemo(
+    () => (ingest?.studies ?? []).flatMap((study) => study.series.flatMap((series) => series.stacks)),
+    [ingest]
+  )
+
   const reformatStack = useMemo(
-    () =>
-      (ingest?.studies ?? [])
-        .flatMap((study) => study.series.flatMap((series) => series.stacks))
-        .find((stack) => stack.id === reformatting?.stackId) ?? null,
-    [ingest, reformatting]
+    () => allStacks.find((stack) => stack.id === reformatting?.stackId) ?? null,
+    [allStacks, reformatting]
   )
 
   const viewedStack = useMemo(
@@ -176,20 +178,34 @@ export function App(): React.JSX.Element {
     setOpened((current) => new Set(current).add(stackId))
   }
 
+  /**
+   * Send the tree as the renderer holds it.
+   *
+   * Every stack, not only the ticked ones, and before anything in the main
+   * process reads pixels — the check, the anonymiser and the volume behind a
+   * reformat all work from this copy, and one that has not been pushed since
+   * the last box was drawn is one that reformats or scans the wrong pixels.
+   */
+  const pushSelection = async (): Promise<void> => {
+    await window.api.setSelection(
+      allStacks.map((s) => ({
+        id: s.id,
+        selected: s.selected,
+        trimStart: s.trimStart,
+        trimEnd: s.trimEnd,
+        masks: s.masks ?? [],
+        crop: s.crop ?? null,
+        window: s.window ?? null
+      }))
+    )
+  }
+
   /** Push the selection, then look through it for text burnt into the pixels. */
   const openCheck = async (): Promise<void> => {
     setConfirming(true)
     setFindings(null)
     try {
-      await window.api.setSelection(
-        selectedStacks.map((s) => ({
-          id: s.id,
-          trimStart: s.trimStart,
-          trimEnd: s.trimEnd,
-          masks: s.masks ?? [],
-          window: s.window ?? null
-        }))
-      )
+      await pushSelection()
       setFindings(await window.api.scanBurnIn())
     } catch {
       // A check that could not run says nothing, which is what an empty list
@@ -237,15 +253,7 @@ export function App(): React.JSX.Element {
     setWorking(true)
     setError(null)
     try {
-      await window.api.setSelection(
-        selectedStacks.map((s) => ({
-          id: s.id,
-          trimStart: s.trimStart,
-          trimEnd: s.trimEnd,
-          masks: s.masks ?? [],
-          window: s.window ?? null
-        }))
-      )
+      await pushSelection()
       const res = await window.api.anonymise()
       setWarnings(res.summary)
       if (res.errors.length > 0) {
@@ -389,13 +397,17 @@ export function App(): React.JSX.Element {
             onOpen={(stack, series, study) =>
               openViewer(stack.id, `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`)
             }
-            onReformat={(stack, series, study) =>
+            onReformat={async (stack, series, study) => {
+              // The volume is built in the main process from its own copy of
+              // the tree, so what was blanked and cropped here has to get there
+              // before the dialog opens and asks for it.
+              await pushSelection()
               setReformatting({
                 stackId: stack.id,
                 seriesId: series.id,
                 heading: `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`
               })
-            }
+            }}
             onKeepOnePhase={(series) => {
               // Keep the earliest phase and drop the rest; the user can re-tick any.
               const first = series.stacks.find((s) => s.selected)?.id ?? series.stacks[0]?.id

@@ -27,7 +27,7 @@ features:
     details: The anonymiser cleans tags; text burnt into the image survives it. The check before uploading rings what looks like a banner — it finds the obvious ones, and says so rather than calling anything clean.
     link: /guide/check
   - title: Erasing that is really erasing
-    details: A blanked region is painted into the pixel data of every image of a stack before upload. On a compressed image that means decoding it first and sending plain samples, because nothing can be painted into a bitstream.
+    details: A blanked region is painted into the pixel data of every image of a stack before upload, and a crop throws the rest away — Rows, Columns and the patient position all rewritten to match. On a compressed image both mean decoding it first and sending plain samples, because nothing can be painted into a bitstream.
     link: /guide/review
   - title: Cuts the volume another way
     details: Coronal and sagittal reformats, and MIP, MinIP or mean slabs of any thickness, added to the case as their own series — without opening a workstation.

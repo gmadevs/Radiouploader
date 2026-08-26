@@ -40,6 +40,22 @@ export interface MaskRect {
   height: number
 }
 
+/**
+ * The part of every image in a stack to keep, in fractions of the image — the
+ * same units and origin as a mask, so both are drawn on the picture as it
+ * arrived and neither has to be re-expressed when the other changes.
+ *
+ * One rectangle for the whole stack, and not because that is simpler: the
+ * volume behind a reformat is a box, and images cut to different sizes do not
+ * make one.
+ */
+export interface CropRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 /** Window centre and width, in the rescaled units the pixels are read in. */
 export interface WindowLevel {
   centre: number
@@ -72,6 +88,15 @@ export interface Stack {
    * data at anonymisation, so what is uploaded really is redacted.
    */
   masks: MaskRect[]
+  /**
+   * The part of the image kept, applied to every slice of the stack. Null keeps
+   * all of it, which is what nearly every stack wants.
+   *
+   * Unlike a mask this changes what the images *are*: Rows, Columns and
+   * ImagePositionPatient are rewritten to match, because a header that still
+   * describes the uncropped grid is a header that lies about its own pixels.
+   */
+  crop: CropRect | null
   /**
    * Window chosen in the viewer, written to WindowCenter/WindowWidth on upload.
    * Null leaves the exporter's own window in place.
@@ -212,13 +237,22 @@ export interface AppInfo {
   electron: string
 }
 
-/** What the renderer sends back about one stack it wants uploaded. */
+/**
+ * What the renderer says about one stack.
+ *
+ * Every stack is sent, ticked or not, because the main process needs the edits
+ * on an unticked one too: a reformat can be taken from a stack that is not
+ * itself going to be uploaded, and the volume behind it has to be built from
+ * the same pixels the user was looking at.
+ */
 export interface StackSelection {
   id: string
+  selected: boolean
   trimStart: number
   trimEnd: number
-  /** Absent from an older renderer, or from a stack nobody opened. */
+  /** Absent from a stack nobody opened. */
   masks?: MaskRect[]
+  crop?: CropRect | null
   window?: WindowLevel | null
 }
 

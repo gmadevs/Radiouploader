@@ -113,9 +113,12 @@ A volume needs geometry that holds, and the dialog says which part did not:
 
 ## What it carries over
 
-Areas you blanked on the parent are blanked in the volume **before** it is built, so a
-banner erased on the axial images cannot come back through a coronal of them. The window
-you chose comes with it. Rescale is preserved exactly: projections are taken on the stored
+Areas you blanked on the parent are blanked in the volume **before** it is built, and the
+crop is taken before it too — so a banner erased on the axial images cannot come back
+through a coronal of them, and neither can a margin cut off them. The volume is the cropped
+one throughout: it is that much smaller, and the derived images carry the position of the
+corner that was kept rather than the one that was thrown away. The window you chose comes
+with it. Rescale is preserved exactly: projections are taken on the stored
 values, and maximum, minimum and mean all commute with the linear rescale, so a MIP of a CT
 is still in Hounsfield units.
 

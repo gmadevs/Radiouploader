@@ -16,6 +16,7 @@ function entry(id: string, masks: Stack['masks'] = []): StackEntry {
       slices: [],
       selected: true,
       trimStart: 0,
+      crop: null,
       trimEnd: 0,
       masks,
       window: null,

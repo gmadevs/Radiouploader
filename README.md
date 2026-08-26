@@ -13,7 +13,8 @@ A desktop app for preparing and uploading cases to [Radiopaedia.org](https://rad
 
 Point it at a folder, a zip or a handful of DICOM files. It reads the study, splits the
 series that contain more than one acquisition — multiphase, diffusion, SWI — lets you pick
-what to keep, blank out any text burnt into the pixels and set the contrast, anonymises
+what to keep, blank out any text burnt into the pixels, crop away the margins and set the
+contrast, anonymises
 everything with Radiopaedia's reference anonymiser, and uploads the result as a draft case.
 
 Before it anonymises it looks through the images for burnt-in banners and rings what it

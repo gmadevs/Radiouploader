@@ -10,7 +10,7 @@ flowchart LR
   A[folder / zip / files] --> B[scan]
   B --> C[read metadata<br/>from the originals]
   C --> D[group into<br/>studies, series, stacks]
-  D --> E[you choose:<br/>keep, trim, erase, window]
+  D --> E[you choose:<br/>keep, trim, erase, crop, window]
   E --> F[anonymise<br/>worker thread]
   F --> G[upload<br/>S3 + Radiopaedia]
 

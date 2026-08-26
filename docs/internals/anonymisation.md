@@ -44,9 +44,16 @@ leaving the tag alone publishes an image with red and blue swapped.
 All of that happens **before** `Anonymize` runs, like the mask itself, so the bytes written
 are final and Radiopaedia's re-run of the same anonymiser stays a no-op.
 
+A [crop](/guide/review#crop) is written there too, and after the mask rather than before it:
+both are fractions of the image as it arrived, so a mask outside the crop goes the way of
+everything else out there. It rewrites `Rows`, `Columns` and `ImagePositionPatient` — the
+last walked across and down in patient millimetres, or deleted when the file says too little
+to walk it — because a header describing the grid the pixels used to sit on is one that
+lies.
+
 The uploaded file is much larger — the JPEG test pattern in the repository is 49 kB and
-768 kB decoded. A compressed image with nothing to blank is passed through untouched
-instead, so it stays small and lossless. The same machinery splits a compressed cine, which
+768 kB decoded. A compressed image with nothing to blank and nothing to cut away is passed
+through untouched instead, so it stays small and lossless. The same machinery splits a compressed cine, which
 cannot have its frames cut out of a bitstream by offset either.
 
 Only a format with no decoder is refused, and RLE is the one that is left.

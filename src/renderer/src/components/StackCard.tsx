@@ -49,12 +49,12 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
     }
   }, [stack.slices, index])
 
-  // The card shows the stack as it will be uploaded, masks and window included.
+  // The card shows the stack as it will be uploaded: masked, cropped, windowed.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !frame) return
-    paintFrame(canvas, frame, { window: stack.window, masks: stack.masks })
-  }, [frame, stack.window, stack.masks])
+    paintFrame(canvas, frame, { window: stack.window, masks: stack.masks, crop: stack.crop })
+  }, [frame, stack.window, stack.masks, stack.crop])
 
   /** Moving a trim handle jumps the preview there, so the cut is visible. */
   const setStart = (value: number): void => {

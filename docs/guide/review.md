@@ -1,4 +1,4 @@
-# Erase and set contrast
+# Erase, crop and set contrast
 
 **Open for review** on any stack shows it full size with a scrubber through every image.
 The wheel and the trackpad move through the stack as well, and so do the left and right
@@ -6,9 +6,10 @@ arrow keys — the slider is for jumping across a series, not for reading throug
 
 ![The ultrasound, banner and all](/shots/04-viewer.png)
 
-Two things can be changed here, and both belong to the **stack** rather than to the image
-on screen — burnt-in text sits in the same corner of every frame of an ultrasound or a
-reconstruction, and a window that suits one slice suits the rest.
+Three things can be changed here, and all of them belong to the **stack** rather than to the
+image on screen — burnt-in text sits in the same corner of every frame of an ultrasound or a
+reconstruction, the margins are the same margins on all of them, and a window that suits one
+slice suits the rest.
 
 ## Erase
 
@@ -36,6 +37,38 @@ first, and only closes the window once nothing is selected.
 original files are never modified — anonymisation writes new ones.
 :::
 
+## Crop
+
+Pick **Crop** and drag out the rectangle to **keep**. Everything outside it comes off every
+image of the stack.
+
+![The sector kept and the margins cut away](/shots/10-crop.png)
+
+The image stays on screen whole, with what is about to go shaded rather than hidden — a cut
+you cannot see past is one you cannot aim. Drag inside the rectangle to move it, a corner to
+resize it, and **Keep whole image** puts it back.
+
+One rectangle serves the whole stack, and not to keep things simple: [Reformat](/guide/reformat)
+builds a box out of the images, and images cut to different sizes do not make one.
+
+::: tip Cropping is not a second way to redact
+A blanked box is already blank pixels rather than an overlay, so nothing survives an erase
+that a crop would have removed. Crop for the reason you would crop a photograph: the black
+margins around an ultrasound sector, the empty air around a reconstruction, the strip a
+banner was sitting in.
+:::
+
+What makes it more than a mask with the pixels thrown away is the geometry, and the app
+moves it for you. `Rows` and `Columns` are rewritten, and so is `ImagePositionPatient` —
+the corner the image starts at, walked across and down in **patient millimetres**. Without
+that a volume built from the cropped images would sit where the discarded corner used to be.
+A file that does not say which way it is pointing has the position **removed** rather than
+left describing a grid its pixels are no longer on; the order the images upload in does not
+depend on it.
+
+The pixels are the same size after a crop as before, so `PixelSpacing` is untouched and a
+measurement made on Radiopaedia still means what it says.
+
 ## Contrast
 
 Pick **Contrast** and drag on the image: right widens the window, down raises its centre,
@@ -47,15 +80,18 @@ any `WindowCenterWidthExplanation` or `VOILUTSequence` that would contradict it 
 **The pixels themselves are untouched**, so the upload keeps its original values and a
 reader on Radiopaedia can still re-window it.
 
-## Erasing a compressed image
+## Erasing or cropping a compressed image
 
-It works, and it changes the file that gets uploaded. Nothing can be painted into a
-bitstream, so a JPEG, JPEG-LS, JPEG 2000, HTJ2K or lossless-JPEG image with a box on it is
-decoded, blanked, and written out as plain uncompressed samples. Expect it to be several
-times the size of the original — the test pattern in the repository goes from 49 kB to
-768 kB.
+Both work, and both change the file that gets uploaded. Nothing can be painted into or cut
+out of a bitstream, so a JPEG, JPEG-LS, JPEG 2000, HTJ2K or lossless-JPEG image with a box
+on it, or a rectangle kept out of it, is decoded and written out as plain uncompressed
+samples. Expect it to be several times the size of the original — the test pattern in the
+repository goes from 49 kB to 768 kB. Cropping claws some of that back, but not the
+compression.
 
-An image with no box on it is uploaded exactly as it arrived.
+An image with no box on it and no crop is uploaded exactly as it arrived. A crop dragged out
+to the edges counts as no crop: it is dropped rather than spent decoding a file to produce
+the bytes it already had.
 
-Only **RLE** is left out: it does not decode, so it cannot be previewed and cannot be
-erased. Blank one in another tool before importing.
+Only **RLE** is left out: it does not decode, so it cannot be previewed, erased or cropped.
+Deal with one in another tool before importing.

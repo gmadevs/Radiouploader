@@ -6,7 +6,7 @@ Every screenshot on this site is regenerated from the running app with one comma
 npm run shots
 ```
 
-It builds, boots the real app, drives it through the whole wizard and writes eight PNGs into
+It builds, boots the real app, drives it through the whole wizard and writes ten PNGs into
 `docs/public/shots/`.
 
 ## Why not take them by hand

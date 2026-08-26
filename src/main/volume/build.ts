@@ -1,4 +1,4 @@
-import { blackSamples, type ImageHeader } from '@shared/dicomImage'
+import { blackSamples, cropBoundsOf, cropSamples, croppedPosition, keepsWholeImage, type ImageHeader } from '@shared/dicomImage'
 import type { MaskRect, Stack } from '@shared/types'
 import { readStoredSamples } from '../preview'
 import type { Volume } from './reformat'
@@ -123,7 +123,28 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
   spacing.x = header.pixelSpacing.column
   spacing.y = header.pixelSpacing.row
 
-  const voxels = header.rows * header.columns * slices.length
+  /**
+   * The crop is applied here, while the volume is built, for the same reason
+   * the masks are: a reformat reads pixels, so a margin cut off the parent
+   * would come back through a plane taken across it.
+   *
+   * What comes out is a header describing the cropped grid — smaller, and with
+   * its corner moved — because that is what the derived images are written
+   * from. Leaving the parent's own header here would put every reformat of a
+   * cropped stack at the position of a corner that was thrown away.
+   */
+  const wanted = stack.crop ? cropBoundsOf(stack.crop, header.columns, header.rows) : null
+  const bounds = wanted && !keepsWholeImage(wanted, header.columns, header.rows) ? wanted : null
+  const cropped: ImageHeader = bounds
+    ? {
+        ...header,
+        rows: bounds.rows,
+        columns: bounds.columns,
+        imagePosition: croppedPosition(header, bounds)
+      }
+    : header
+
+  const voxels = cropped.rows * cropped.columns * slices.length
   const bytes = voxels * (header.bitsAllocated <= 8 ? 1 : 2)
   if (bytes > MAX_BYTES) {
     throw new VolumeError(
@@ -138,42 +159,48 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
         ? new Int16Array(voxels)
         : new Uint16Array(voxels)
 
+  /** What is read from a file, before the crop takes a rectangle out of it. */
   const perSlice = header.rows * header.columns
   const masks = stack.masks ?? []
   // The lowest sample there is: air, background, whatever this modality calls
   // nothing. An oblique plane leaves the volume halfway across the picture and
   // this is what it finds out there.
   let low = Infinity
-  const firstSlice = first.samples.slice(0, perSlice)
-  blank(firstSlice, header, masks, stack.window)
+  const read = first.samples.slice(0, perSlice)
+  blank(read, header, masks, stack.window)
+  const firstSlice = bounds ? cropSamples(read, header.columns, bounds) : read
   samples.set(firstSlice, 0)
   for (const value of firstSlice) if (value < low) low = value
 
+  const perCropped = cropped.rows * cropped.columns
   for (let i = 1; i < slices.length; i++) {
-    const { header: other, samples: read } = await readStoredSamples(slices[i].path, slices[i].frame)
-    const frame = read.slice(0, perSlice)
-    blank(frame, header, masks, stack.window)
+    const { header: other, samples: whole } = await readStoredSamples(slices[i].path, slices[i].frame)
+    // Checked before the crop is taken, so a stack of mixed sizes is caught by
+    // the size it really is rather than by the rectangle asked of it.
     if (other.rows !== header.rows || other.columns !== header.columns) {
       throw new VolumeError('The images in this stack are not all the same size, so they do not stack')
     }
     if (other.slope !== header.slope || other.intercept !== header.intercept) {
       throw new VolumeError('The images in this stack are not all in the same units, so a projection of them would not be either')
     }
-    samples.set(frame, i * perSlice)
+    const read = whole.slice(0, perSlice)
+    blank(read, header, masks, stack.window)
+    const frame = bounds ? cropSamples(read, header.columns, bounds) : read
+    samples.set(frame, i * perCropped)
     for (const value of frame) if (value < low) low = value
   }
 
   return {
     volume: {
       samples,
-      columns: header.columns,
-      rows: header.rows,
+      columns: cropped.columns,
+      rows: cropped.rows,
       depth: slices.length,
       spacing,
       low: Number.isFinite(low) ? low : 0
     },
     sourcePath: slices[0].path,
     sourceFrame: slices[0].frame,
-    header
+    header: cropped
   }
 }

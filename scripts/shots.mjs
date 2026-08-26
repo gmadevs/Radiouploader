@@ -100,6 +100,15 @@ async function run() {
   await sleep(700)
   await shot('05-erase', 'the banner blanked')
 
+  // The crop stays on for the rest of the run, so the steps after this one are
+  // driven with a stack that really has been cut down.
+  await click('Crop')
+  // Round the sector: the strip above it is the margin the banner was sitting
+  // in, and the point of the picture is that it can be cut rather than blanked.
+  await dragOnCanvas({ x: 0.02, y: 0.17 }, { x: 0.99, y: 0.95 })
+  await sleep(700)
+  await shot('10-crop', 'the sector kept and the margins cut away')
+
   await click('Done')
   await sleep(600)
 
@@ -194,7 +203,13 @@ async function run() {
    * eraser takes a pointer capture, and a synthetic PointerEvent has no pointer
    * to capture, so the drag would fall apart on the first move.
    */
+  /** The banner sits in the top-left eighth of the image. */
   async function dragOverBanner() {
+    return dragOnCanvas({ x: 0.01, y: 0.01 }, { x: 0.84, y: 0.19 })
+  }
+
+  /** Drag between two points given as fractions of the viewer's canvas. */
+  async function dragOnCanvas(start, end) {
     const rect = await evaluate(
       `(() => { const c = document.querySelector('.viewer-stage canvas'); if (!c) return null
                 const r = c.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height } })()`
@@ -203,9 +218,8 @@ async function run() {
       problems.push('no canvas to drag on')
       return
     }
-    // The banner sits in the top-left eighth of the image.
-    const from = { x: Math.round(rect.x + rect.w * 0.01), y: Math.round(rect.y + rect.h * 0.01) }
-    const to = { x: Math.round(rect.x + rect.w * 0.84), y: Math.round(rect.y + rect.h * 0.19) }
+    const from = { x: Math.round(rect.x + rect.w * start.x), y: Math.round(rect.y + rect.h * start.y) }
+    const to = { x: Math.round(rect.x + rect.w * end.x), y: Math.round(rect.y + rect.h * end.y) }
 
     win.webContents.sendInputEvent({ type: 'mouseDown', button: 'left', clickCount: 1, ...from })
     for (let i = 1; i <= 6; i++) {

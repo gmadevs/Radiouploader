@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { BurnInFinding, MaskRect } from '@shared/types'
+import type { BurnInFinding, CropRect, MaskRect } from '@shared/types'
 import type { StackEntry } from '../burnIn'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
 
@@ -19,7 +19,25 @@ interface Props {
   onConfirm: () => void
 }
 
-/** A middle image of one stack, as it will be uploaded — masks and window included. */
+/**
+ * Where a region the check noticed lands once the crop has been taken.
+ *
+ * The check reports in fractions of the uncropped image, because that is the
+ * picture it read; the thumbnail below shows the cropped one. Nothing outside
+ * the crop is ever reported — the scan is told to skip it — so a ring always
+ * has somewhere to go.
+ */
+function withinCrop(regions: MaskRect[] | undefined, crop: CropRect | null): MaskRect[] | undefined {
+  if (!regions || !crop) return regions
+  return regions.map((region) => ({
+    x: (region.x - crop.x) / crop.width,
+    y: (region.y - crop.y) / crop.height,
+    width: region.width / crop.width,
+    height: region.height / crop.height
+  }))
+}
+
+/** A middle image of one stack, as it will be uploaded — masked, cropped, windowed. */
 function Thumb({ entry, outline }: { entry: StackEntry; outline?: MaskRect[] }): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [error, setError] = useState<string | null>(null)
@@ -35,8 +53,8 @@ function Thumb({ entry, outline }: { entry: StackEntry; outline?: MaskRect[] }):
     loadFrame(slice.path, slice.frame, 256)
       .then((frame) => {
         if (cancelled || !canvasRef.current) return
-        paintFrame(canvasRef.current, frame, { window: stack.window, masks: stack.masks })
-        drawOutline(canvasRef.current, outline)
+        paintFrame(canvasRef.current, frame, { window: stack.window, masks: stack.masks, crop: stack.crop })
+        drawOutline(canvasRef.current, withinCrop(outline, stack.crop))
         setError(null)
       })
       .catch((err: unknown) => {
@@ -46,7 +64,7 @@ function Thumb({ entry, outline }: { entry: StackEntry; outline?: MaskRect[] }):
     return () => {
       cancelled = true
     }
-  }, [stack.slices, stack.window, stack.masks, outline])
+  }, [stack.slices, stack.window, stack.masks, stack.crop, outline])
 
   return (
     <div className="shot">
