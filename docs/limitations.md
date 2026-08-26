@@ -19,14 +19,6 @@ noticed in, which is not the same as a series that is clean**, and nowhere in th
 say otherwise. Finding the text is still your job; this only makes the obvious cases harder
 to walk past.
 
-## RLE is the one format that is not decoded
-
-JPEG, lossless JPEG, JPEG-LS, JPEG 2000 and HTJ2K all decode, through the standalone
-`@cornerstonejs/codec-*` WASM builds — not `@cornerstonejs/dicom-image-loader`, which drags
-in `@cornerstonejs/core`. Those series preview, scrub, window, erase and split like any
-other. **RLE does not**: it shows the reason in place of the image, and an RLE cine cannot be
-uploaded at all.
-
 ## Blanking a compressed image makes it bigger
 
 Nothing can be painted into a bitstream, so an image that has to change — a mask to apply, or
@@ -43,17 +35,22 @@ A compressed image that needs no change is **passed through untouched**, which k
 and keeps it lossless. Windowing counts as no change: it is written to `WindowCenter` /
 `WindowWidth` and never touches the pixels.
 
-## A cine in a format with no decoder cannot be uploaded
+## A DICOM video cannot be uploaded
 
 A multiframe object keeps its frames as fragments when it is compressed, so they are decoded
 before they are sent one at a time. Sending the file whole is not an answer: Radiopaedia does
 not expand multiframe objects, and a run of dozens would be published as its first frame.
 
-Which leaves RLE. Such a run is **named in the picker** — the card carries the codec, cannot
-be ticked, and the count of stacks in that state sits beside the selection count — rather
-than being discovered during anonymisation, where the failure is per file and used to take
-the whole series out of the case behind "N file(s) could not be anonymised". Exporting the
-run uncompressed from the PACS is the way to publish it.
+Every still-image compression in DICOM decodes here — JPEG, lossless JPEG, JPEG-LS,
+JPEG 2000, HTJ2K and RLE. What is left is **video**: MPEG-2, MPEG-4 (H.264) and HEVC
+(H.265), which some machines write an ultrasound or angiography run as. Those are a video
+stream rather than a stack of pictures, and nothing here reads one.
+
+Such a run is **named in the picker** — the card carries the codec, cannot be ticked, and
+the count of stacks in that state sits beside the selection count — rather than being
+discovered during anonymisation, where the failure is per file and used to take the whole
+series out of the case behind "N file(s) could not be anonymised". Exporting the run as
+still frames from the PACS is the way to publish it.
 
 ## A reformat is flat
 

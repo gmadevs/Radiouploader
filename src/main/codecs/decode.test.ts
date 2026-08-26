@@ -92,12 +92,12 @@ describe('decodeEncapsulatedFrame', () => {
   })
 
   it('refuses a syntax it has no codec for, by name', async () => {
-    await expect(decodeEncapsulatedFrame(new Uint8Array(4), header({ transferSyntax: '1.2.840.10008.1.2.5' }))).rejects.toThrow(
-      UnsupportedTransferSyntaxError
-    )
-    await expect(decodeEncapsulatedFrame(new Uint8Array(4), header({ transferSyntax: '1.2.840.10008.1.2.5' }))).rejects.toThrow(
-      /RLE/
-    )
+    // MPEG-4, which is a video stream rather than a stack of pictures. Reading
+    // one as samples produces an image, and that image is noise that looks
+    // like an image, so it is refused by name instead.
+    const mpeg = header({ transferSyntax: '1.2.840.10008.1.2.4.102' })
+    await expect(decodeEncapsulatedFrame(new Uint8Array(4), mpeg)).rejects.toThrow(UnsupportedTransferSyntaxError)
+    await expect(decodeEncapsulatedFrame(new Uint8Array(4), mpeg)).rejects.toThrow(/MPEG-4/)
   })
 
   it('reads JPEG-LS back exactly, since it is lossless', async () => {

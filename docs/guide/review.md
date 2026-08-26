@@ -93,5 +93,6 @@ An image with no box on it and no crop is uploaded exactly as it arrived. A crop
 to the edges counts as no crop: it is dropped rather than spent decoding a file to produce
 the bytes it already had.
 
-Only **RLE** is left out: it does not decode, so it cannot be previewed, erased or cropped.
-Deal with one in another tool before importing.
+Every still-image compression DICOM has is read here, RLE included. Only **video** —
+MPEG-2, MPEG-4, HEVC — is left out: it does not decode, so it cannot be previewed, erased or
+cropped. Export those as still frames before importing.

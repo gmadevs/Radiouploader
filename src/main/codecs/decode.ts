@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import { UnsupportedTransferSyntaxError } from '@shared/dicomImage'
 import type { ImageHeader } from '@shared/dicomImage'
+import { decodeRleFrame } from './rle'
 
 /**
  * Decoding compressed pixel data.
@@ -94,6 +95,7 @@ const CODECS: Record<string, DecoderFactory> = {
 
 /** Syntaxes decoded by a plain JavaScript decoder rather than by WASM. */
 const JPEG_LOSSLESS = new Set(['1.2.840.10008.1.2.4.57', '1.2.840.10008.1.2.4.70'])
+const RLE_LOSSLESS = '1.2.840.10008.1.2.5'
 
 /**
  * Whether this app can turn the given transfer syntax into samples.
@@ -103,7 +105,7 @@ const JPEG_LOSSLESS = new Set(['1.2.840.10008.1.2.4.57', '1.2.840.10008.1.2.4.70
  * image this can read back.
  */
 export function canDecode(transferSyntax: string): boolean {
-  return transferSyntax in CODECS || JPEG_LOSSLESS.has(transferSyntax)
+  return transferSyntax in CODECS || JPEG_LOSSLESS.has(transferSyntax) || transferSyntax === RLE_LOSSLESS
 }
 
 /**
@@ -196,6 +198,7 @@ export async function decodeEncapsulatedFrame(
   header: ImageHeader
 ): Promise<DecodedSamples> {
   const transferSyntax = header.transferSyntax
+  if (transferSyntax === RLE_LOSSLESS) return decodeRleFrame(encoded, header)
   if (JPEG_LOSSLESS.has(transferSyntax)) return decodeLosslessJpeg(encoded, header)
   if (transferSyntax in CODECS) return decodeWithWasm(transferSyntax, encoded, header)
   throw new UnsupportedTransferSyntaxError(transferSyntax)

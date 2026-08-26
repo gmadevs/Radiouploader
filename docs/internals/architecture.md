@@ -51,7 +51,8 @@ from just its own byte range.
 
 Compressed pixel data goes through `src/main/codecs/decode.ts`, which loads the standalone
 `@cornerstonejs/codec-*` WASM builds on first use — JPEG, JPEG-LS, JPEG 2000 and HTJ2K —
-with a plain JavaScript decoder for lossless JPEG. Only RLE is left out. A compressed frame
+with plain JavaScript decoders for lossless JPEG and for RLE, which is PackBits over byte
+planes and wants no codec at all. Only video is left out. A compressed frame
 cannot be addressed arithmetically, so the fragment table is read to find where each one
 starts, and the most recently parsed file is kept so scrubbing a cine does not re-parse it
 per frame.

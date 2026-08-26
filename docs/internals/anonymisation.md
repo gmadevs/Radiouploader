@@ -56,7 +56,8 @@ The uploaded file is much larger — the JPEG test pattern in the repository is 
 through untouched instead, so it stays small and lossless. The same machinery splits a compressed cine, which
 cannot have its frames cut out of a bitstream by offset either.
 
-Only a format with no decoder is refused, and RLE is the one that is left.
+Only a format with no decoder is refused, and video — MPEG-2, MPEG-4, HEVC — is what is
+left.
 
 ## Warnings
 

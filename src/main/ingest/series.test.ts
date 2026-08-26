@@ -158,15 +158,21 @@ describe('buildStacks — multiframe objects', () => {
 })
 
 describe('buildStacks — compressed multiframe', () => {
-  /** RLE: encapsulated like the rest, and the one format with no decoder here. */
+  /** MPEG-4: encapsulated like the rest, and a video rather than a stack. */
   const undecodableCine = (): InstanceMeta[] => [
-    inst({ numberOfFrames: 40, transferSyntaxUid: '1.2.840.10008.1.2.5' })
+    inst({ numberOfFrames: 40, transferSyntaxUid: '1.2.840.10008.1.2.4.102' })
   ]
 
   it('names the codec and refuses a run it cannot decode', () => {
     const { stacks } = buildStacks('s', undecodableCine())
-    expect(stacks[0].unsupported).toContain('RLE')
+    expect(stacks[0].unsupported).toContain('MPEG-4 (H.264)')
     expect(stacks[0].selected).toBe(false)
+  })
+
+  it('accepts an RLE run, which it decodes in plain JavaScript', () => {
+    const { stacks } = buildStacks('s', [inst({ numberOfFrames: 40, transferSyntaxUid: '1.2.840.10008.1.2.5' })])
+    expect(stacks[0].unsupported).toBeNull()
+    expect(stacks[0].selected).toBe(true)
   })
 
   it('accepts a compressed run it can decode — the frames are split after decoding', () => {

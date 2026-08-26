@@ -181,23 +181,106 @@ describe('anonymiseFile — multiframe', () => {
     expect(new Set(results.map((r) => r.sha256)).size).toBe(4)
   })
 
+  /** PackBits with literal runs only, which is a legal encoding of anything. */
+  function packBits(bytes: number[]): number[] {
+    const out: number[] = []
+    for (let i = 0; i < bytes.length; i += 128) {
+      const chunk = bytes.slice(i, i + 128)
+      out.push(chunk.length - 1, ...chunk)
+    }
+    return out
+  }
+
+  /** One RLE frame of 16-bit greyscale: the high byte plane, then the low one. */
+  function rleFrame(values: number[]): ArrayBuffer {
+    const segments = [
+      packBits(values.map((v) => (v >> 8) & 0xff)),
+      packBits(values.map((v) => v & 0xff))
+    ]
+    const table = new Uint8Array(64)
+    const view = new DataView(table.buffer)
+    view.setUint32(0, 2, true)
+    view.setUint32(4, 64, true)
+    view.setUint32(8, 64 + segments[0].length, true)
+
+    const out = new Uint8Array(64 + segments[0].length + segments[1].length)
+    out.set(table, 0)
+    out.set(segments[0], 64)
+    out.set(segments[1], 64 + segments[0].length)
+    return out.buffer
+  }
+
+  /** Four 8x8 frames of RLE, each a different picture. */
+  async function rleCine(): Promise<{ path: string; frames: number[][] }> {
+    const buf = await fs.readFile(path.join(fixtures, 'TestPattern_JPEG-Baseline_YBRFull.dcm'))
+    const message = dcmio.Message.readFile(
+      buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+    )
+    const dict = message.dict as unknown as Record<string, { vr: string; Value: unknown[] }>
+    const meta = message.meta as unknown as Record<string, { vr: string; Value: unknown[] }>
+
+    const frames = [0, 1, 2, 3].map((f) => Array.from({ length: 64 }, (_, i) => (f + 1) * 1000 + i))
+    meta['00020010'] = { vr: 'UI', Value: ['1.2.840.10008.1.2.5'] }
+    dict['00280010'] = { vr: 'US', Value: [8] }
+    dict['00280011'] = { vr: 'US', Value: [8] }
+    dict['00280002'] = { vr: 'US', Value: [1] }
+    dict['00280100'] = { vr: 'US', Value: [16] }
+    dict['00280101'] = { vr: 'US', Value: [16] }
+    dict['00280102'] = { vr: 'US', Value: [15] }
+    dict['00280103'] = { vr: 'US', Value: [0] }
+    dict['00280004'] = { vr: 'CS', Value: ['MONOCHROME2'] }
+    delete dict['00280006']
+    dict['00280008'] = { vr: 'IS', Value: ['4'] }
+    dict['7FE00010'] = { vr: 'OB', Value: frames.map(rleFrame) }
+
+    const outputPath = path.join(outDir, 'rle-cine.dcm')
+    await fs.writeFile(outputPath, Buffer.from(message.write()))
+    return { path: outputPath, frames }
+  }
+
+  it('splits an RLE run, which used to be the one that could not be uploaded at all', async () => {
+    // RLE is the last compressed syntax without a WASM codec, and it needs
+    // none: PackBits over byte planes is a page of plain JavaScript. Until it
+    // was written a run like this was refused by name in the picker.
+    const cine = await rleCine()
+    const results = await anonymiseFile(
+      cine.path,
+      outDir,
+      [0, 1, 2, 3].map((frame) => ({ frame, outputName: `rle-${frame}.dcm`, instanceNumber: frame + 1 }))
+    )
+    expect(results).toHaveLength(4)
+
+    for (const [frame, result] of results.entries()) {
+      const ds = await tagsOf(result.outputPath)
+      expect(ds.string('x00020010')).toBe('1.2.840.10008.1.2.1')
+      expect(ds.string('x00280008')).toBe('1')
+      expect(ds.uint16('x00280010')).toBe(8)
+      expect(ds.uint16('x00280011')).toBe(8)
+      expect(ds.elements['x7fe00010'].length).toBe(8 * 8 * 2)
+      // The samples themselves, woven back from the two byte planes. Reading
+      // them the other way round produces an image rather than an error.
+      const values = Array.from({ length: 64 }, (_, i) => ds.uint16('x7fe00010', i) ?? 0)
+      expect(values).toEqual(cine.frames[frame])
+    }
+  })
+
   it('refuses a compressed run it has no decoder for, rather than guessing', async () => {
     const buf = await fs.readFile(path.join(fixtures, 'TestPattern_JPEG-Baseline_YBRFull.dcm'))
     const bytes = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
     const message = dcmio.Message.readFile(bytes)
     const dict = message.dict as unknown as Record<string, { vr: string; Value: unknown[] }>
     dict['00280008'] = { vr: 'IS', Value: ['4'] }
-    // RLE: encapsulated like the others, and nothing here reads it.
+    // MPEG-4: encapsulated like the others, and nothing here reads it.
     ;(message.meta as Record<string, { vr: string; Value: unknown[] }>)['00020010'] = {
       vr: 'UI',
-      Value: ['1.2.840.10008.1.2.5']
+      Value: ['1.2.840.10008.1.2.4.102']
     }
-    const outputPath = path.join(outDir, 'rle-cine.dcm')
+    const outputPath = path.join(outDir, 'mpeg-cine.dcm')
     await fs.writeFile(outputPath, Buffer.from(message.write()))
 
     await expect(
-      anonymiseFile(outputPath, outDir, [{ frame: 1, outputName: 'rle.dcm', instanceNumber: 1 }])
-    ).rejects.toThrow(/RLE is not a format this app decodes/)
+      anonymiseFile(outputPath, outDir, [{ frame: 1, outputName: 'mpeg.dcm', instanceNumber: 1 }])
+    ).rejects.toThrow(/is not a format this app decodes/)
   })
 })
 

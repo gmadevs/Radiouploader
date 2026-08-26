@@ -28,7 +28,18 @@ const TRANSFER_SYNTAX_NAMES: Record<string, string> = {
   '1.2.840.10008.1.2.4.91': 'JPEG 2000',
   '1.2.840.10008.1.2.4.201': 'HTJ2K',
   '1.2.840.10008.1.2.4.202': 'HTJ2K',
-  '1.2.840.10008.1.2.5': 'RLE'
+  '1.2.840.10008.1.2.5': 'RLE',
+  // Video, and the only encapsulated syntaxes left with no decoder here. Named
+  // so a file that cannot be read says what it is rather than a bare UID.
+  '1.2.840.10008.1.2.4.100': 'MPEG-2',
+  '1.2.840.10008.1.2.4.101': 'MPEG-2',
+  '1.2.840.10008.1.2.4.102': 'MPEG-4 (H.264)',
+  '1.2.840.10008.1.2.4.103': 'MPEG-4 (H.264)',
+  '1.2.840.10008.1.2.4.104': 'MPEG-4 (H.264)',
+  '1.2.840.10008.1.2.4.105': 'MPEG-4 (H.264)',
+  '1.2.840.10008.1.2.4.106': 'MPEG-4 (H.264)',
+  '1.2.840.10008.1.2.4.107': 'HEVC (H.265)',
+  '1.2.840.10008.1.2.4.108': 'HEVC (H.265)'
 }
 
 const EXPLICIT_VR_BIG_ENDIAN = '1.2.840.10008.1.2.2'

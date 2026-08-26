@@ -43,16 +43,16 @@ setting.
 
 ## What the preview will and will not show
 
-The preview decodes JPEG, lossless JPEG, JPEG-LS, JPEG 2000 and HTJ2K as well as
-uncompressed DICOM. RLE is the one that is left: it shows the reason it cannot be drawn
-rather than being mis-rendered.
+The preview decodes every still-image compression DICOM has — JPEG, lossless JPEG, JPEG-LS,
+JPEG 2000, HTJ2K and RLE — as well as uncompressed DICOM. Anything it cannot read shows the
+reason in place of the image rather than being mis-rendered.
 
 A compressed image can be reviewed, windowed, erased and cropped like any other. It is sent
 untouched unless something has to change its pixels — a blanked area, a crop, or a cine run
 being split — in which case it is decoded and uploaded uncompressed, which makes a larger
 file. See [known limitations](/limitations).
 
-A cine in a format with no decoder — RLE — is the one case that cannot be uploaded at all,
+A cine written as **video** — MPEG-2, MPEG-4 or HEVC — is the one case that cannot be uploaded at all,
 because its frames cannot be read to be split. That card says so in place of the tick, and
 the count beside *selected* tells you how many stacks are in that state, so a run cannot go
 missing from the case without having been mentioned.
