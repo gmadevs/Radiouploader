@@ -19,6 +19,11 @@ noticed in, which is not the same as a series that is clean**, and nowhere in th
 say otherwise. Finding the text is still your job; this only makes the obvious cases harder
 to walk past.
 
+Reading the images with OCR is **not planned**. It would turn a check that appears instantly
+into one that takes seconds to tens of seconds per study, and it would still not let the app
+call anything clean: the text this misses — small, low contrast, over anatomy — is the text
+OCR is worst at.
+
 ## Blanking a compressed image makes it bigger
 
 Nothing can be painted into a bitstream, so an image that has to change — a mask to apply, or
@@ -57,7 +62,8 @@ still frames from the PACS is the way to publish it.
 [Reformat](/guide/reformat) opens on the patient's own planes, worked out from
 `ImageOrientationPatient`, and the crosshair turns them from there. What there is no way to
 do is **curve** one: a reformat along the length of a vessel or a nerve root needs a path
-drawn in the image and a different piece of machinery behind it.
+drawn in the image and a different piece of machinery behind it. That is not planned — a
+plain MPR is what a case needs to show a finding in another plane.
 
 Files that do not carry `ImageOrientationPatient` fall back to the acquisition's own axes,
 which on anything but an axial study is a guess. The dialog says when it has had to.
