@@ -35,6 +35,8 @@ function inst(overrides: Partial<InstanceMeta> = {}): InstanceMeta {
     patientBirthDate: null,
     patientSex: null,
     frames: null,
+    imageOrientation: [1, 0, 0, 0, 1, 0],
+    byteLength: 1024,
     ...overrides
   }
 }
@@ -479,5 +481,62 @@ describe('buildStacks — enhanced multiframe', () => {
     ])
     expect(stacks.every((s) => s.unsupported !== null)).toBe(true)
     expect(stacks.every((s) => !s.selected)).toBe(true)
+  })
+})
+
+describe('buildStacks — what the picker shows about a stack', () => {
+  it('names the plane the images were cut on, in the patient’s axes', () => {
+    const axial = buildStacks('s', [inst({ imageOrientation: [1, 0, 0, 0, 1, 0] })])
+    expect(axial.stacks[0].plane).toBe('Axial')
+
+    const sagittal = buildStacks('s', [inst({ imageOrientation: [0, 1, 0, 0, 0, -1] })])
+    expect(sagittal.stacks[0].plane).toBe('Sagittal')
+
+    // Not one of the three, and not rounded to the nearest either.
+    const oblique = buildStacks('s', [inst({ imageOrientation: [0.71, 0.71, 0, 0, 0, -1] })])
+    expect(oblique.stacks[0].plane).toBe('Oblique')
+  })
+
+  it('says nothing about the plane when the files do not point anywhere', () => {
+    expect(buildStacks('s', [inst({ imageOrientation: null })]).stacks[0].plane).toBeNull()
+  })
+
+  it('adds up what the stack weighs', () => {
+    const { stacks } = buildStacks('s', [inst({ byteLength: 1000 }), inst({ byteLength: 2000 })])
+    expect(stacks[0].bytes).toBe(3000)
+  })
+
+  it('gives a whole cine its whole file', () => {
+    const { stacks } = buildStacks('s', [inst({ numberOfFrames: 40, byteLength: 4000 })])
+    expect(stacks[0].bytes).toBe(4000)
+  })
+
+  it('gives each phase of a split file its share rather than a copy of it', () => {
+    // Four frames of one 4000-byte file, split in two: the shares add up to the
+    // file instead of to twice it, or the study would seem to weigh double.
+    const frames = [0, 1, 2, 3].map((frame) => ({
+      frame,
+      sliceLocation: frame % 2 === 0 ? 0 : 5,
+      component: 'magnitude' as const,
+      bValue: null,
+      echoTime: null,
+      echoNumber: null,
+      temporalIndex: frame < 2 ? 1 : 2,
+      triggerTime: null,
+      acquisitionTime: null,
+      stackId: null,
+      inStackPosition: null
+    }))
+    const { stacks } = buildStacks('s', [inst({ numberOfFrames: 4, byteLength: 4000, frames })])
+    expect(stacks).toHaveLength(2)
+    expect(stacks.map((s) => s.bytes)).toEqual([2000, 2000])
+  })
+
+  it('names the compression, and says nothing when there is none', () => {
+    const jpeg = buildStacks('s', [inst({ transferSyntaxUid: '1.2.840.10008.1.2.4.50' })])
+    expect(jpeg.stacks[0].compression).toBe('JPEG baseline')
+
+    const plain = buildStacks('s', [inst({ transferSyntaxUid: '1.2.840.10008.1.2.1' })])
+    expect(plain.stacks[0].compression).toBeNull()
   })
 })

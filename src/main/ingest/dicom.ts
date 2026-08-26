@@ -76,6 +76,14 @@ export interface InstanceMeta {
   /** Frames inside this object; more than 1 for cine and enhanced objects. */
   numberOfFrames: number
   /**
+   * ImageOrientationPatient (0020,0037), which says which plane this was cut
+   * on. An enhanced object states it in a functional group instead, and that is
+   * read here too — one value for the file, since it is shared by every frame.
+   */
+  imageOrientation: number[] | null
+  /** Size of the file on disk, so the picker can say what a series weighs. */
+  byteLength: number
+  /**
    * Transfer syntax from the file meta. Read here because what can be done with
    * a series — split its frames, blank a region — is decided while the tree is
    * built, long before anything opens the pixel data.
@@ -204,6 +212,12 @@ function computeSliceLocation(ds: DataSet): number | null {
   return projected ?? num(ds, 'x00201041')
 }
 
+/** Six direction cosines, or null unless there are exactly six real ones. */
+function orientationOf(values: string[]): number[] | null {
+  const numbers = values.map(Number)
+  return numbers.length === 6 && numbers.every(Number.isFinite) ? numbers : null
+}
+
 /** The first item of a nested sequence, or null when there is not one. */
 function item(ds: DataSet | null, tag: string): DataSet | null {
   return ds?.elements[tag]?.items?.[0]?.dataSet ?? null
@@ -227,6 +241,21 @@ function timeOfDateTime(value: string | null): string | null {
   if (value === null || value.length < 14) return null
   const time = value.slice(8)
   return /^\d{6}(\.\d+)?$/.test(time) ? time : null
+}
+
+/**
+ * The orientation of an enhanced object, which it states in a functional group
+ * rather than at the top level. Shared by every frame in practice, and the
+ * first frame's own is the fallback for a file that repeats it per frame.
+ */
+function enhancedOrientation(ds: DataSet): number[] | null {
+  const shared = ds.elements['x52009229']?.items?.[0]?.dataSet ?? null
+  const first = ds.elements['x52009230']?.items?.[0]?.dataSet ?? null
+  for (const group of [item(shared, 'x00209116'), item(first, 'x00209116')]) {
+    const found = group === null ? null : orientationOf(multiValue(group, 'x00200037'))
+    if (found !== null) return found
+  }
+  return null
 }
 
 /**
@@ -394,6 +423,8 @@ export async function readInstance(filePath: string): Promise<InstanceMeta> {
     acquisitionTime: str(ds, 'x00080032') ?? str(ds, 'x00080033'),
     bValue: readBValue(ds),
     numberOfFrames,
+    imageOrientation: orientationOf(multiValue(ds, 'x00200037')) ?? enhancedOrientation(ds),
+    byteLength: buf.byteLength,
     transferSyntaxUid: str(ds, 'x00020010'),
     // Identifying, and gone after anonymisation. Read here so the case form can
     // offer them back as the two fields Radiopaedia asks for.

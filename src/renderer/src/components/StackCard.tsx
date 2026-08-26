@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PreviewFrame, Stack } from '@shared/types'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
+import { extentOf, formatSize, millimetres, perImage } from '../stackDetail'
 import { useWheelScrub } from '../wheelScrub'
 
 interface Props {
@@ -27,6 +28,14 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
   const last = stack.slices.length - 1
   const kept = stack.trimEnd - stack.trimStart + 1
   const trimmed = kept < stack.slices.length
+
+  // What the stack is, rather than what has been done to it: the plane it was
+  // cut on and how far it runs. Absent on anything that does not say where its
+  // images sit, which is most cine runs.
+  const extent = extentOf(stack.slices)
+  const geometry = [stack.plane, extent && `${millimetres(extent.span)} / ${millimetres(extent.spacing)} mm`]
+    .filter(Boolean)
+    .join(' · ')
 
   useEffect(() => {
     const slice = stack.slices[index]
@@ -182,6 +191,15 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
             {maskCount > 0 && <> · {maskCount} blanked</>}
             {stack.window && <> · contrast set</>}
           </div>
+          {geometry !== '' && <div className="muted small">{geometry}</div>}
+          <div className="muted small">
+            {formatSize(stack.bytes)} · {perImage(stack.bytes, stack.slices.length)} each
+          </div>
+          {/* Only when there is something to say. Plain samples are what most
+              exports are, and a badge on every card would cost a line to tell
+              you nothing; a codec named here is the series that will grow if
+              you blank or crop it. */}
+          {stack.compression !== null && <div className="small codec">{stack.compression}</div>}
         </label>
         {stack.slices.length > 2 && !showTrim && !stack.unsupported && (
           <button

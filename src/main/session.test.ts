@@ -28,6 +28,9 @@ function stack(id: string, sliceCount: number): Stack {
     trimEnd: sliceCount - 1,
     masks: [],
     crop: null,
+    plane: 'Axial',
+    bytes: 1024,
+    compression: null,
     window: null,
     unsupported: null
   }

@@ -17,6 +17,18 @@ interface Props {
   onSelectEverything: (selected: boolean) => void
 }
 
+/**
+ * A card and the gap after it, and the padding the row of them sits in.
+ *
+ * A series group is made as wide as its cards rather than left to the layout:
+ * its heading can be a paragraph of description, and left to itself it would
+ * stretch the group past the cards and leave a single one adrift in it. The
+ * heading is truncated to this instead.
+ */
+const CARD_WIDTH = 240
+const CARD_GAP = 12
+const ROW_PADDING = 32
+
 const SPLIT_LABELS: Record<string, string> = {
   component: 'Split by image type',
   diffusion: 'Split by b-value',
@@ -85,51 +97,60 @@ export function ReviewStep({
             {studies.length > 1 && <span className="badge">{describeInterval(study.intervalDays)}</span>}
           </h2>
 
-          {study.series.map((series) => (
-            <div className="series" key={series.id}>
-              <div className="series-head">
-                <div style={{ flex: 1 }}>
-                  <h3>
-                    {series.seriesNumber !== null && <span className="muted">{series.seriesNumber}. </span>}
-                    {series.description ?? 'Unnamed series'}
-                  </h3>
-                  <div className="muted small">
-                    {series.modality ?? '—'} · {series.instanceCount} images
+          {/* One strip per study, scrolling sideways: a study of thirty series
+              is a row to run along rather than a page to scroll down, and the
+              series stay side by side where they can be compared. */}
+          <div className="study-strip">
+            {study.series.map((series) => (
+              <div className="series" key={series.id}>
+                <div
+                  className="series-head"
+                  style={{ maxWidth: series.stacks.length * (CARD_WIDTH + CARD_GAP) - CARD_GAP + ROW_PADDING }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <h3>
+                      {series.seriesNumber !== null && <span className="muted">{series.seriesNumber}. </span>}
+                      {series.description ?? 'Unnamed series'}
+                    </h3>
+                    <div className="muted small">
+                      {series.modality ?? '—'} · {series.instanceCount} image
+                      {series.instanceCount === 1 ? '' : 's'}
+                    </div>
                   </div>
+                  {series.splitReason && (
+                    <span className="badge split">{SPLIT_LABELS[series.splitReason] ?? 'Split'}</span>
+                  )}
+                  {series.splitReason === 'phase' && (
+                    <button className="small ghost" onClick={() => onKeepOnePhase(series)}>
+                      Keep one phase
+                    </button>
+                  )}
+                  {series.stacks.length > 1 && (
+                    <>
+                      <button className="small ghost" onClick={() => onSelectAll(series, true)}>
+                        All
+                      </button>
+                      <button className="small ghost" onClick={() => onSelectAll(series, false)}>
+                        None
+                      </button>
+                    </>
+                  )}
                 </div>
-                {series.splitReason && (
-                  <span className="badge split">{SPLIT_LABELS[series.splitReason] ?? 'Split'}</span>
-                )}
-                {series.splitReason === 'phase' && (
-                  <button className="small ghost" onClick={() => onKeepOnePhase(series)}>
-                    Keep one phase
-                  </button>
-                )}
-                {series.stacks.length > 1 && (
-                  <>
-                    <button className="small ghost" onClick={() => onSelectAll(series, true)}>
-                      All
-                    </button>
-                    <button className="small ghost" onClick={() => onSelectAll(series, false)}>
-                      None
-                    </button>
-                  </>
-                )}
+                <div className="stacks">
+                  {series.stacks.map((stack) => (
+                    <StackCard
+                      key={stack.id}
+                      stack={stack}
+                      onToggle={onToggle}
+                      onTrim={onTrim}
+                      onOpen={() => onOpen(stack, series, study)}
+                      onReformat={() => onReformat(stack, series, study)}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="stacks">
-                {series.stacks.map((stack) => (
-                  <StackCard
-                    key={stack.id}
-                    stack={stack}
-                    onToggle={onToggle}
-                    onTrim={onTrim}
-                    onOpen={() => onOpen(stack, series, study)}
-                    onReformat={() => onReformat(stack, series, study)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </section>
       ))}
     </>

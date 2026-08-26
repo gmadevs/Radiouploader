@@ -103,6 +103,23 @@ export interface Stack {
    */
   window: WindowLevel | null
   /**
+   * The plane these images were cut on, as a word — Axial, Coronal, Sagittal or
+   * Oblique. Null when the files do not say which way they point.
+   */
+  plane: string | null
+  /**
+   * What this stack weighs on disk. A stack that is part of a multiframe file
+   * gets its share of it rather than the whole, so the shares of a run split
+   * into phases add up to the file instead of to four times it.
+   */
+  bytes: number
+  /**
+   * How the pixels are stored, in the words the picker shows — "JPEG 2000",
+   * "RLE". Null means plain samples, which is what most exports are and what
+   * nothing has to be decoded to change.
+   */
+  compression: string | null
+  /**
    * Why this stack cannot be uploaded, in words for the picker; null when it
    * can. Said here, while the tree is built, because the alternative is finding
    * out during anonymisation — where the failure is per file, so the stack

@@ -129,6 +129,7 @@ export async function writeReformatted(
   const high = wide ? (built.header.signed ? 32767 : 65535) : 255
 
   const slices: SliceRef[] = []
+  let bytes = 0
 
   for (const [index, offset] of offsets.entries()) {
     const image = reformatSlice(built.volume, {
@@ -190,7 +191,9 @@ export async function writeReformatted(
     }
 
     const outputPath = path.join(outputDir, `${String(index).padStart(4, '0')}.dcm`)
-    await fs.writeFile(outputPath, Buffer.from(message.write()))
+    const written = Buffer.from(message.write())
+    bytes += written.byteLength
+    await fs.writeFile(outputPath, written)
     slices.push({ path: outputPath, frame: 0, instanceNumber: index + 1, sliceLocation: offset, sopInstanceUid: null })
   }
 
@@ -219,6 +222,15 @@ export async function writeReformatted(
         masks: [],
         crop: null,
         window: parent.window,
+        // The plane it was actually cut on, in the patient's axes — the same
+        // one the label is built from, and Oblique when it is one.
+        plane: (() => {
+          const normal = toPatient(built.header, plan.frame.n)
+          return normal === null ? null : describePlane(normal)
+        })(),
+        bytes,
+        // Written as plain samples, whatever the parent was stored as.
+        compression: null,
         unsupported: null
       }
     ]

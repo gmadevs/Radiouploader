@@ -1,4 +1,5 @@
 import { compressionOf } from '@shared/dicomImage'
+import { cross, describePlane, normalise, type Vec3 } from '@shared/geometry'
 import { nearestAgeOption } from '@shared/radiopaedia'
 import { canDecode } from '../codecs/decode'
 import type { ImageComponent, Series, SliceRef, Stack, StackKind, Study } from '@shared/types'
@@ -331,6 +332,47 @@ function primaryKind(varying: Set<StackKind>): StackKind {
   return 'single'
 }
 
+/**
+ * The plane these images were cut on, named in the patient's own axes.
+ *
+ * The normal of the row and column directions is what the plane *is*; the words
+ * are the ones a reader would use, and anything that is not one of the three is
+ * Oblique rather than a guess at the nearest.
+ */
+function planeOf(orientation: number[] | null): string | null {
+  if (orientation === null) return null
+  const row = orientation.slice(0, 3) as Vec3
+  const column = orientation.slice(3, 6) as Vec3
+  const normal = cross(row, column)
+  return normal.every((v) => v === 0) ? null : describePlane(normalise(normal))
+}
+
+/**
+ * What this stack weighs.
+ *
+ * A stack that took every frame of its files gets their whole size. One that
+ * took some of the frames — a phase out of an enhanced object, a b-value out of
+ * a run — gets that share of them, so the stacks of a split file add up to the
+ * file rather than to a copy of it each.
+ */
+function bytesOf(units: Unit[]): number {
+  const instances = new Map<string, InstanceMeta>()
+  const framesUsed = new Map<string, number>()
+  for (const unit of units) {
+    instances.set(unit.instance.path, unit.instance)
+    const taken = unit.frame === null ? Math.max(1, Math.floor(unit.instance.numberOfFrames)) : 1
+    framesUsed.set(unit.instance.path, (framesUsed.get(unit.instance.path) ?? 0) + taken)
+  }
+
+  let total = 0
+  for (const instance of instances.values()) {
+    const frames = Math.max(1, Math.floor(instance.numberOfFrames))
+    const share = Math.min(1, (framesUsed.get(instance.path) ?? 0) / frames)
+    total += instance.byteLength * share
+  }
+  return Math.round(total)
+}
+
 function makeStack(
   seriesId: string,
   index: number,
@@ -358,6 +400,9 @@ function makeStack(
     masks: [],
     crop: null,
     window: null,
+    plane: planeOf(units[0].instance.imageOrientation),
+    bytes: bytesOf(units),
+    compression: compressionOf(units[0].instance.transferSyntaxUid),
     unsupported
   }
 }

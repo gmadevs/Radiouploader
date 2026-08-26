@@ -117,11 +117,18 @@ h3 { font-size: 13px; margin: 0; font-weight: 600; }
 }
 .drop.over { border-color: var(--accent); background: var(--panel); }
 
+/* A study is a row to run along rather than a page to scroll down: the series
+   stay side by side, which is where they can be compared. */
+.study-strip {
+  display: flex; align-items: flex-start; gap: 14px;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  padding-bottom: 10px;
+}
 .series {
+  flex: none;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel);
-  margin-bottom: 14px;
   overflow: hidden;
 }
 .series-head {
@@ -130,15 +137,21 @@ h3 { font-size: 13px; margin: 0; font-weight: 600; }
   background: var(--panel-2);
   border-bottom: 1px solid var(--border);
 }
+/* The group is as wide as its cards, so a long description is cut rather than
+   allowed to stretch it. A flex child does not shrink below its content
+   without this. */
+.series-head > div:first-child { min-width: 0; }
+.series-head h3 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .badge {
   font-size: 11px; padding: 2px 8px; border-radius: 999px;
   border: 1px solid var(--border); color: var(--muted);
 }
 .badge.split { color: var(--warn); border-color: var(--warn); }
 
-.stacks { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 14px 16px; }
+.stacks { display: flex; gap: 12px; padding: 14px 16px; }
 
 .stack {
+  width: 240px; flex: none;
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
@@ -179,6 +192,11 @@ label.field { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
   position: absolute; top: calc(100% + 10px); right: 0; width: 380px; z-index: 10;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
+
+/* Said in words under the image rather than over it: the top corners of a
+   thumbnail are where patient banners sit, and this is the app that must not
+   cover one up. */
+.codec { color: var(--warn); }
 
 .stack-preview canvas.dropped { opacity: 0.28; }
 .dropped-tag {
