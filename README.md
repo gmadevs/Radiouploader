@@ -28,6 +28,24 @@ Runs on macOS, Linux and Windows.
 
 > Unofficial. Not affiliated with or endorsed by Radiopaedia.org.
 
+## Download
+
+<!-- downloads: npm run links -->
+
+Version **0.1.0-beta.1** — a pre-release, like every release so far. Nothing is signed, so
+the first launch needs one extra step per platform:
+[how to open it](https://gmadevs.github.io/Radiouploader/guide/install).
+
+| | Also built |
+|---|---|
+| [![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-111111?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/Radiouploader-0.1.0-beta.1-arm64.dmg) | Intel: [.dmg](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/Radiouploader-0.1.0-beta.1.dmg) |
+| [![Linux](https://img.shields.io/badge/Linux-AppImage%20x64-FCC624?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/Radiouploader-0.1.0-beta.1.AppImage) | arm64: [.AppImage](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/Radiouploader-0.1.0-beta.1-arm64.AppImage) · Debian: [amd64](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/radiouploader_0.1.0-beta.1_amd64.deb) · [arm64](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/radiouploader_0.1.0-beta.1_arm64.deb) |
+| [![Windows](https://img.shields.io/badge/Windows-Installer%20x64-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/Radiouploader.Setup.0.1.0-beta.1.exe) | |
+
+Older versions, and the notes that come with each, are on the [releases page](https://github.com/gmadevs/Radiouploader/releases).
+
+<!-- /downloads -->
+
 ![The review step](docs/public/shots/02-review.png)
 
 ## Documentation

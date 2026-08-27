@@ -25,6 +25,28 @@ It is triggered manually or by a tag rather than on every push, because macOS an
 runners bill at 10x and 2x — a habit worth keeping even now the repository is public and
 the minutes are free.
 
+## The download links
+
+```bash
+npm run links
+```
+
+The README's download buttons carry the version, because GitHub has no stable URL for "the
+newest installer": `/releases/latest` resolves only to a release that is **not** a
+pre-release, and every release here is one. A link that carries a version goes stale the
+moment the version changes — silently, on the front page, where stale means a 404 for
+whoever came to try the app.
+
+So they are generated from `package.json` into a marked block in the README, and the
+generator also runs on `npm version`, which is what bumps that field. The links in the
+commit that bumps the version are therefore already the right ones, and there is no step to
+forget.
+
+The filenames it builds are electron-builder's, which is not one convention but three: the
+dmg and the AppImage take the product name and dashes, the deb takes the package name and
+underscores and calls x64 amd64, and NSIS writes `Setup` in the middle. They were checked
+against the files a real tag produced rather than read off the documentation.
+
 ## The icon
 
 ```bash
