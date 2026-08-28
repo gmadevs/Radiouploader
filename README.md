@@ -11,6 +11,7 @@
 [![Build](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml/badge.svg)](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml)
 [![CodeFactor](https://www.codefactor.io/repository/github/gmadevs/radiouploader/badge)](https://www.codefactor.io/repository/github/gmadevs/radiouploader)
 [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/gmadevs/Radiouploader?utm_source=oss&utm_medium=github&utm_campaign=gmadevs%2FRadiouploader&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)](https://coderabbit.ai)
+[![Known Vulnerabilities](https://snyk.io/test/github/gmadevs/Radiouploader/badge.svg)](https://snyk.io/test/github/gmadevs/Radiouploader)
 [![Electron](https://img.shields.io/badge/Electron-43-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
