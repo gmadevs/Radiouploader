@@ -9,7 +9,7 @@
 [![Status: beta](https://img.shields.io/badge/status-beta-yellow?style=flat-square)](https://gmadevs.github.io/Radiouploader/limitations)
 [![Docs](https://img.shields.io/badge/docs-gmadevs.github.io-4c9aff?style=flat-square)](https://gmadevs.github.io/Radiouploader/)
 [![Build](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml/badge.svg)](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml)
-[![Test Status](https://github.com)]
+[![Test Status](https://github.com)](https://github.com)
 [![CodeFactor](https://www.codefactor.io/repository/github/gmadevs/radiouploader/badge)](https://www.codefactor.io/repository/github/gmadevs/radiouploader)
 [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/gmadevs/Radiouploader?utm_source=oss&utm_medium=github&utm_campaign=gmadevs%2FRadiouploader&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)](https://coderabbit.ai)
 [![Known Vulnerabilities](https://snyk.io/test/github/gmadevs/Radiouploader/badge.svg)](https://snyk.io/test/github/gmadevs/Radiouploader)
