@@ -10,6 +10,7 @@ import { ReformatDialog } from './components/ReformatDialog'
 import { CaseStep, type CaseForm } from './components/CaseStep'
 import { InfoDialog } from './components/InfoDialog'
 import { ReviewStep } from './components/ReviewStep'
+import { moveBy } from './reorder'
 import { SeriesViewer } from './components/SeriesViewer'
 import { SourceStep } from './components/SourceStep'
 
@@ -147,6 +148,27 @@ export function App(): React.JSX.Element {
       ),
     [ingest]
   )
+
+  /**
+   * Move one series past its neighbour within its study.
+   *
+   * This is not decoration. The series endpoint has no position of its own, so
+   * the order they are posted in is the order the case ends up in — and that
+   * order is this array.
+   */
+  const moveSeries = (studyId: string, seriesId: string, delta: number): void => {
+    setIngest((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        studies: current.studies.map((study) => {
+          if (study.id !== studyId) return study
+          const index = study.series.findIndex((series) => series.id === seriesId)
+          return index === -1 ? study : { ...study, series: moveBy(study.series, index, delta) }
+        })
+      }
+    })
+  }
 
   /** Rebuild the tree, applying `change` to each stack; null leaves it alone. */
   const mutateStacks = (change: (stack: Stack, series: Series) => Partial<Stack> | null): void => {
@@ -394,6 +416,7 @@ export function App(): React.JSX.Element {
               mutateStacks((_stack, s) => (s.id === series.id ? { selected } : null))
             }
             onSelectEverything={(selected) => mutateStacks(() => ({ selected }))}
+            onMoveSeries={moveSeries}
             onOpen={(stack, series, study) =>
               openViewer(stack.id, `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`)
             }

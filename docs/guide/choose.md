@@ -20,6 +20,20 @@ Scrolling with the wheel or the trackpad over a card looks through its images. T
 stays where it is while the pointer is over one, so a card can be scrubbed without the strip
 sliding out from under it.
 
+## Putting the series in order
+
+The arrows in a series heading move it past its neighbour, left or right along the strip.
+Series arrive in the order the scanner numbered them, which is the order they were acquired
+in and not always the order they are worth reading in — the localiser first and the sequence
+that shows the finding last.
+
+**This is not decoration.** Radiopaedia's series endpoint has no position of its own, so the
+order the app posts them in is the order the case ends up with. What you leave the strip in
+is what a reader scrolls through.
+
+Studies have no arrows: they are ordered by date, oldest first, because the case is a
+timeline and the [interval between them](/guide/upload) is what carries the meaning.
+
 ## What a card says
 
 Under the preview, in the order that decides whether a series is worth uploading:

@@ -26,6 +26,18 @@ Steps 1 and 3 live at the **site root**, not under `/api/v1/`.
 Because the presigned URLs expire after 15 minutes, a very large case is uploaded in
 batches rather than requesting every URL up front.
 
+## Series order is post order
+
+The series endpoint takes `image_format`, `series.root_index` and the list of upload ids.
+There is no position in it, and no endpoint to reorder a case afterwards — so the order the
+series appear in is the order they were posted in, one at a time, and that is the only lever
+there is. It is why the picker lets a series be
+[moved past its neighbour](/guide/choose): the order left there is the order that ships.
+
+`root_index` is not that lever. It is 0-based and picks which frame of the series is shown
+as its thumbnail; the middle one is the useful default, and for a single image it has to
+be 0.
+
 ## The step this app does not take
 
 There is a fourth call in the API — `PUT /api/v1/cases/:id/mark_upload_finished` — and this

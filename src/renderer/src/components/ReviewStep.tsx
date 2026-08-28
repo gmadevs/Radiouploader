@@ -15,6 +15,8 @@ interface Props {
   onSelectAll: (series: Series, selected: boolean) => void
   /** Select or clear every stack in the import at once. */
   onSelectEverything: (selected: boolean) => void
+  /** Move one series past its neighbour, which is what reorders the case. */
+  onMoveSeries: (studyId: string, seriesId: string, delta: number) => void
 }
 
 /**
@@ -45,7 +47,8 @@ export function ReviewStep({
   onOpen,
   onReformat,
   onSelectAll,
-  onSelectEverything
+  onSelectEverything,
+  onMoveSeries
 }: Props): React.JSX.Element {
   const stacks = studies.flatMap((study) => study.series.flatMap((series) => series.stacks))
   const selectedCount = stacks.filter((stack) => stack.selected).length
@@ -101,7 +104,7 @@ export function ReviewStep({
               is a row to run along rather than a page to scroll down, and the
               series stay side by side where they can be compared. */}
           <div className="study-strip">
-            {study.series.map((series) => (
+            {study.series.map((series, index) => (
               <div className="series" key={series.id}>
                 <div
                   className="series-head"
@@ -134,6 +137,31 @@ export function ReviewStep({
                         None
                       </button>
                     </>
+                  )}
+                  {/* The order of these strips is the order the case gets: the
+                      series endpoint has no position of its own, so what the
+                      app posts first is what appears first. */}
+                  {study.series.length > 1 && (
+                    <span className="reorder">
+                      <button
+                        className="small ghost"
+                        disabled={index === 0}
+                        title="Move this series earlier in the case"
+                        aria-label={`Move ${series.description ?? 'this series'} earlier`}
+                        onClick={() => onMoveSeries(study.id, series.id, -1)}
+                      >
+                        ←
+                      </button>
+                      <button
+                        className="small ghost"
+                        disabled={index === study.series.length - 1}
+                        title="Move this series later in the case"
+                        aria-label={`Move ${series.description ?? 'this series'} later`}
+                        onClick={() => onMoveSeries(study.id, series.id, 1)}
+                      >
+                        →
+                      </button>
+                    </span>
                   )}
                 </div>
                 <div className="stacks">

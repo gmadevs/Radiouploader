@@ -297,6 +297,12 @@ label.field { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
 .mask .handle.se, .crop .handle.se { right: -6px; bottom: -6px; cursor: nwse-resize; }
 .mask .handle.sw, .crop .handle.sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
 
+/* The two arrows read as one control, so they sit tight against each other
+   rather than in the gap the rest of the header row uses. */
+.reorder { display: inline-flex; gap: 2px; flex: none; }
+.reorder button { padding: 3px 7px; line-height: 1; }
+.reorder button:disabled { opacity: 0.3; cursor: default; }
+
 /* What the crop cuts away is shaded, never hidden — the shade is how you see
    that the rectangle is round the wrong thing. It lets the pointer through, so
    a drag that starts out there still draws a new rectangle on the canvas. */
