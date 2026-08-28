@@ -1,6 +1,5 @@
 <p align="center">
   <img src="resources/icon.png" alt="" width="128" height="128">
-</p>
 
 # Radiouploader
 
@@ -15,6 +14,8 @@
 [![Electron](https://img.shields.io/badge/Electron-43-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+
+</p>
 
 A desktop app for preparing and uploading cases to [Radiopaedia.org](https://radiopaedia.org).
 
