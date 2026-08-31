@@ -269,13 +269,4 @@ export class RadiopaediaClient {
     if (id === undefined || id === null) throw new Error('Radiopaedia did not return a study id')
     return String(id)
   }
-
-  /** Move the case out of "uploading" once every series has been attached. */
-  async markUploadFinished(caseId: string): Promise<void> {
-    await this.request(`cases/${caseId}/mark_upload_finished`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}'
-    })
-  }
 }

@@ -238,7 +238,9 @@ export function registerIpc(): void {
       }
     }
 
-    await c.markUploadFinished(caseId)
+    // mark_upload_finished is deliberately not called: an unmarked case stays a
+    // draft, which is what adding images to it later needs, and marking one may
+    // do more than unlock editing — see docs/internals/upload.md.
     return { caseId, url: `https://radiopaedia.org/cases/${caseId}` }
   })
 }
