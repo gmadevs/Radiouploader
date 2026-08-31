@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: Radiouploader
-  text: DICOM in, a Radiopaedia draft case out
+  text: Unofficial Radiopaedia draft case preparing and uploading
   tagline: Reads a study, splits the series that hold more than one acquisition, lets you blank burnt-in text, anonymises with Radiopaedia's own anonymiser, and uploads.
   image:
     src: /shots/04-viewer.png
@@ -21,7 +21,7 @@ hero:
 
 features:
   - title: Splits what your PACS exported as one series
-    details: Magnitude and phase, b-values, echoes, time points — each becomes its own stack you can keep or drop, because the tags that tell them apart are destroyed by anonymisation.
+    details: Magnitude and phase, DWI different b-values, echoes, time points — each becomes its own stack you can keep or drop, because the tags that tell them apart are destroyed by anonymisation.
     link: /internals/splitting
   - title: The pixels are your job, and it helps
     details: The anonymiser cleans tags; text burnt into the image survives it. The check before uploading rings what looks like a banner — it finds the obvious ones, and says so rather than calling anything clean.
