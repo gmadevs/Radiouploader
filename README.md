@@ -9,6 +9,7 @@
 [![Status: stable](https://img.shields.io/badge/status-stable-brightgreen?style=flat-square)](https://gmadevs.github.io/Radiouploader/limitations)
 [![Docs](https://img.shields.io/badge/docs-gmadevs.github.io-4c9aff?style=flat-square)](https://gmadevs.github.io/Radiouploader/)
 [![Build](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml/badge.svg)](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml)
+[![Tests](https://github.com/gmadevs/Radiouploader/actions/workflows/test.yml/badge.svg)](https://github.com/gmadevs/Radiouploader/actions/workflows/test.yml)
 [![CodeQL](https://github.com/gmadevs/Radiouploader/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/gmadevs/Radiouploader/security/code-scanning)
 [![GitGuardian](https://github.com/gmadevs/Radiouploader/actions/workflows/gitguardian.yml/badge.svg)](https://github.com/gmadevs/Radiouploader/actions/workflows/gitguardian.yml)
 [![CodeFactor](https://www.codefactor.io/repository/github/gmadevs/radiouploader/badge)](https://www.codefactor.io/repository/github/gmadevs/radiouploader)

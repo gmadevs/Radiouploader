@@ -1,0 +1,53 @@
+name: Tests
+
+# The unit tests, on every push and every pull request.
+#
+# The installer workflow runs these too, but only on a tag or by hand — which
+# is late to hear that a decoder regressed. This one is Linux alone, a couple
+# of minutes, and free on a public repository; it is what the badge on the
+# README reports.
+on:
+  push:
+    branches: [main]
+    # Documentation cannot break a test, and the docs workflow already builds it.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Typecheck and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Both projects: the main process and the renderer have their own
+      # configurations, and `npm test` type-checks neither.
+      - run: npm run typecheck
+
+      # The JSON goes to the step summary below; the default reporter is what
+      # makes a failure readable in the log.
+      - name: Test
+        run: npx vitest run --reporter=default --reporter=json --outputFile=test-results.json
+
+      # So the run says what it proved without anyone opening the log. Written
+      # even when the tests fail, which is when the count matters most.
+      - name: Count
+        if: always()
+        run: |
+          test -f test-results.json || exit 0
+          jq -r '"**" + (.numPassedTests|tostring) + " of " + (.numTotalTests|tostring)
+            + " tests passed** in " + (.testResults|length|tostring) + " files."' \
+            test-results.json >> "$GITHUB_STEP_SUMMARY"

@@ -12,6 +12,19 @@ npm run smoke      # boots the built app, fails on console errors, writes smoke.
 previous bundle in place, and testing that instead reports success for code that does not
 compile.
 
+## The tests on CI
+
+`.github/workflows/test.yml` type-checks both projects and runs the suite on every push and
+every pull request, on Linux alone — it is the badge on the README, and it exists because the
+installer workflow runs the same tests only on a tag or by hand, which is late to hear that a
+decoder regressed. The run's summary says how many tests passed, so a green tick can be
+read without opening the log.
+
+`vitest.config.ts` collects `src/**/*.test.ts` only. There is no React testing library here,
+so anything worth testing in the UI is written as a plain module beside the component and
+tested there — `burnIn.ts` beside `BurnInCheck.tsx`, `selection.ts` in `src/shared/` for the
+rule that decides which images of a stack are really uploaded.
+
 ## Layout
 
 ```
