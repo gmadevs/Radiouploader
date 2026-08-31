@@ -81,6 +81,10 @@ uploaded*.
 Trimmed images are never decoded, written out or uploaded — trimming is not a display
 setting.
 
+A single image in the middle of a stack is a different problem, and has
+[its own control in the viewer](/guide/review#drop-this-image). The card counts both the
+same way: `N of M images`, with the range and the number dropped beside it.
+
 ## What the preview will and will not show
 
 The preview decodes every still-image compression DICOM has — JPEG, lossless JPEG, JPEG-LS,

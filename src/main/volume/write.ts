@@ -219,6 +219,7 @@ export async function writeReformatted(
         selected: true,
         trimStart: 0,
         trimEnd: slices.length - 1,
+        dropped: [],
         masks: [],
         crop: null,
         window: parent.window,

@@ -334,6 +334,12 @@ label.field { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
 }
 
 .viewer-controls { flex: none; display: grid; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+/* The image number and the button that drops that one image, on one line: a
+   control that acts on the image under the pointer belongs beside the number
+   of it, not in the row of things that apply to the whole stack. */
+.viewer-row { display: flex; align-items: center; gap: 10px; }
+.viewer-row .viewer-slider { flex: 1; min-width: 0; }
+.viewer-row button { flex: none; }
 .viewer-slider { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
 .viewer-slider > span:first-child { width: 52px; flex: none; }
 .viewer-slider .n { width: 64px; flex: none; text-align: right; font-variant-numeric: tabular-nums; }

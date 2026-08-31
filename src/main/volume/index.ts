@@ -10,6 +10,7 @@ import type {
   VolumeInfo,
   WindowLevel
 } from '@shared/types'
+import { keptSlices } from '@shared/selection'
 import { session } from '../session'
 import { buildVolume, pixelSpacingOf, VolumeError, type BuiltVolume } from './build'
 import { ACQUISITION_FRAMES, anatomicalFrames } from './orientation'
@@ -50,12 +51,11 @@ function find(stackId: string): OpenVolume['parent'] {
 /** Read a stack into a volume and report what can be made from it. */
 export async function openVolume(stackId: string): Promise<VolumeInfo> {
   const parent = find(stackId)
-  // Trimmed, because a reformat of images that will not be uploaded would be a
-  // reformat of something nobody else can see.
-  const stack: Stack = {
-    ...parent.stack,
-    slices: parent.stack.slices.slice(parent.stack.trimStart, parent.stack.trimEnd + 1)
-  }
+  // Trimmed, and without the images dropped one at a time, because a reformat
+  // of images that will not be uploaded would be a reformat of something nobody
+  // else can see. A hole left in the middle by a drop is not smoothed over
+  // here: buildVolume measures the gaps and refuses a stack that has one.
+  const stack: Stack = { ...parent.stack, slices: keptSlices(parent.stack) }
 
   const built = await buildVolume(stack)
   open = { stackId, built, parent }

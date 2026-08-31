@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppInfo, BurnInFinding, CaseSummary, IngestResult, Progress, Series, Stack } from '@shared/types'
+import { keptCount } from '@shared/selection'
 import { AccountBar } from './components/AccountBar'
 import { quotaExhausted, type AccountState } from './quota'
 import { describeInterval } from '@shared/interval'
@@ -117,10 +118,7 @@ export function App(): React.JSX.Element {
   )
   const selectedStacks = useMemo(() => selectedEntries.map((entry) => entry.stack), [selectedEntries])
   const { seen, unseen } = useMemo(() => splitByReview(selectedEntries, opened), [selectedEntries, opened])
-  const selectedImageCount = selectedStacks.reduce(
-    (n, stack) => n + (stack.trimEnd - stack.trimStart + 1),
-    0
-  )
+  const selectedImageCount = selectedStacks.reduce((n, stack) => n + keptCount(stack), 0)
 
   const allStacks = useMemo(
     () => (ingest?.studies ?? []).flatMap((study) => study.series.flatMap((series) => series.stacks)),
@@ -215,6 +213,7 @@ export function App(): React.JSX.Element {
         selected: s.selected,
         trimStart: s.trimStart,
         trimEnd: s.trimEnd,
+        dropped: s.dropped ?? [],
         masks: s.masks ?? [],
         crop: s.crop ?? null,
         window: s.window ?? null

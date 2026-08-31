@@ -6,10 +6,35 @@ arrow keys — the slider is for jumping across a series, not for reading throug
 
 ![The ultrasound, banner and all](/shots/04-viewer.png)
 
-Three things can be changed here, and all of them belong to the **stack** rather than to the
+Three of the four things that can be changed here belong to the **stack** rather than to the
 image on screen — burnt-in text sits in the same corner of every frame of an ultrasound or a
 reconstruction, the margins are the same margins on all of them, and a window that suits one
-slice suits the rest.
+slice suits the rest. The fourth is about the one image you are looking at.
+
+## Drop this image
+
+**Drop image**, beside the image number, leaves that one image out of the upload and changes
+nothing else about the series. It is for the image a series can be missing: the one that
+moved, the duplicate a reconstruction wrote twice, the slice that caught the table edge.
+
+A dropped image is tagged *dropped* while you are on it, the button becomes **Keep image**,
+and the count beside it says how many have gone. **Keep all** puts every one back. Nothing is
+decided until you anonymise, and the card in the picker says `N of M images` so the loss is
+visible from outside the viewer as well.
+
+This is not [trimming](/guide/choose#trimming). A trim is a range and takes the dead ends of
+a series; a drop takes one image out of the middle and leaves its neighbours where they are.
+Use whichever describes what is actually wrong.
+
+::: warning A hole is a hole
+The last image of a series cannot be dropped — a series that uploads nothing would simply be
+missing from the case, and the tick box in the picker is the control that says that out loud.
+
+And a stack with an image dropped out of the middle usually **cannot be reformatted**: the
+volume behind [Reformat](/guide/reformat) measures the gap between images and refuses a stack
+whose gaps are uneven, rather than stretching the pictures across the hole. Reformat first,
+then drop, if you want both.
+:::
 
 ## Erase
 

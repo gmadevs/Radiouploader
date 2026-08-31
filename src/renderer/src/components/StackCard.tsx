@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PreviewFrame, Stack } from '@shared/types'
+import { isKept, keptCount } from '@shared/selection'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
 import { extentOf, formatSize, millimetres, perImage } from '../stackDetail'
 import { useWheelScrub } from '../wheelScrub'
@@ -26,8 +27,11 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
   const [showTrim, setShowTrim] = useState(false)
 
   const last = stack.slices.length - 1
-  const kept = stack.trimEnd - stack.trimStart + 1
-  const trimmed = kept < stack.slices.length
+  const kept = keptCount(stack)
+  const trimmed = stack.trimStart > 0 || stack.trimEnd < last
+  // Only the ones inside the trim: an image dropped and then trimmed away as
+  // well is one image missing from the upload, not two.
+  const droppedInside = (stack.dropped ?? []).filter((i) => i >= stack.trimStart && i <= stack.trimEnd).length
 
   // What the stack is, rather than what has been done to it: the plane it was
   // cut on and how far it runs. Absent on anything that does not say where its
@@ -77,7 +81,7 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
     setIndex(end)
   }
 
-  const outsideTrim = index < stack.trimStart || index > stack.trimEnd
+  const outsideTrim = !isKept(stack, index)
   const maskCount = stack.masks?.length ?? 0
 
   // Scrolling over a card looks through the stack; the page keeps still while
@@ -179,9 +183,11 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
         <label htmlFor={stack.id}>
           <h3>{stack.label}</h3>
           <div className="muted small">
-            {trimmed ? (
+            {kept < stack.slices.length ? (
               <>
-                {kept} of {stack.slices.length} images · {stack.trimStart + 1}–{stack.trimEnd + 1}
+                {kept} of {stack.slices.length} images
+                {trimmed && <> · {stack.trimStart + 1}–{stack.trimEnd + 1}</>}
+                {droppedInside > 0 && <> · {droppedInside} dropped</>}
               </>
             ) : (
               <>
@@ -203,7 +209,7 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
         </label>
         {stack.slices.length > 2 && !showTrim && !stack.unsupported && (
           <button
-            className={trimmed ? 'small trim-toggle on' : 'small trim-toggle'}
+            className={kept < stack.slices.length ? 'small trim-toggle on' : 'small trim-toggle'}
             title="Choose the first and last image to upload"
             onClick={() => setShowTrim(true)}
           >

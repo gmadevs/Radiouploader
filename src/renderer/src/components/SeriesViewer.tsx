@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CropRect, MaskRect, PreviewFrame, Stack, WindowLevel } from '@shared/types'
+import { keptCount, toggleDropped } from '@shared/selection'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
 import { MIN_MASK_SIDE, moveMask, resizeMask, type MaskHandle } from '../maskEdit'
 import { useWheelScrub } from '../wheelScrub'
@@ -8,7 +9,12 @@ interface Props {
   stack: Stack
   /** Series and study the stack came from, so the header says what is open. */
   heading: string
-  onChange: (patch: { masks?: MaskRect[]; crop?: CropRect | null; window?: WindowLevel | null }) => void
+  onChange: (patch: {
+    masks?: MaskRect[]
+    crop?: CropRect | null
+    window?: WindowLevel | null
+    dropped?: number[]
+  }) => void
   onClose: () => void
 }
 
@@ -307,7 +313,17 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
     return () => globalThis.removeEventListener('keydown', onKey)
   }, [onClose, stack.slices.length, selected, masks, onChange])
 
+  const dropped = stack.dropped ?? []
+  const droppedHere = dropped.includes(index)
   const outsideTrim = index < stack.trimStart || index > stack.trimEnd
+  /**
+   * The last image cannot be dropped.
+   *
+   * A stack with nothing left in it is not uploaded at all, and it would go
+   * without saying so — the series would simply not be in the case. Whoever
+   * wants that wants the tick box in the picker, which says what it does.
+   */
+  const lastOne = !droppedHere && keptCount(stack) <= 1
 
   return (
     <div className="viewer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -478,25 +494,55 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
               )}
             </div>
           )}
-          {outsideTrim && <div className="dropped-tag">not uploaded</div>}
+          {droppedHere ? (
+            <div className="dropped-tag">dropped</div>
+          ) : (
+            outsideTrim && <div className="dropped-tag">not uploaded</div>
+          )}
         </div>
 
         <div className="viewer-controls">
-          <label className="viewer-slider">
-            <span>Image</span>
-            <input
-              type="range"
-              min={0}
-              max={stack.slices.length - 1}
-              value={index}
-              disabled={stack.slices.length < 2}
-              aria-label="Image"
-              onChange={(e) => setIndex(Number(e.target.value))}
-            />
-            <span className="n">
-              {index + 1}/{stack.slices.length}
-            </span>
-          </label>
+          <div className="viewer-row">
+            <label className="viewer-slider">
+              <span>Image</span>
+              <input
+                type="range"
+                min={0}
+                max={stack.slices.length - 1}
+                value={index}
+                disabled={stack.slices.length < 2}
+                aria-label="Image"
+                onChange={(e) => setIndex(Number(e.target.value))}
+              />
+              <span className="n">
+                {index + 1}/{stack.slices.length}
+              </span>
+            </label>
+            <button
+              className={droppedHere ? 'small on' : 'small ghost'}
+              disabled={lastOne}
+              title={
+                lastOne
+                  ? 'This is the only image left in the series. Untick the series in the picker to leave it out altogether.'
+                  : droppedHere
+                    ? 'Put this image back into the upload'
+                    : 'Leave this one image out of the upload. The rest of the series is unaffected, and it can be put back.'
+              }
+              onClick={() => onChange({ dropped: toggleDropped(dropped, index) })}
+            >
+              {droppedHere ? 'Keep image' : 'Drop image'}
+            </button>
+            {dropped.length > 0 && (
+              <>
+                <span className="muted small" style={{ flex: 'none' }}>
+                  {dropped.length} dropped
+                </span>
+                <button className="small ghost" onClick={() => onChange({ dropped: [] })}>
+                  Keep all
+                </button>
+              </>
+            )}
+          </div>
 
           <div className="viewer-actions">
             <span className="muted small">

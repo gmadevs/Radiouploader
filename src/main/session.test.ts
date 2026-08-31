@@ -26,6 +26,7 @@ function stack(id: string, sliceCount: number): Stack {
     selected: true,
     trimStart: 0,
     trimEnd: sliceCount - 1,
+    dropped: [],
     masks: [],
     crop: null,
     plane: 'Axial',
@@ -125,6 +126,50 @@ describe('applySelection', () => {
     expect(session.selectedStacks()[0].slices).toHaveLength(3)
     session.applySelection([{ id: 'a', selected: true, trimStart: 0, trimEnd: 9 }])
     expect(session.selectedStacks()[0].slices).toHaveLength(10)
+  })
+})
+
+describe('applySelection — images dropped one at a time', () => {
+  const full = { id: 'a', selected: true, trimStart: 0, trimEnd: 9 }
+
+  it('leaves a dropped image out of what gets anonymised', () => {
+    session.applySelection([{ ...full, dropped: [3] }])
+    const [selected] = session.selectedStacks()
+    expect(selected.slices.map((s) => s.instanceNumber)).toEqual([0, 1, 2, 4, 5, 6, 7, 8, 9])
+  })
+
+  it('applies a drop and a trim together, and counts a drop outside the trim once', () => {
+    session.applySelection([{ ...full, trimStart: 2, trimEnd: 6, dropped: [4, 9] }])
+    const [selected] = session.selectedStacks()
+    expect(selected.slices.map((s) => s.instanceNumber)).toEqual([2, 3, 5, 6])
+  })
+
+  // The renderer's copy reaches the anonymiser; an index it could not have
+  // meant is thrown away rather than carried into a filter that would not fail.
+  it('throws away an index that is not one', () => {
+    session.applySelection([{ ...full, dropped: [-1, 2.5, 42, 3, 3] }])
+    const [selected] = session.selectedStacks()
+    expect(selected.slices.map((s) => s.instanceNumber)).toEqual([0, 1, 2, 4, 5, 6, 7, 8, 9])
+  })
+
+  it('puts an image back when the renderer stops sending it', () => {
+    session.applySelection([{ ...full, dropped: [3] }])
+    expect(session.selectedStacks()[0].slices).toHaveLength(9)
+    session.applySelection([{ ...full, dropped: [] }])
+    expect(session.selectedStacks()[0].slices).toHaveLength(10)
+  })
+
+  // A selection sent by an older renderer, or by the reformat dialog's push,
+  // says nothing about drops; that means none, not "keep the last ones".
+  it('treats a selection with no dropped list as nothing dropped', () => {
+    session.applySelection([{ ...full, dropped: [3] }])
+    session.applySelection([full])
+    expect(session.selectedStacks()[0].slices).toHaveLength(10)
+  })
+
+  it('drops the whole stack out of the upload when every image is dropped', () => {
+    session.applySelection([{ ...full, dropped: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }])
+    expect(session.selectedStacks().map((s) => s.id)).toEqual([])
   })
 })
 

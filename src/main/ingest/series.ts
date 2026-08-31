@@ -397,6 +397,7 @@ function makeStack(
     selected: unsupported === null,
     trimStart: 0,
     trimEnd: slices.length - 1,
+    dropped: [],
     masks: [],
     crop: null,
     window: null,

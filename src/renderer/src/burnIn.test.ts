@@ -21,6 +21,7 @@ function entry(id: string, masks: Stack['masks'] = []): StackEntry {
       bytes: 0,
       compression: null,
       trimEnd: 0,
+      dropped: [],
       masks,
       window: null,
       unsupported: null

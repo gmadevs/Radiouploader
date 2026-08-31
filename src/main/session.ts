@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
 import type { AnonResult, CropRect, IngestResult, MaskRect, Stack, StackSelection, WindowLevel } from '@shared/types'
+import { keptSlices, sanitiseDropped } from '@shared/selection'
 import { cleanupTempDir } from './ingest'
 
 /**
@@ -59,15 +60,15 @@ class Session {
   }
 
   /**
-   * Every stack the user has ticked, with the trim already applied — so
-   * anonymisation and upload only ever see the images that were kept.
+   * Every stack the user has ticked, with the trim and the dropped images
+   * already applied — so anonymisation and upload only ever see what was kept.
    */
   selectedStacks(): Stack[] {
     if (!this.ingest) return []
     return this.ingest.studies
       .flatMap((study) => study.series.flatMap((series) => series.stacks))
       .filter((stack) => stack.selected)
-      .map((stack) => ({ ...stack, slices: stack.slices.slice(stack.trimStart, stack.trimEnd + 1) }))
+      .map((stack) => ({ ...stack, slices: keptSlices(stack) }))
       .filter((stack) => stack.slices.length > 0)
   }
 
@@ -94,6 +95,7 @@ class Session {
           const last = stack.slices.length - 1
           stack.trimStart = Math.min(Math.max(chosen.trimStart, 0), last)
           stack.trimEnd = Math.min(Math.max(chosen.trimEnd, stack.trimStart), last)
+          stack.dropped = sanitiseDropped(chosen.dropped, stack.slices.length)
           stack.masks = sanitiseMasks(chosen.masks)
           stack.crop = sanitiseCrop(chosen.crop)
           stack.window = sanitiseWindow(chosen.window)

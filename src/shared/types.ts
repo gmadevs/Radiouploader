@@ -83,6 +83,17 @@ export interface Stack {
   trimStart: number
   trimEnd: number
   /**
+   * Images thrown out one at a time, by their index in `slices` as it arrived —
+   * the blurred one, the doubled one, the one that caught the wrong anatomy,
+   * with good images on either side of it. A trim cannot express that: it is a
+   * range, and the reason for it is the dead ends of a series.
+   *
+   * Indices rather than a filter on the array, so an image can be put back: a
+   * drop is a decision made while looking, and the way to find out it was the
+   * wrong one is to look again.
+   */
+  dropped: number[]
+  /**
    * Regions painted out in the viewer, applied to every slice of the stack —
    * burnt-in text sits in the same place on all of them. Written into the pixel
    * data at anonymisation, so what is uploaded really is redacted.
@@ -267,6 +278,8 @@ export interface StackSelection {
   selected: boolean
   trimStart: number
   trimEnd: number
+  /** Absent from a stack nothing was dropped out of. */
+  dropped?: number[]
   /** Absent from a stack nobody opened. */
   masks?: MaskRect[]
   crop?: CropRect | null
