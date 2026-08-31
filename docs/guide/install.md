@@ -22,6 +22,36 @@ Signing needs an Apple Developer ID ($99/year) and an Authenticode certificate. 
 in place — see [packaging](/develop/packaging). That is what the extra step is for; it says
 nothing about what the app does once it is open.
 
+## macOS, with Homebrew
+
+```bash
+brew install --cask --no-quarantine gmadevs/radiouploader/radiouploader
+```
+
+That is the whole of it: the tap is added, the disk image for your architecture is
+downloaded, its checksum is checked against the one in the cask, and the app is put in
+`/Applications`. `brew upgrade` picks up later releases, and `brew uninstall --cask
+--zap radiouploader` removes the app and what it left in your Library.
+
+**`--no-quarantine` is the Gatekeeper step, said once instead of clicked.** Without it
+Homebrew marks the download the way Safari would and macOS refuses the first launch of the
+app it has just installed. The cask does not strip that flag by itself: waiving the check on
+an unsigned binary is a decision for the person installing it, and one made in the open beats
+one made quietly by a script. If you would rather keep the quarantine, install without the
+flag and open the app once with right-click → Open.
+
+The cask is not in `homebrew/cask` and cannot be yet: that repository asks a project to be
+notable first — thirty days old at the least, and stars, forks or watchers in numbers this
+one does not have. So it lives in a tap of this project's own,
+[gmadevs/homebrew-Radiouploader](https://github.com/gmadevs/homebrew-Radiouploader), written
+by [a workflow](/develop/packaging#the-homebrew-tap) whenever a release is published.
+
+::: tip What a zap cannot reach
+`--zap` empties `~/Library/Application Support/Radiouploader` and the preferences, but your
+Radiopaedia tokens are in the **login keychain**, which no cask may touch. Sign out in the
+app first, or delete the *Radiouploader* entry in Keychain Access.
+:::
+
 ## Register an application
 
 The app talks to Radiopaedia as **you**, with credentials you register yourself. Go to

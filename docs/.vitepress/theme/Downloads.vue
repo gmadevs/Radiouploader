@@ -74,8 +74,13 @@ const downloads = theme.value.downloads
         </template>
       </p>
 
+      <p class="brew">
+        <span>macOS, with Homebrew</span>
+        <code>{{ downloads.brew }}</code>
+      </p>
+
       <p class="note">
-        Nothing is signed yet, so the first launch needs one extra step per platform —
+        Nothing is signed, so the first launch needs one extra step per platform —
         <a :href="withBase('/guide/install')">install and sign in</a> has all three, and what
         to read before pointing it at a study you care about. Older versions are on the
         <a :href="downloads.releases">releases page</a>.
@@ -128,6 +133,27 @@ const downloads = theme.value.downloads
   font-family: var(--vp-font-family-mono);
   font-size: 13px;
   color: var(--vp-c-brand-1);
+}
+
+.brew {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--vp-c-text-2);
+}
+.brew code {
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-divider);
+  /* The command is long and the pane is not: it wraps rather than pushing the
+     cards' column wider on a phone. */
+  overflow-wrap: anywhere;
 }
 
 .cards {

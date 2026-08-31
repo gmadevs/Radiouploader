@@ -18,6 +18,17 @@ import fs from 'node:fs'
 
 export const REPO = 'https://github.com/gmadevs/Radiouploader'
 
+/**
+ * Installing on macOS with Homebrew, from a tap of this project's own.
+ *
+ * `--no-quarantine` is not decoration: nothing here is signed, so without it
+ * Gatekeeper refuses the first launch of the app Homebrew has just installed,
+ * and the person who typed one command is left with a dialog and no obvious
+ * next step. The flag is asked for explicitly rather than stripped by the cask
+ * behind their back — it is their machine's check to waive.
+ */
+export const BREW_INSTALL = 'brew install --cask --no-quarantine gmadevs/radiouploader/radiouploader'
+
 /** The version the app is at, which is also the tag its release is under. */
 export const version = JSON.parse(
   fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')
@@ -54,6 +65,7 @@ export function downloads(v = version) {
   return {
     version: v,
     releases: `${REPO}/releases`,
+    brew: BREW_INSTALL,
     platforms: [
       {
         id: 'mac',

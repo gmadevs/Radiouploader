@@ -49,6 +49,12 @@ platform: [how to open it](https://gmadevs.github.io/Radiouploader/guide/install
 | [![Linux](https://img.shields.io/badge/Linux-AppImage%20x64-FCC624?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader-1.0.0.AppImage) | AppImage arm64: [.AppImage](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader-1.0.0-arm64.AppImage) · Debian amd64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/radiouploader_1.0.0_amd64.deb) · Debian arm64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/radiouploader_1.0.0_arm64.deb) |
 | [![Windows](https://img.shields.io/badge/Windows-x64%20installer-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader.Setup.1.0.0.exe) |  |
 
+On macOS, with Homebrew:
+
+```bash
+brew install --cask --no-quarantine gmadevs/radiouploader/radiouploader
+```
+
 Older versions, and the notes that come with each, are on the [releases page](https://github.com/gmadevs/Radiouploader/releases).
 
 <!-- /downloads -->

@@ -1,0 +1,83 @@
+name: Cask
+
+# Update the Homebrew tap when a release is published.
+#
+# On publish rather than on the tag: the tag drafts a release, and the draft is
+# opened and checked by hand before anyone can download it. A cask pushed at tag
+# time would point at files that are not there yet, and `brew install` would
+# fail on a 404 that reads like the download was tampered with.
+on:
+  release:
+    types: [published]
+  # For a release that was published before this workflow existed, or one whose
+  # push failed: give it the tag and it rebuilds the cask from that release.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to write the cask from, e.g. v1.0.0
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  cask:
+    name: Write the cask
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Work out which release
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          test -n "$TAG" || { echo "::error::no tag to work from"; exit 1; }
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+
+      # The checksums are of the files people will actually download, so they
+      # are taken from the release rather than from a local build: an installer
+      # built here would hash differently and every install would fail.
+      - name: Download the disk images
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.dmg' --dir dmg
+
+      - name: Write the cask
+        run: |
+          arm=$(sha256sum "dmg/Radiouploader-$VERSION-arm64.dmg" | cut -d' ' -f1)
+          intel=$(sha256sum "dmg/Radiouploader-$VERSION.dmg" | cut -d' ' -f1)
+          node scripts/cask.mjs "$VERSION" "$arm" "$intel" > radiouploader.rb
+          cat radiouploader.rb
+
+      # A token for the tap repository, which is not this one: the workflow's
+      # own token cannot write there, and giving this job `contents: write`
+      # would not help. Without the secret the job stops here and says so,
+      # rather than failing later inside git with an authentication error.
+      - name: Push it to the tap
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          TAP_REPO: gmadevs/homebrew-Radiouploader
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::error::TAP_TOKEN is not set, so the cask cannot be pushed to $TAP_REPO"
+            exit 1
+          fi
+          git clone --quiet "https://x-access-token:$TAP_TOKEN@github.com/$TAP_REPO.git" tap
+          mkdir -p tap/Casks
+          cp radiouploader.rb tap/Casks/radiouploader.rb
+          cd tap
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Casks/radiouploader.rb
+          if git diff --staged --quiet; then
+            echo "The tap already carries this cask; nothing to push."
+            exit 0
+          fi
+          git commit --quiet -m "Radiouploader $VERSION"
+          git push --quiet origin HEAD:main
+          echo "Pushed radiouploader $VERSION to $TAP_REPO" >> "$GITHUB_STEP_SUMMARY"

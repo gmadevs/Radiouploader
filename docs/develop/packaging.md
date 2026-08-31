@@ -64,6 +64,44 @@ release under that tag exists yet. The docs workflow runs on every push to `main
 published by hand — so a push in between puts live download links in front of readers a few
 minutes before the files are there. Publish the release on the same pass as the tag.
 
+## The Homebrew tap
+
+```bash
+node scripts/cask.mjs <version> <arm64 sha256> <x64 sha256>
+```
+
+macOS can install this with `brew install --cask --no-quarantine
+gmadevs/radiouploader/radiouploader`, from
+[gmadevs/homebrew-Radiouploader](https://github.com/gmadevs/homebrew-Radiouploader) rather
+than from `homebrew/cask`. The official repository asks a project to be notable before it
+will carry it — thirty days old at the least, and stars, forks or watchers in numbers this
+does not have — and a tap of one's own needs none of that from anybody.
+
+`.github/workflows/cask.yml` writes it. It runs when a release is **published**, not when
+the tag is pushed: the tag drafts a release that is opened and checked by hand, and a cask
+pointing at files nobody can download yet fails an install with a 404 that reads like a
+tampered download. It fetches the two disk images the release actually published, hashes
+them, and pushes the result to the tap.
+
+The checksums come from the released files rather than from a build made in that job, which
+would hash differently and make every install fail. The version and those two hashes are the
+whole of what changes between releases; everything else in the cask is written by
+`scripts/cask.mjs`, which **checks itself against `scripts/downloads.mjs`** — expand the
+cask's `#{version}`/`#{arch}` template and it must produce, character for character, the URLs
+the README's download buttons point at. Rename an artifact and the generator stops rather
+than publishing a cask that 404s.
+
+Pushing to another repository needs a token this workflow's own cannot supply, so the tap
+takes a fine-grained PAT with *Contents: write* on `homebrew-Radiouploader`, kept as the
+`TAP_TOKEN` secret. Without it the job stops with a message that says so, rather than failing
+inside git.
+
+Two things about that repository are worth knowing. Homebrew lower-cases a tap name, so
+`gmadevs/radiouploader` resolves to `homebrew-radiouploader` and reaches the repository only
+because GitHub is case-insensitive about names; renaming it to `homebrew-radiouploader` would
+remove the doubt. And the cask is checked before it ships — `brew style` on it is clean,
+which is what catches a deprecated `depends_on` form or a stanza in the wrong order.
+
 ## The icon
 
 ```bash
