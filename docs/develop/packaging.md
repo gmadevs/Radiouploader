@@ -118,3 +118,28 @@ npm run docs:dev       # local, with hot reload
 npm run docs:build
 npm run docs:preview
 ```
+
+### VitePress runs on the project's Vite, not its own
+
+VitePress 1.6.4 depends on Vite 5, and Vite 5 stopped at 5.4.21 — three advisories against
+it, and one against the esbuild it carries, have no version to move to. None of it ships:
+this is the documentation's build tooling, and the only thing exposed is the local dev
+server. But the alerts sit on a public repository's default branch, where an ignored one is
+indistinguishable from an unnoticed one.
+
+So `overrides` in `package.json` points VitePress at the Vite the rest of the project
+already uses, and at the `@vitejs/plugin-vue` that supports it. The tree then holds one Vite
+rather than two, and `npm audit` is clean. The build, the dev server, the Mermaid diagrams
+and the home page's download cards were all checked on it — a major version of a bundler
+under a tool that pins the previous one is exactly the change that builds and then renders
+nothing.
+
+Adding the override is not enough on its own: npm leaves an already-resolved nested tree
+alone, reports "up to date", and warns only about the peer. The
+`node_modules/vitepress/node_modules/…` entries have to be dropped from `package-lock.json`
+before `npm install` will re-resolve them, and the diff should touch nothing outside that
+subtree.
+
+VitePress 2 moves off Vite 5 by itself, but it is alpha and asks for Vite 8, and
+`vitepress-plugin-mermaid` declares a peer of VitePress ^1. When both have caught up, this
+override is the thing to try removing rather than to keep forever.
