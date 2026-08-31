@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import type { AppInfo } from '@shared/types'
 import { APP_NAME, APP_TAGLINE } from '../about'
+// Inlined as a data URI rather than emitted beside the bundle: the window is
+// loaded from a file:// URL, where the page's own 'self' does not cover a
+// sibling file, and the CSP in index.html allows data: for images.
+import logo from '../assets/logo.png?inline'
 
 interface Props {
   onPick: (kind: 'folder' | 'zip') => void
@@ -18,6 +22,8 @@ export function SourceStep({ onPick, onDropPaths, busy, blocked, info }: Props):
   return (
     <div className="home">
       <div className="home-title">
+        {/* The mark, not a picture of anything: the name is right under it. */}
+        <img className="home-logo" src={logo} alt="" width={96} height={96} />
         <h1>{APP_NAME}</h1>
         <p className="muted">{APP_TAGLINE}</p>
         {/* Version and platform, so a bug report can quote them. The blank keeps

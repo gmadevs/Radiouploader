@@ -40,7 +40,23 @@ const SHAPE = 840
 /** Names tried in order; the first that exists is the artwork. */
 const SOURCES = ['icon-src.png', 'icon-src.jpeg', 'icon-src.jpg']
 
-const TARGETS = [path.join(resources, 'icon.png'), path.join(root, 'docs/public/favicon.png')]
+/**
+ * Every file cut from the artwork, and how big.
+ *
+ * The home screen shows the same mark at 96 CSS pixels and the bundler inlines
+ * it as a data URI, so it gets a 256-pixel cut of its own: the 1024 one is half
+ * a megabyte, and base64 of it would sit in the renderer bundle to be drawn at
+ * a twelfth of its size. No Dock grid applies inside a window, so that one is
+ * full-bleed.
+ */
+const OUTPUTS = [
+  {
+    size: SIZE,
+    shape: SHAPE,
+    targets: [path.join(resources, 'icon.png'), path.join(root, 'docs/public/favicon.png')]
+  },
+  { size: 256, shape: 256, targets: [path.join(root, 'src/renderer/src/assets/logo.png')] }
+]
 
 app.whenReady().then(run).catch((err) => {
   console.error(err)
@@ -69,23 +85,30 @@ async function run() {
   const win = new BrowserWindow({ show: false, width: SIZE, height: SIZE })
   await win.loadURL('about:blank')
 
-  const result = await win.webContents.executeJavaScript(
-    `(${cutOut.toString()})(${JSON.stringify(dataUrl)}, ${SIZE}, ${SHAPE})`
-  )
-  if (typeof result === 'string') {
-    console.error(`PROBLEMS: ${result}`)
-    app.exit(1)
-    return
-  }
+  let last = null
+  for (const { size, shape, targets } of OUTPUTS) {
+    const result = await win.webContents.executeJavaScript(
+      `(${cutOut.toString()})(${JSON.stringify(dataUrl)}, ${size}, ${shape})`
+    )
+    if (typeof result === 'string') {
+      console.error(`PROBLEMS: ${result}`)
+      app.exit(1)
+      return
+    }
+    last = result
 
-  const png = Buffer.from(result.png.replace(/^data:image\/png;base64,/, ''), 'base64')
-  for (const target of TARGETS) {
-    await fs.writeFile(target, png)
-    console.log(`${path.relative(root, target).padEnd(24)}: ${SIZE}x${SIZE}, ${Math.round(png.byteLength / 1024)} KB`)
+    const png = Buffer.from(result.png.replace(/^data:image\/png;base64,/, ''), 'base64')
+    for (const target of targets) {
+      await fs.mkdir(path.dirname(target), { recursive: true })
+      await fs.writeFile(target, png)
+      console.log(
+        `${path.relative(root, target).padEnd(32)}: ${size}x${size}, ${Math.round(png.byteLength / 1024)} KB`
+      )
+    }
   }
   console.log(
-    `from ${source.name}: shape ${result.width}x${result.height} at ${result.scale.toFixed(2)}x` +
-      (result.scale > 1 ? ' — enlarged, so a bigger original would be better' : '')
+    `from ${source.name}: shape ${last.width}x${last.height} at ${last.scale.toFixed(2)}x` +
+      (last.scale > 1 ? ' — enlarged, so a bigger original would be better' : '')
   )
   console.log('ICON OK')
   app.exit(0)
