@@ -30,9 +30,9 @@ the minutes are free.
 ## Cutting a release
 
 ```bash
-npm version 1.1.0 --no-git-tag-version
+npm version 1.2.0 --no-git-tag-version
 git commit -am "One sentence, in the imperative, about what this release is"
-git tag -a v1.1.0 -m "Radiouploader 1.1.0"
+git tag -a v1.2.0 -m "Radiouploader 1.2.0"
 git push origin main --follow-tags
 ```
 
@@ -48,7 +48,7 @@ Then four things happen, and only the third is yours:
 
 `--no-git-tag-version` because the bump and the commit are separated on purpose. The `version`
 script runs either way, which is what rewrites the README's download links from the new
-number; what is skipped is npm's own commit, called `1.1.0`, where the commits here are
+number; what is skipped is npm's own commit, called `1.2.0`, where the commits here are
 sentences. The tag is annotated, like the ones before it.
 
 The one window to be careful about is between the bump and step 3: the documentation site

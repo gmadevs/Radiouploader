@@ -37,8 +37,8 @@ a fix goes into the next release rather than back into an older one.
 
 | Version | Supported |
 | ------- | --------- |
-| 1.0.x   | ✅ |
-| < 1.0   | ❌ — the beta builds; update instead |
+| 1.1.x   | ✅ |
+| < 1.1   | ❌ — update instead |
 
 ## In scope
 

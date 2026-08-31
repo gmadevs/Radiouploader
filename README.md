@@ -40,14 +40,14 @@ Runs on macOS, Linux and Windows.
 
 <!-- downloads: npm run links -->
 
-Version **1.0.0**. Nothing is signed, so the first launch needs one extra step per
+Version **1.1.0**. Nothing is signed, so the first launch needs one extra step per
 platform: [how to open it](https://gmadevs.github.io/Radiouploader/guide/install).
 
 | | Also built |
 |---|---|
-| [![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-111111?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader-1.0.0-arm64.dmg) | Intel: [.dmg](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader-1.0.0.dmg) |
-| [![Linux](https://img.shields.io/badge/Linux-AppImage%20x64-FCC624?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader-1.0.0.AppImage) | AppImage arm64: [.AppImage](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader-1.0.0-arm64.AppImage) · Debian amd64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/radiouploader_1.0.0_amd64.deb) · Debian arm64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/radiouploader_1.0.0_arm64.deb) |
-| [![Windows](https://img.shields.io/badge/Windows-x64%20installer-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader.Setup.1.0.0.exe) |  |
+| [![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-111111?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.1.0/Radiouploader-1.1.0-arm64.dmg) | Intel: [.dmg](https://github.com/gmadevs/Radiouploader/releases/download/v1.1.0/Radiouploader-1.1.0.dmg) |
+| [![Linux](https://img.shields.io/badge/Linux-AppImage%20x64-FCC624?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.1.0/Radiouploader-1.1.0.AppImage) | AppImage arm64: [.AppImage](https://github.com/gmadevs/Radiouploader/releases/download/v1.1.0/Radiouploader-1.1.0-arm64.AppImage) · Debian amd64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.1.0/radiouploader_1.1.0_amd64.deb) · Debian arm64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.1.0/radiouploader_1.1.0_arm64.deb) |
+| [![Windows](https://img.shields.io/badge/Windows-x64%20installer-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.1.0/Radiouploader.Setup.1.1.0.exe) |  |
 
 🍺 On macOS, with Homebrew — the second line because the app is not signed and
 Homebrew quarantines what it downloads:
