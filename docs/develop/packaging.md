@@ -27,6 +27,35 @@ It is triggered manually or by a tag rather than on every push, because macOS an
 runners bill at 10x and 2x — a habit worth keeping even now the repository is public and
 the minutes are free.
 
+## Cutting a release
+
+```bash
+npm version 1.1.0 --no-git-tag-version
+git commit -am "One sentence, in the imperative, about what this release is"
+git tag -a v1.1.0 -m "Radiouploader 1.1.0"
+git push origin main --follow-tags
+```
+
+Then four things happen, and only the third is yours:
+
+1. the tag starts `build.yml`: three runners, three sets of installers, and a **drafted**
+   release with them attached;
+2. nobody can download any of it, because the release is a draft;
+3. you open the installers — at least the one for the machine you are on — and press
+   **Publish release**;
+4. publishing fires [`cask.yml`](#the-homebrew-tap), which hashes the two disk images the
+   release published and pushes the cask to the tap.
+
+`--no-git-tag-version` because the bump and the commit are separated on purpose. The `version`
+script runs either way, which is what rewrites the README's download links from the new
+number; what is skipped is npm's own commit, called `1.1.0`, where the commits here are
+sentences. The tag is annotated, like the ones before it.
+
+The one window to be careful about is between the bump and step 3: the documentation site
+builds from `package.json` on any push touching `docs/`, so it can offer links to files that
+do not exist yet. That is the reason to publish on the same pass as the tag, and it is the
+same argument as [the download links](#the-download-links) below.
+
 ## The download links
 
 ```bash

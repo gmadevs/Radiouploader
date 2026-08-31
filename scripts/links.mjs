@@ -60,7 +60,7 @@ function block(v) {
     row('linux'),
     row('windows'),
     '',
-    'On macOS, with Homebrew — the second line because the app is not signed and',
+    '🍺 On macOS, with Homebrew — the second line because the app is not signed and',
     'Homebrew quarantines what it downloads:',
     '',
     '```bash',

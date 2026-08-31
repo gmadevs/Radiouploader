@@ -22,7 +22,7 @@ Signing needs an Apple Developer ID ($99/year) and an Authenticode certificate. 
 in place — see [packaging](/develop/packaging). That is what the extra step is for; it says
 nothing about what the app does once it is open.
 
-## macOS, with Homebrew
+## 🍺 macOS, with Homebrew {#macos-with-homebrew}
 
 ```bash
 brew install --cask gmadevs/radiouploader/radiouploader

@@ -75,7 +75,7 @@ const downloads = theme.value.downloads
       </p>
 
       <p class="brew">
-        <span>macOS, with Homebrew</span>
+        <span>🍺 macOS, with Homebrew</span>
         <code>{{ downloads.brew }}</code>
         <!-- Not optional: Homebrew quarantines what it downloads and no longer
              offers a way not to, and this app is not signed. -->
