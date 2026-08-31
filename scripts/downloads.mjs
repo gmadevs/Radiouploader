@@ -21,13 +21,21 @@ export const REPO = 'https://github.com/gmadevs/Radiouploader'
 /**
  * Installing on macOS with Homebrew, from a tap of this project's own.
  *
- * `--no-quarantine` is not decoration: nothing here is signed, so without it
- * Gatekeeper refuses the first launch of the app Homebrew has just installed,
- * and the person who typed one command is left with a dialog and no obvious
- * next step. The flag is asked for explicitly rather than stripped by the cask
- * behind their back — it is their machine's check to waive.
+ * Two lines rather than one, and the second is not optional: Homebrew marks
+ * every cask download the way a browser would, and current Homebrew has no
+ * `--no-quarantine` to turn that off any more — the flag is gone, and nothing
+ * in it releases a download from quarantine. Nothing here is signed, so macOS
+ * then refuses the first launch of the app Homebrew has just installed, and
+ * whoever typed one command is left at a dialog.
+ *
+ * Removing the mark is left to the person installing rather than done by the
+ * cask in a postflight: waiving Gatekeeper on an unsigned binary is a decision
+ * that should be made in the open.
  */
-export const BREW_INSTALL = 'brew install --cask --no-quarantine gmadevs/radiouploader/radiouploader'
+export const BREW_INSTALL = 'brew install --cask gmadevs/radiouploader/radiouploader'
+
+/** What the install above needs afterwards, since the app is not signed. */
+export const BREW_UNQUARANTINE = 'xattr -dr com.apple.quarantine /Applications/Radiouploader.app'
 
 /** The version the app is at, which is also the tag its release is under. */
 export const version = JSON.parse(
@@ -66,13 +74,14 @@ export function downloads(v = version) {
     version: v,
     releases: `${REPO}/releases`,
     brew: BREW_INSTALL,
+    brewUnquarantine: BREW_UNQUARANTINE,
     platforms: [
       {
         id: 'mac',
         name: 'macOS',
         primary: { label: 'Apple silicon', kind: '.dmg', url: url(ASSETS.macArm) },
         others: [{ label: 'Intel', kind: '.dmg', url: url(ASSETS.macIntel) }],
-        first: 'Gatekeeper refuses an unsigned dmg: right-click → Open.'
+        first: 'Gatekeeper blocks an unsigned app: allow it in System Settings → Privacy & Security.'
       },
       {
         id: 'windows',

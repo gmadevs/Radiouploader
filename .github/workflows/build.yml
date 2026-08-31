@@ -111,7 +111,8 @@ jobs:
           generate_release_notes: true
           body: |
             **Nothing here is signed**, so the first launch needs one extra step per
-            platform — right-click → Open on macOS, More info → Run anyway on Windows,
+            platform — on macOS `xattr -dr com.apple.quarantine` on the app, or allow it
+            in System Settings → Privacy & Security; More info → Run anyway on Windows;
             `chmod +x` on the AppImage. See
             [Install and sign in](https://gmadevs.github.io/Radiouploader/guide/install).
 

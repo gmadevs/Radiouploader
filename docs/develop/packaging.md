@@ -70,10 +70,12 @@ minutes before the files are there. Publish the release on the same pass as the 
 node scripts/cask.mjs <version> <arm64 sha256> <x64 sha256>
 ```
 
-macOS can install this with `brew install --cask --no-quarantine
-gmadevs/radiouploader/radiouploader`, from
+macOS can install this with `brew install --cask gmadevs/radiouploader/radiouploader`,
+followed by an `xattr -dr com.apple.quarantine` on the installed app — current Homebrew
+quarantines every cask download and has no `--no-quarantine` any more, and this app is not
+signed. It comes from
 [gmadevs/homebrew-radiouploader](https://github.com/gmadevs/homebrew-radiouploader) rather
-than from `homebrew/cask`. The official repository asks a project to be notable before it
+than from `homebrew/cask`: the official repository asks a project to be notable before it
 will carry it — thirty days old at the least, and stars, forks or watchers in numbers this
 does not have — and a tap of one's own needs none of that from anybody.
 
@@ -130,8 +132,10 @@ the same argument the [screenshots](/develop/screenshots) are generated for.
 Neither platform is signed:
 
 - **macOS** needs an Apple Developer ID ($99/year) for signing and notarisation. Without
-  one the dmg installs fine, but Gatekeeper refuses the first launch — right-click → Open,
-  or `xattr -dr com.apple.quarantine /Applications/Radiouploader.app`.
+  one the dmg installs fine, but Gatekeeper blocks the first launch — `xattr -dr
+  com.apple.quarantine /Applications/Radiouploader.app`, or allow it in System Settings →
+  Privacy & Security. macOS 15 removed the Control-click → Open override for an app it has
+  blocked, so instructions that only say that no longer work.
 - **Windows** needs an Authenticode certificate. Without one SmartScreen warns until the
   binary builds reputation — More info → Run anyway.
 - **Linux** needs nothing. The AppImage runs on any distribution after `chmod +x`; the deb

@@ -8,6 +8,11 @@
  * have. So the cask lives in a tap of its own, `gmadevs/homebrew-radiouploader`,
  * which anyone can add in one command and which nobody has to review.
  *
+ * The quarantine is not removed here. Homebrew has no `--no-quarantine` any
+ * more, and a cask can still strip the attribute in a postflight — this one
+ * does not: waiving Gatekeeper on an unsigned binary is a decision for the
+ * person installing it, so the caveats ask for it in one line they can read.
+ *
  * The version and the two checksums are the whole of what changes between
  * releases, and all three are read off the files rather than typed: the
  * workflow downloads the disk images the release published and hashes them.
@@ -91,11 +96,13 @@ process.stdout.write(`cask "radiouploader" do
   ]
 
   caveats <<~EOS
-    Radiouploader is not signed with an Apple Developer ID, so Gatekeeper will
-    refuse the first launch of an ordinary install. Either open it once from the
-    Finder with right-click -> Open, or install it with:
+    Radiouploader is not signed with an Apple Developer ID, and Homebrew marks
+    what it downloads, so macOS will refuse the first launch. Take the mark off:
 
-      brew install --cask --no-quarantine gmadevs/radiouploader/radiouploader
+      xattr -dr com.apple.quarantine \#{appdir}/Radiouploader.app
+
+    Or leave it, let macOS block the app once, and allow it in System Settings ->
+    Privacy & Security (on macOS 14 and earlier, Control-click -> Open).
 
     The app never tells you your images are clean: it looks for burnt-in text
     before anonymising and rings what it finds, but it misses small print and

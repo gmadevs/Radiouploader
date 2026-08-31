@@ -14,7 +14,7 @@ first launch needs one extra step:
 
 | Platform | First launch |
 |---|---|
-| **macOS** | Gatekeeper refuses an unsigned dmg: right-click → Open, or `xattr -dr com.apple.quarantine /Applications/Radiouploader.app` |
+| **macOS** | Gatekeeper blocks an unsigned app: `xattr -dr com.apple.quarantine /Applications/Radiouploader.app`, or allow it in System Settings → Privacy & Security (Control-click → Open on macOS 14 and earlier) |
 | **Windows** | SmartScreen warns until the binary builds reputation: More info → Run anyway |
 | **Linux** | `chmod +x` the AppImage, or install the deb |
 
@@ -25,20 +25,29 @@ nothing about what the app does once it is open.
 ## macOS, with Homebrew
 
 ```bash
-brew install --cask --no-quarantine gmadevs/radiouploader/radiouploader
+brew install --cask gmadevs/radiouploader/radiouploader
+xattr -dr com.apple.quarantine /Applications/Radiouploader.app
 ```
 
-That is the whole of it: the tap is added, the disk image for your architecture is
+The first line is the install: the tap is added, the disk image for your architecture is
 downloaded, its checksum is checked against the one in the cask, and the app is put in
 `/Applications`. `brew upgrade` picks up later releases, and `brew uninstall --cask
 --zap radiouploader` removes the app and what it left in your Library.
 
-**`--no-quarantine` is the Gatekeeper step, said once instead of clicked.** Without it
-Homebrew marks the download the way Safari would and macOS refuses the first launch of the
-app it has just installed. The cask does not strip that flag by itself: waiving the check on
-an unsigned binary is a decision for the person installing it, and one made in the open beats
-one made quietly by a script. If you would rather keep the quarantine, install without the
-flag and open the app once with right-click → Open.
+**The second line is the Gatekeeper step**, and it is not optional. Homebrew marks every
+cask download the way a browser would, and current Homebrew has no `--no-quarantine` to turn
+that off any more — the option was removed. Since this app is not signed, macOS then refuses
+the first launch of the app Homebrew has just installed. `xattr -dr` takes the mark off, and
+works on every version of macOS.
+
+If you would rather leave Gatekeeper's mark in place, skip that line and let macOS block the
+app once: on macOS 14 and earlier, Control-click the app and choose **Open**; on macOS 15 and
+later, where that override was removed, go to **System Settings → Privacy & Security** and
+choose **Open Anyway** under the message about Radiouploader.
+
+The cask does not remove the quarantine by itself. Waiving that check on an unsigned binary
+is a decision for the person installing it, and one made in the open beats one made quietly
+by a script.
 
 The cask is not in `homebrew/cask` and cannot be yet: that repository asks a project to be
 notable first — thirty days old at the least, and stars, forks or watchers in numbers this

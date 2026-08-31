@@ -15,7 +15,7 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { BREW_INSTALL, REPO, downloads, version } from './downloads.mjs'
+import { BREW_INSTALL, BREW_UNQUARANTINE, REPO, downloads, version } from './downloads.mjs'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const readme = path.join(root, 'README.md')
@@ -60,10 +60,12 @@ function block(v) {
     row('linux'),
     row('windows'),
     '',
-    'On macOS, with Homebrew:',
+    'On macOS, with Homebrew — the second line because the app is not signed and',
+    'Homebrew quarantines what it downloads:',
     '',
     '```bash',
     BREW_INSTALL,
+    BREW_UNQUARANTINE,
     '```',
     '',
     `Older versions, and the notes that come with each, are on the [releases page](${REPO}/releases).`,
