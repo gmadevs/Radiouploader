@@ -8,6 +8,13 @@ on:
   push:
     tags: ['v*']
 
+# Building an installer reads the repository and writes nothing to it. The one
+# job that does write — drafting the release the installers attach to — asks
+# for that itself, below, so a compromised dependency pulled in by `npm ci`
+# on three runners cannot push a commit or move a tag.
+permissions:
+  contents: read
+
 jobs:
   build:
     name: ${{ matrix.name }}

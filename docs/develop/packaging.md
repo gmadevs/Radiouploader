@@ -98,6 +98,10 @@ Neither platform is signed:
 `CSC_IDENTITY_AUTO_DISCOVERY=false` is set on CI. Without it electron-builder hunts for a
 signing identity that is not there and fails instead of producing an unsigned dmg.
 
+The workflow's own token is read-only. Only the job that drafts the release asks for
+`contents: write`, so the three runners that install dependencies and build installers
+cannot push a commit or move a tag between them.
+
 `GH_TOKEN` is deliberately **not** set: electron-builder would then publish a release
 itself rather than leaving the files as artifacts for the release job to attach to a draft.
 Withholding the token is not enough on its own, though — on CI with a tag present
