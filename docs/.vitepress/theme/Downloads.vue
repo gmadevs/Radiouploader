@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useData, withBase } from 'vitepress'
 
 /**
@@ -12,6 +13,37 @@ import { useData, withBase } from 'vitepress'
  */
 const { theme } = useData()
 const downloads = theme.value.downloads
+
+/**
+ * The two Homebrew lines, each with a button that copies it.
+ *
+ * Both, not just the install: the second one is what makes the app open at all,
+ * and a command somebody retypes from a screen is a command they retype wrong.
+ */
+const brewLines: string[] = [downloads.brew, downloads.brewUnquarantine]
+
+const copied = ref(-1)
+const failed = ref(-1)
+let clearing: ReturnType<typeof setTimeout> | undefined
+
+async function copy(line: string, index: number): Promise<void> {
+  clearTimeout(clearing)
+  try {
+    await navigator.clipboard.writeText(line)
+    copied.value = index
+    failed.value = -1
+  } catch {
+    // A browser can refuse the clipboard outright — an insecure context, or a
+    // permission that was never granted. Saying so is better than a button that
+    // looks like it worked and left the pasteboard alone.
+    copied.value = -1
+    failed.value = index
+  }
+  clearing = setTimeout(() => {
+    copied.value = -1
+    failed.value = -1
+  }, 2400)
+}
 </script>
 
 <template>
@@ -74,13 +106,25 @@ const downloads = theme.value.downloads
         </template>
       </p>
 
-      <p class="brew">
-        <span>🍺 macOS, with Homebrew</span>
-        <code>{{ downloads.brew }}</code>
-        <!-- Not optional: Homebrew quarantines what it downloads and no longer
-             offers a way not to, and this app is not signed. -->
-        <code>{{ downloads.brewUnquarantine }}</code>
-      </p>
+      <!-- The second line is not optional: Homebrew quarantines what it
+           downloads and no longer offers a way not to, and this app is not
+           signed. Both lines are offered the same way for that reason. -->
+      <div class="brew">
+        <span class="brew-label">🍺 macOS, with Homebrew</span>
+        <div class="brew-lines">
+          <div v-for="(line, i) in brewLines" :key="line" class="brew-line">
+            <code>{{ line }}</code>
+            <button
+              class="copy"
+              :class="{ done: copied === i, failed: failed === i }"
+              :aria-label="`Copy: ${line}`"
+              @click="copy(line, i)"
+            >
+              {{ copied === i ? 'Copied' : failed === i ? 'Copy it by hand' : 'Copy' }}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <p class="note">
         Nothing is signed, so the first launch needs one extra step per platform —
@@ -139,24 +183,58 @@ const downloads = theme.value.downloads
 }
 
 .brew {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  display: grid;
   gap: 10px;
-  margin: 16px 0 0;
-  font-size: 13px;
+  margin: 18px 0 0;
+  font-size: 15px;
   color: var(--vp-c-text-2);
 }
-.brew code {
-  font-family: var(--vp-font-family-mono);
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 6px;
+.brew-label {
+  font-weight: 500;
+}
+.brew-lines {
+  display: grid;
+  gap: 8px;
+}
+.brew-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px 9px 13px;
+  border-radius: 8px;
   background: var(--vp-c-bg-soft);
   border: 1px solid var(--vp-c-divider);
+}
+.brew-line code {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--vp-font-family-mono);
+  font-size: 14px;
+  color: var(--vp-c-text-1);
   /* The command is long and the pane is not: it wraps rather than pushing the
      cards' column wider on a phone. */
   overflow-wrap: anywhere;
+}
+.copy {
+  flex: none;
+  font-size: 12.5px;
+  line-height: 1.4;
+  padding: 4px 11px;
+  border-radius: 6px;
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.copy:hover,
+.copy.done {
+  color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}
+.copy.failed {
+  color: var(--vp-c-danger-1);
+  border-color: var(--vp-c-danger-1);
 }
 
 .cards {
