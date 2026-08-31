@@ -61,7 +61,7 @@ jobs:
       - name: Push it to the tap
         env:
           TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
-          TAP_REPO: gmadevs/homebrew-Radiouploader
+          TAP_REPO: gmadevs/homebrew-radiouploader
         run: |
           if [ -z "$TAP_TOKEN" ]; then
             echo "::error::TAP_TOKEN is not set, so the cask cannot be pushed to $TAP_REPO"

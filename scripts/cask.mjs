@@ -5,7 +5,7 @@
  * There is no cask in homebrew-cask, and there cannot be one yet: that
  * repository asks a project to be notable before it will carry it — thirty days
  * old at the least, and stars or forks or watchers in numbers this does not
- * have. So the cask lives in a tap of its own, `gmadevs/homebrew-Radiouploader`,
+ * have. So the cask lives in a tap of its own, `gmadevs/homebrew-radiouploader`,
  * which anyone can add in one command and which nobody has to review.
  *
  * The version and the two checksums are the whole of what changes between

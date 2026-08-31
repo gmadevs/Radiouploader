@@ -72,7 +72,7 @@ node scripts/cask.mjs <version> <arm64 sha256> <x64 sha256>
 
 macOS can install this with `brew install --cask --no-quarantine
 gmadevs/radiouploader/radiouploader`, from
-[gmadevs/homebrew-Radiouploader](https://github.com/gmadevs/homebrew-Radiouploader) rather
+[gmadevs/homebrew-radiouploader](https://github.com/gmadevs/homebrew-radiouploader) rather
 than from `homebrew/cask`. The official repository asks a project to be notable before it
 will carry it — thirty days old at the least, and stars, forks or watchers in numbers this
 does not have — and a tap of one's own needs none of that from anybody.
@@ -92,15 +92,15 @@ the README's download buttons point at. Rename an artifact and the generator sto
 than publishing a cask that 404s.
 
 Pushing to another repository needs a token this workflow's own cannot supply, so the tap
-takes a fine-grained PAT with *Contents: write* on `homebrew-Radiouploader`, kept as the
+takes a fine-grained PAT with *Contents: write* on `homebrew-radiouploader`, kept as the
 `TAP_TOKEN` secret. Without it the job stops with a message that says so, rather than failing
 inside git.
 
-Two things about that repository are worth knowing. Homebrew lower-cases a tap name, so
-`gmadevs/radiouploader` resolves to `homebrew-radiouploader` and reaches the repository only
-because GitHub is case-insensitive about names; renaming it to `homebrew-radiouploader` would
-remove the doubt. And the cask is checked before it ships — `brew style` on it is clean,
-which is what catches a deprecated `depends_on` form or a stanza in the wrong order.
+The tap is named in lower case because Homebrew lower-cases a tap name: `gmadevs/radiouploader`
+resolves to `homebrew-radiouploader`, and a repository named any other way is reached only
+through GitHub's own case-insensitivity, which is a redirect to depend on rather than a name
+to have. The cask itself is checked before it ships — `brew style` on it is clean, which is
+what catches a deprecated `depends_on` form or a stanza in the wrong order.
 
 ## The icon
 

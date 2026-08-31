@@ -43,7 +43,7 @@ flag and open the app once with right-click → Open.
 The cask is not in `homebrew/cask` and cannot be yet: that repository asks a project to be
 notable first — thirty days old at the least, and stars, forks or watchers in numbers this
 one does not have. So it lives in a tap of this project's own,
-[gmadevs/homebrew-Radiouploader](https://github.com/gmadevs/homebrew-Radiouploader), written
+[gmadevs/homebrew-radiouploader](https://github.com/gmadevs/homebrew-radiouploader), written
 by [a workflow](/develop/packaging#the-homebrew-tap) whenever a release is published.
 
 ::: tip What a zap cannot reach
