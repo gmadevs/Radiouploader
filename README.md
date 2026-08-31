@@ -78,6 +78,11 @@ npm run docs:dev   # the documentation site, locally
 
 More in [build and run](https://gmadevs.github.io/Radiouploader/develop/build).
 
+## Security
+
+Found a way this app could leak patient data, or a hole in how it keeps credentials? Report
+it privately — [SECURITY.md](SECURITY.md) says how, and what not to attach to a report.
+
 ## Licence
 
 AGPL-3.0-only.
