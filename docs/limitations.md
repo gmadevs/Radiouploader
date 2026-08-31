@@ -1,7 +1,8 @@
 # Known limitations
 
-The app is beta. These are the things it does not do, written down so nobody has to
-discover them mid-upload.
+These are the things the app does not do, written down so nobody has to discover them
+mid-upload. Some are decisions, and the reason is given with each; the rest is work that has
+not been done.
 
 ## Burnt-in text is only partly detected
 

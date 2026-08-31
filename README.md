@@ -6,7 +6,7 @@
 
 [![Licence: AGPL-3.0-only](https://img.shields.io/badge/licence-AGPL--3.0--only-blue?style=flat-square)](LICENSE)
 [![Platform: macOS, Linux, Windows](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square)](https://gmadevs.github.io/Radiouploader/develop/packaging)
-[![Status: beta](https://img.shields.io/badge/status-beta-yellow?style=flat-square)](https://gmadevs.github.io/Radiouploader/limitations)
+[![Status: stable](https://img.shields.io/badge/status-stable-brightgreen?style=flat-square)](https://gmadevs.github.io/Radiouploader/limitations)
 [![Docs](https://img.shields.io/badge/docs-gmadevs.github.io-4c9aff?style=flat-square)](https://gmadevs.github.io/Radiouploader/)
 [![Build](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml/badge.svg)](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml)
 [![CodeQL](https://github.com/gmadevs/Radiouploader/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/gmadevs/Radiouploader/security/code-scanning)
@@ -39,15 +39,14 @@ Runs on macOS, Linux and Windows.
 
 <!-- downloads: npm run links -->
 
-Version **0.1.0-beta.1** — a pre-release, like every release so far. Nothing is signed, so
-the first launch needs one extra step per platform:
-[how to open it](https://gmadevs.github.io/Radiouploader/guide/install).
+Version **1.0.0**. Nothing is signed, so the first launch needs one extra step per
+platform: [how to open it](https://gmadevs.github.io/Radiouploader/guide/install).
 
 | | Also built |
 |---|---|
-| [![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-111111?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/Radiouploader-0.1.0-beta.1-arm64.dmg) | Intel: [.dmg](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/Radiouploader-0.1.0-beta.1.dmg) |
-| [![Linux](https://img.shields.io/badge/Linux-AppImage%20x64-FCC624?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/Radiouploader-0.1.0-beta.1.AppImage) | AppImage arm64: [.AppImage](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/Radiouploader-0.1.0-beta.1-arm64.AppImage) · Debian amd64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/radiouploader_0.1.0-beta.1_amd64.deb) · Debian arm64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/radiouploader_0.1.0-beta.1_arm64.deb) |
-| [![Windows](https://img.shields.io/badge/Windows-x64%20installer-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v0.1.0-beta.1/Radiouploader.Setup.0.1.0-beta.1.exe) |  |
+| [![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-111111?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader-1.0.0-arm64.dmg) | Intel: [.dmg](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader-1.0.0.dmg) |
+| [![Linux](https://img.shields.io/badge/Linux-AppImage%20x64-FCC624?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader-1.0.0.AppImage) | AppImage arm64: [.AppImage](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader-1.0.0-arm64.AppImage) · Debian amd64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/radiouploader_1.0.0_amd64.deb) · Debian arm64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/radiouploader_1.0.0_arm64.deb) |
+| [![Windows](https://img.shields.io/badge/Windows-x64%20installer-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.0.0/Radiouploader.Setup.1.0.0.exe) |  |
 
 Older versions, and the notes that come with each, are on the [releases page](https://github.com/gmadevs/Radiouploader/releases).
 

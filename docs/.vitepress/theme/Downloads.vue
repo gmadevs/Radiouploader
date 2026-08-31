@@ -20,7 +20,6 @@ const downloads = theme.value.downloads
       <div class="downloads-head">
         <h2>Download</h2>
         <span class="version">v{{ downloads.version }}</span>
-        <span class="pre">pre-release</span>
       </div>
 
       <div class="cards">
@@ -129,16 +128,6 @@ const downloads = theme.value.downloads
   font-family: var(--vp-font-family-mono);
   font-size: 13px;
   color: var(--vp-c-brand-1);
-}
-
-.pre {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--vp-c-text-3);
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 10px;
-  padding: 1px 8px;
 }
 
 .cards {

@@ -10,16 +10,18 @@ All three also run on CI. `.github/workflows/build.yml` builds every platform on
 runner and uploads the installers as artifacts; pushing a `v*` tag additionally drafts a
 release with them attached.
 
-The release is drafted rather than published, and marked a pre-release. Nobody can download
-an installer until the draft is published by hand, which is the point: the binaries get
-opened once before they are offered to anyone. The warning that heads every release — beta,
-tested on one machine, unsigned, never says your images are clean — is the `body:` of the
-release step, so it is the same on every tag and cannot be forgotten while writing notes.
-It is prose about what the app does, so it goes stale the way prose does: check it says
-something still true before tagging.
+The release is drafted rather than published. Nobody can download an installer until the
+draft is published by hand, which is the point: the binaries get opened once before they are
+offered to anyone. The warning that heads every release — unsigned, and never says your
+images are clean — is the `body:` of the release step, so it is the same on every tag and
+cannot be forgotten while writing notes. It is prose about what the app does, so it goes
+stale the way prose does: check it says something still true before tagging.
 
-Versions carry the pre-release suffix, `0.1.0-beta.1`, and it reaches the filenames: the
-dmg, the deb and the installer all say `beta` before anyone runs them.
+Up to `0.1.0-beta.1` the version carried a pre-release suffix and the release was flagged as
+a pre-release on GitHub; the suffix reached the filenames, so the dmg, the deb and the
+installer all said `beta` before anyone ran them. From `1.0.0` the version is a plain one and
+`prerelease:` is off — the draft is still a draft, which is where the checking happens, but
+what gets published is a release rather than a warning.
 
 It is triggered manually or by a tag rather than on every push, because macOS and Windows
 runners bill at 10x and 2x — a habit worth keeping even now the repository is public and
@@ -32,10 +34,10 @@ npm run links
 ```
 
 The README's download buttons carry the version, because GitHub has no stable URL for "the
-newest installer": `/releases/latest` resolves only to a release that is **not** a
-pre-release, and every release here is one. A link that carries a version goes stale the
-moment the version changes — silently, on the front page, where stale means a 404 for
-whoever came to try the app.
+newest installer": `/releases/latest` resolves to the newest release's **page**, and a direct
+download needs the asset's own filename — which electron-builder writes the version into. A
+link that carries a version goes stale the moment the version changes — silently, on the
+front page, where stale means a 404 for whoever came to try the app.
 
 So they are generated from `package.json` into a marked block in the README, and the
 generator also runs on `npm version`, which is what bumps that field. The links in the
@@ -45,7 +47,9 @@ forget.
 The filenames it builds are electron-builder's, which is not one convention but three: the
 dmg and the AppImage take the product name and dashes, the deb takes the package name and
 underscores and calls x64 amd64, and NSIS writes `Setup` in the middle. They were checked
-against the files a real tag produced rather than read off the documentation.
+against the files a real tag produced rather than read off the documentation: all three on
+`v0.1.0-beta.1`, and the mac pair again on `v1.0.0`, since dropping the suffix is exactly the
+kind of change that moves a name.
 
 Two front pages want those links now — the README and the download cards under the hero on
 this site — so the filenames live in `scripts/downloads.mjs` and both take them from there.

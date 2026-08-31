@@ -51,9 +51,8 @@ function block(v) {
   return [
     START,
     '',
-    `Version **${v}** — a pre-release, like every release so far. Nothing is signed, so`,
-    'the first launch needs one extra step per platform:',
-    `[how to open it](https://gmadevs.github.io/Radiouploader/guide/install).`,
+    `Version **${v}**. Nothing is signed, so the first launch needs one extra step per`,
+    `platform: [how to open it](https://gmadevs.github.io/Radiouploader/guide/install).`,
     '',
     '| | Also built |',
     '|---|---|',

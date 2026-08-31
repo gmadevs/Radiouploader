@@ -2,10 +2,11 @@
  * Where each installer of a given version lives, in one place.
  *
  * GitHub has no stable URL for "the newest installer": `/releases/latest`
- * resolves only to a release that is *not* a pre-release, and every release
- * here is one. So every download link carries the version, and a link that
- * carries a version goes stale the moment the version changes — silently, on
- * the front page, where stale means a 404 for whoever came to try the app.
+ * resolves to the newest release's *page*, and a direct download needs the
+ * asset's own filename, which electron-builder writes the version into. So
+ * every download link carries the version, and a link that carries a version
+ * goes stale the moment the version changes — silently, on the front page,
+ * where stale means a 404 for whoever came to try the app.
  *
  * Two front pages ask for the same links now: the README, written by
  * `npm run links`, and the documentation home page, which reads this at build
@@ -26,8 +27,10 @@ export const version = JSON.parse(
  * What electron-builder names each target, which is not one convention but
  * three: the dmg and the AppImage take the product name and a dash, the deb
  * takes the package name and underscores and calls x64 amd64, and NSIS writes
- * "Setup" in the middle. Checked against the files v0.1.0-beta.1 produced
- * rather than read off the documentation.
+ * "Setup" in the middle. Checked against the files a real tag produced rather
+ * than read off the documentation — v0.1.0-beta.1 for all three, and v1.0.0
+ * again for the mac pair, which is where dropping the suffix could have moved
+ * a name.
  */
 const ASSETS = {
   macArm: (v) => `Radiouploader-${v}-arm64.dmg`,

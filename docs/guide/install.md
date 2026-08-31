@@ -1,15 +1,15 @@
 # Install and sign in
 
-::: danger These are beta builds
-Every release so far is a pre-release. The app has been run on its author's machine and
-nowhere else — not on another computer, not on another operating system version, not
-against anybody else's studies. Read [known limitations](/limitations) before you point it
-at a study you care about.
+::: danger The app never tells you your images are clean
+It looks for burnt-in text before anonymising and rings what it finds, but it finds the
+obvious banners and misses small print, text over anatomy and anything on the images it did
+not read. Look at every frame yourself, and read [known limitations](/limitations) before
+you point it at a study you care about.
 :::
 
 Radiouploader runs on macOS, Linux and Windows. The current version of each is linked from
 the [home page](/), and every build of every version is attached to its
-[release](https://github.com/gmadevs/Radiouploader/releases); nothing is signed yet, so the
+[release](https://github.com/gmadevs/Radiouploader/releases); nothing is signed, so the
 first launch needs one extra step:
 
 | Platform | First launch |
@@ -19,7 +19,8 @@ first launch needs one extra step:
 | **Linux** | `chmod +x` the AppImage, or install the deb |
 
 Signing needs an Apple Developer ID ($99/year) and an Authenticode certificate. Neither is
-in place — see [packaging](/develop/packaging).
+in place — see [packaging](/develop/packaging). That is what the extra step is for; it says
+nothing about what the app does once it is open.
 
 ## Register an application
 
