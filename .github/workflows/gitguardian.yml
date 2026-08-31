@@ -1,0 +1,37 @@
+name: GitGuardian
+
+# Every push, every pull request. A secret that reaches a public repository is
+# public the moment it lands — the whole history is world-readable, and deleting
+# the file in a later commit does not take it back — so this runs on the cheap
+# runner rather than being saved for tags the way the installers are.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# The scan reads the repository and writes nothing to it.
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan for secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # ggshield scans every commit a push contains, not just its tip, and
+          # a shallow clone has nothing to compare the range against.
+          fetch-depth: 0
+
+      # Pinned to a release rather than a moving major: this is a third party's
+      # action, and it is the one thing here handed the scanning credential.
+      - uses: GitGuardian/ggshield/actions/secret@v1.54.0
+        env:
+          # What the push or the pull request actually changed. Without these
+          # ggshield has no range and falls back to scanning the last commit.
+          GITHUB_PUSH_BEFORE_SHA: ${{ github.event.before }}
+          GITHUB_PUSH_BASE_SHA: ${{ github.event.base }}
+          GITHUB_PULL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
