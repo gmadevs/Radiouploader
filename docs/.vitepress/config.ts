@@ -1,5 +1,7 @@
 import { defineConfig } from 'vitepress'
 import { withMermaid } from 'vitepress-plugin-mermaid'
+// @ts-expect-error plain JavaScript, shared with the README's link generator
+import { downloads } from '../../scripts/downloads.mjs'
 
 /**
  * Docs for Radiouploader, published to GitHub Pages.
@@ -31,6 +33,10 @@ export default withMermaid(
 
     themeConfig: {
       logo: '/favicon.png',
+
+      // Read at build time from package.json, so the home page cannot offer a
+      // version that was never tagged — see scripts/downloads.mjs.
+      downloads: downloads(),
 
       nav: [
         { text: 'Guide', link: '/guide/install' },

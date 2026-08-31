@@ -1,45 +1,27 @@
 /**
  * The download buttons in the README, written from the version in package.json.
  *
- * GitHub has no stable URL for "the newest installer": `/releases/latest`
- * resolves only to a release that is *not* a pre-release, and every release
- * here is one. So the links carry the version, and a link that carries a
- * version goes stale the moment the version changes — silently, and on the
- * front page, where a stale link is a 404 for whoever came to try the app.
+ * A link that carries a version goes stale the moment the version changes —
+ * silently, and on the front page, where a stale link is a 404 for whoever
+ * came to try the app. Which is why this is generated rather than typed. It
+ * runs on `npm version` as well as on demand, so the links are already right
+ * in the commit that bumps the version.
  *
- * Which is why this is generated rather than typed. It runs on `npm version`
- * as well as on demand, so the links are already right in the commit that
- * bumps the version.
+ * The filenames themselves live in `scripts/downloads.mjs`, which the
+ * documentation home page reads too.
  *
  * Run with: npm run links
  */
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { REPO, downloads, version } from './downloads.mjs'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const readme = path.join(root, 'README.md')
 
-const REPO = 'https://github.com/gmadevs/Radiouploader'
 const START = '<!-- downloads: npm run links -->'
 const END = '<!-- /downloads -->'
-
-/**
- * What electron-builder names each target, which is not one convention but
- * three: the dmg and the AppImage take the product name and a dash, the deb
- * takes the package name and underscores and calls x64 amd64, and NSIS writes
- * "Setup" in the middle. Checked against the files v0.1.0-beta.1 produced
- * rather than read off the documentation.
- */
-const ASSETS = {
-  macArm: (v) => `Radiouploader-${v}-arm64.dmg`,
-  macIntel: (v) => `Radiouploader-${v}.dmg`,
-  appImage: (v) => `Radiouploader-${v}.AppImage`,
-  appImageArm: (v) => `Radiouploader-${v}-arm64.AppImage`,
-  deb: (v) => `radiouploader_${v}_amd64.deb`,
-  debArm: (v) => `radiouploader_${v}_arm64.deb`,
-  windows: (v) => `Radiouploader.Setup.${v}.exe`
-}
 
 /** A shields badge, which is how every other button in this README is drawn. */
 function badge(label, message, colour, logo) {
@@ -47,21 +29,37 @@ function badge(label, message, colour, logo) {
   return `https://img.shields.io/badge/${text}?style=for-the-badge&logo=${logo}&logoColor=white`
 }
 
-function block(version) {
-  const url = (asset) => `${REPO}/releases/download/v${version}/${asset(version)}`
+/** Shields has no logo named "macos"; each platform's is its own. */
+const BADGE = {
+  mac: { colour: '111111', logo: 'apple' },
+  linux: { colour: 'FCC624', logo: 'linux' },
+  windows: { colour: '0078D6', logo: 'windows' }
+}
+
+function block(v) {
+  const { platforms } = downloads(v)
+  const byId = Object.fromEntries(platforms.map((p) => [p.id, p]))
+
+  const row = (id) => {
+    const p = byId[id]
+    const { colour, logo } = BADGE[id]
+    const button = `[![${p.name}](${badge(p.name, p.primary.label, colour, logo)})](${p.primary.url})`
+    const rest = p.others.map((o) => `${o.label}: [${o.kind}](${o.url})`).join(' · ')
+    return `| ${button} | ${rest} |`
+  }
 
   return [
     START,
     '',
-    `Version **${version}** — a pre-release, like every release so far. Nothing is signed, so`,
+    `Version **${v}** — a pre-release, like every release so far. Nothing is signed, so`,
     'the first launch needs one extra step per platform:',
     `[how to open it](https://gmadevs.github.io/Radiouploader/guide/install).`,
     '',
     '| | Also built |',
     '|---|---|',
-    `| [![macOS](${badge('macOS', 'Apple silicon', '111111', 'apple')})](${url(ASSETS.macArm)}) | Intel: [.dmg](${url(ASSETS.macIntel)}) |`,
-    `| [![Linux](${badge('Linux', 'AppImage x64', 'FCC624', 'linux')})](${url(ASSETS.appImage)}) | arm64: [.AppImage](${url(ASSETS.appImageArm)}) · Debian: [amd64](${url(ASSETS.deb)}) · [arm64](${url(ASSETS.debArm)}) |`,
-    `| [![Windows](${badge('Windows', 'Installer x64', '0078D6', 'windows')})](${url(ASSETS.windows)}) | |`,
+    row('mac'),
+    row('linux'),
+    row('windows'),
     '',
     `Older versions, and the notes that come with each, are on the [releases page](${REPO}/releases).`,
     '',
@@ -69,7 +67,6 @@ function block(version) {
   ].join('\n')
 }
 
-const { version } = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'))
 const text = await fs.readFile(readme, 'utf8')
 
 const from = text.indexOf(START)

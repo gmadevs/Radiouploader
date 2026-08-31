@@ -1,0 +1,5 @@
+/* The hero leaves room for what used to follow it directly; the downloads
+   band supplies its own bottom padding instead. */
+.VPHome .VPHero {
+  padding-bottom: 24px;
+}

@@ -47,6 +47,19 @@ dmg and the AppImage take the product name and dashes, the deb takes the package
 underscores and calls x64 amd64, and NSIS writes `Setup` in the middle. They were checked
 against the files a real tag produced rather than read off the documentation.
 
+Two front pages want those links now — the README and the download cards under the hero on
+this site — so the filenames live in `scripts/downloads.mjs` and both take them from there.
+The site reads it at build time, in `docs/.vitepress/config.ts`, and hands the result to the
+component through `themeConfig.downloads`; no version is typed into a template. A second
+copy of those filenames would drift, and the copy that drifted would be the one whose
+generator nobody ran.
+
+The consequence is that the site advertises whatever `package.json` says, whether or not a
+release under that tag exists yet. The docs workflow runs on every push to `main` touching
+`docs/`, and `npm version` bumps the field before the tag is pushed and the draft release
+published by hand — so a push in between puts live download links in front of readers a few
+minutes before the files are there. Publish the release on the same pass as the tag.
+
 ## The icon
 
 ```bash

@@ -7,9 +7,10 @@ against anybody else's studies. Read [known limitations](/limitations) before yo
 at a study you care about.
 :::
 
-Radiouploader runs on macOS, Linux and Windows. Installers for all three are attached to
-each [release](https://github.com/gmadevs/Radiouploader/releases); nothing is signed yet, so
-the first launch needs one extra step:
+Radiouploader runs on macOS, Linux and Windows. The current version of each is linked from
+the [home page](/), and every build of every version is attached to its
+[release](https://github.com/gmadevs/Radiouploader/releases); nothing is signed yet, so the
+first launch needs one extra step:
 
 | Platform | First launch |
 |---|---|
