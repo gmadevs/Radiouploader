@@ -27,7 +27,11 @@ export default defineConfig({
 
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/preload/index.ts') }
+        input: { index: resolve(__dirname, 'src/preload/index.ts') },
+        // A sandboxed preload cannot be an ES module, and the sandbox is what
+        // keeps a compromised renderer out of Node. `.cjs` because the package
+        // is `type: module`, where a plain `.js` would be read as ESM again.
+        output: { format: 'cjs', entryFileNames: '[name].cjs' }
       }
     }
   },

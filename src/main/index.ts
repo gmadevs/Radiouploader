@@ -16,12 +16,14 @@ function createWindow(): BrowserWindow {
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     backgroundColor: '#111418',
     webPreferences: {
-      preload: path.join(import.meta.dirname, '../preload/index.mjs'),
+      preload: path.join(import.meta.dirname, '../preload/index.cjs'),
       // Patient data is handled in the main process only; the renderer gets no
       // Node access and reaches the filesystem solely through the IPC bridge.
+      // The preload asks for nothing outside Electron's sandboxed surface —
+      // contextBridge, ipcRenderer, webUtils — so the sandbox costs nothing.
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   })
 
