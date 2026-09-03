@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moveBy } from './reorder'
+import { moveBy, moveTo } from './reorder'
 
 describe('moveBy', () => {
   const list = ['a', 'b', 'c', 'd']
@@ -34,6 +34,27 @@ describe('moveBy', () => {
   it('leaves the list it was given alone', () => {
     const original = [...list]
     moveBy(original, 0, 2)
+    expect(original).toEqual(list)
+  })
+})
+
+describe('moveTo', () => {
+  const list = ['a', 'b', 'c', 'd']
+
+  it('puts an item where another one is, both ways round', () => {
+    expect(moveTo(list, 3, 0)).toEqual(['d', 'a', 'b', 'c'])
+    expect(moveTo(list, 0, 2)).toEqual(['b', 'c', 'a', 'd'])
+  })
+
+  it('does nothing when the item is dropped on itself or off the list', () => {
+    expect(moveTo(list, 1, 1)).toEqual(list)
+    expect(moveTo(list, -1, 2)).toEqual(list)
+    expect(moveTo(list, 1, 4)).toEqual(list)
+  })
+
+  it('leaves the list it was given alone', () => {
+    const original = [...list]
+    moveTo(original, 0, 3)
     expect(original).toEqual(list)
   })
 })

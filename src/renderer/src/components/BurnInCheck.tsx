@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BurnInFinding, CropRect, MaskRect } from '@shared/types'
 import type { StackEntry } from '../burnIn'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
+import { type OrderGroup, type OrderStudy, uploadOrder } from '../uploadOrder'
 
 interface Props {
   /** Everything going to upload, so a flagged stack can be shown whether or not it was opened. */
@@ -15,6 +16,8 @@ interface Props {
   busy: boolean
   /** Open one from the list; the dialog stays behind the viewer. */
   onOpen: (entry: StackEntry) => void
+  /** Put one series where another one is. Both are in the same study. */
+  onReorder: (studyId: string, seriesId: string, targetSeriesId: string) => void
   onBack: () => void
   onConfirm: () => void
 }
@@ -38,7 +41,15 @@ function withinCrop(regions: MaskRect[] | undefined, crop: CropRect | null): Mas
 }
 
 /** A middle image of one stack, as it will be uploaded — masked, cropped, windowed. */
-function Thumb({ entry, outline }: { entry: StackEntry; outline?: MaskRect[] }): React.JSX.Element {
+function Thumb({
+  entry,
+  outline,
+  maxEdge = 256
+}: {
+  entry: StackEntry
+  outline?: MaskRect[]
+  maxEdge?: number
+}): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [error, setError] = useState<string | null>(null)
   const { stack } = entry
@@ -50,7 +61,7 @@ function Thumb({ entry, outline }: { entry: StackEntry; outline?: MaskRect[] }):
     if (!slice) return
 
     let cancelled = false
-    loadFrame(slice.path, slice.frame, 256)
+    loadFrame(slice.path, slice.frame, maxEdge)
       .then((frame) => {
         if (cancelled || !canvasRef.current) return
         paintFrame(canvasRef.current, frame, { window: stack.window, masks: stack.masks, crop: stack.crop })
@@ -64,7 +75,7 @@ function Thumb({ entry, outline }: { entry: StackEntry; outline?: MaskRect[] }):
     return () => {
       cancelled = true
     }
-  }, [stack.slices, stack.window, stack.masks, stack.crop, outline])
+  }, [stack.slices, stack.window, stack.masks, stack.crop, outline, maxEdge])
 
   return (
     <div className="shot">
@@ -111,6 +122,136 @@ function findingText(finding: BurnInFinding): string {
 }
 
 /**
+ * The order the case will read in, and the last cheap chance to change it.
+ *
+ * The series are posted one after another and that is the order they appear in
+ * on Radiopaedia, so it is a decision whether or not anyone makes it. It is
+ * asked here because by here there is already a grid of small pictures to
+ * recognise them by, and moving the fourth series to the front is one drag.
+ *
+ * A tile is a series rather than a stack. A series split into b-values is
+ * several uploads that came out of one acquisition, and the tree the rest of
+ * the app reads has no way to say that one of them sits somewhere else — so
+ * they are boxed together and move together, which the tile says out loud.
+ */
+function OrderCheck({
+  studies,
+  onReorder
+}: {
+  studies: OrderStudy[]
+  onReorder: Props['onReorder']
+}): React.JSX.Element {
+  /**
+   * What is being dragged, in a ref rather than in state.
+   *
+   * A drag is three events that can arrive without a render between them, and a
+   * drop that reads the dragged series out of state reads whatever the render
+   * it was closed over had — which for a quick drag is nothing at all. The
+   * state below is only what the strip has to look like while it happens.
+   */
+  const dragging = useRef<OrderGroup | null>(null)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [over, setOver] = useState<string | null>(null)
+
+  const endDrag = (): void => {
+    dragging.current = null
+    setDraggingId(null)
+    setOver(null)
+  }
+
+  return (
+    <div className="order-check">
+      <p className="small" style={{ margin: 0 }}>
+        <strong>Check the order as well.</strong> The series are posted in this order, and it is the order they appear
+        in on the case. Drag one to move it, or use the arrows.
+      </p>
+      {studies.map((study) => (
+        <div className="order-study" key={study.studyId}>
+          {studies.length > 1 && <div className="muted small">{study.heading}</div>}
+          <div className="order-strip">
+            {study.groups.map((group, index) => (
+              <div
+                key={group.seriesId}
+                className={`order-group${draggingId === group.seriesId ? ' dragging' : ''}${
+                  over === group.seriesId ? ' over' : ''
+                }`}
+                draggable
+                onDragStart={(e) => {
+                  dragging.current = group
+                  setDraggingId(group.seriesId)
+                  e.dataTransfer.effectAllowed = 'move'
+                  // A drag carrying nothing does not start in every browser.
+                  e.dataTransfer.setData('text/plain', group.seriesId)
+                }}
+                onDragEnd={endDrag}
+                onDragOver={(e) => {
+                  const held = dragging.current
+                  // A drop stays inside one study: the studies are ordered by
+                  // when they were acquired, which is not a matter of taste.
+                  if (held === null || held.studyId !== group.studyId) return
+                  if (held.seriesId === group.seriesId) return
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  setOver(group.seriesId)
+                }}
+                onDragLeave={() => setOver((current) => (current === group.seriesId ? null : current))}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const held = dragging.current
+                  if (held !== null && held.studyId === group.studyId) {
+                    onReorder(group.studyId, held.seriesId, group.seriesId)
+                  }
+                  endDrag()
+                }}
+              >
+                <div className="order-shots">
+                  {group.entries.map((entry) => (
+                    <Thumb key={entry.stack.id} entry={entry} maxEdge={128} />
+                  ))}
+                </div>
+                <div className="order-cap">
+                  <span className="n">{index + 1}</span>
+                  <span className="name" title={group.name}>
+                    {group.name}
+                  </span>
+                </div>
+                <div className="order-foot">
+                  {group.entries.length > 1 && (
+                    <span className="muted order-note">
+                      {group.entries.length} image sets out of this series, moving together
+                    </span>
+                  )}
+                  <span className="reorder">
+                    <button
+                      className="small ghost"
+                      disabled={index === 0}
+                      title="Move this series earlier in the case"
+                      aria-label={`Move ${group.name} earlier`}
+                      onClick={() => onReorder(group.studyId, group.seriesId, study.groups[index - 1].seriesId)}
+                    >
+                      ←
+                    </button>
+                    <button
+                      className="small ghost"
+                      disabled={index === study.groups.length - 1}
+                      title="Move this series later in the case"
+                      aria-label={`Move ${group.name} later`}
+                      onClick={() => onReorder(group.studyId, group.seriesId, study.groups[index + 1].seriesId)}
+                    >
+                      →
+                    </button>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
  * The last stop before anonymisation, which is where a mask stops being an
  * overlay and becomes pixels.
  *
@@ -127,6 +268,7 @@ export function BurnInCheck({
   findings,
   busy,
   onOpen,
+  onReorder,
   onBack,
   onConfirm
 }: Props): React.JSX.Element {
@@ -138,6 +280,11 @@ export function BurnInCheck({
     return () => window.removeEventListener('keydown', onKey)
   }, [onBack])
 
+  // Read here rather than inside the strip: whether there is an order to check
+  // decides whether the dialog has a second column to put it in.
+  const order = useMemo(() => uploadOrder(entries), [entries])
+  const reorderable = order.some((study) => study.groups.length > 1)
+
   const total = seenCount + unseen.length
   const noticed = new Map((findings ?? []).map((finding) => [finding.stackId, finding]))
   const flagged = entries.filter((entry) => noticed.has(entry.stack.id))
@@ -147,7 +294,7 @@ export function BurnInCheck({
 
   return (
     <div className="viewer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onBack()}>
-      <div className="info" role="dialog" aria-label="Check for burnt-in text">
+      <div className="info check" role="dialog" aria-label="Check for burnt-in text">
         <header className="viewer-head">
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2>Before anonymising</h2>
@@ -157,83 +304,91 @@ export function BurnInCheck({
           </div>
         </header>
 
-        <div className="info-body">
-          <div className="notice warn">
-            <strong>Anonymisation does not touch the pixels.</strong> Names, dates and hospital banners burnt into the
-            images upload exactly as they are. Only what you blank with <strong>Open for review</strong> is removed.
+        <div className={`info-body check-body${reorderable ? ' split' : ''}`}>
+          <div className="check-main">
+            <div className="notice warn">
+              <strong>Anonymisation does not touch the pixels.</strong> Names, dates and hospital banners burnt into the
+              images upload exactly as they are. Only what you blank with <strong>Open for review</strong> is removed.
+            </div>
+
+            {findings === null && (
+              <p className="muted small" style={{ margin: 0 }}>
+                Looking through the images for text…
+              </p>
+            )}
+
+            {flagged.length > 0 && (
+              <>
+                <p className="small" style={{ margin: 0, color: 'var(--warn)' }}>
+                  {flagged.length === 1 ? 'Something was noticed in one series' : `Something was noticed in ${flagged.length} series`}
+                  . Open it and blank anything identifying — the ring is where to look, not the whole of what is there.
+                </p>
+                <div className="check-grid">
+                  {flagged.map((entry) => (
+                    <button
+                      key={entry.stack.id}
+                      className="check-item flagged"
+                      title="Open for review — blank out burnt-in text and set the contrast"
+                      onClick={() => onOpen(entry)}
+                    >
+                      <Thumb entry={entry} outline={noticed.get(entry.stack.id)?.regions} />
+                      <span className="cap">
+                        <span className="name">{entry.label}</span>
+                        <span style={{ color: 'var(--warn)' }}>{findingText(noticed.get(entry.stack.id)!)}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {stillUnseen.length > 0 ? (
+              <>
+                <p className="muted small" style={{ margin: 0 }}>
+                  {stillUnseen.length === 1
+                    ? 'One selected series has not been opened full size yet:'
+                    : `${stillUnseen.length} selected series have not been opened full size yet:`}{' '}
+                  open anything that could carry text — ultrasound, screen captures, reconstructions.
+                </p>
+                <div className="check-grid">
+                  {stillUnseen.map((entry) => (
+                    <button
+                      key={entry.stack.id}
+                      className="check-item"
+                      title="Open for review — blank out burnt-in text and set the contrast"
+                      onClick={() => onOpen(entry)}
+                    >
+                      <Thumb entry={entry} />
+                      <span className="cap">
+                        <span className="name">{entry.label}</span>
+                        {entry.modality ?? '—'} · {entry.stack.slices.length} image
+                        {entry.stack.slices.length === 1 ? '' : 's'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              unseen.length === 0 && (
+                <p className="muted small" style={{ margin: 0 }}>
+                  Every selected series has been opened full size. That is not the same as having read every image in
+                  them — go back if any of these carry text you have not looked for.
+                </p>
+              )
+            )}
+
+            {findings !== null && (
+              <p className="muted small" style={{ margin: 0 }}>
+                Nothing was noticed in the rest. That check reads two images per series and finds obvious banners; it
+                does not find small print, text over anatomy, or anything on the images it did not look at.
+              </p>
+            )}
           </div>
 
-          {findings === null && (
-            <p className="muted small" style={{ margin: 0 }}>
-              Looking through the images for text…
-            </p>
-          )}
-
-          {flagged.length > 0 && (
-            <>
-              <p className="small" style={{ margin: 0, color: 'var(--warn)' }}>
-                {flagged.length === 1 ? 'Something was noticed in one series' : `Something was noticed in ${flagged.length} series`}
-                . Open it and blank anything identifying — the ring is where to look, not the whole of what is there.
-              </p>
-              <div className="check-grid">
-                {flagged.map((entry) => (
-                  <button
-                    key={entry.stack.id}
-                    className="check-item flagged"
-                    title="Open for review — blank out burnt-in text and set the contrast"
-                    onClick={() => onOpen(entry)}
-                  >
-                    <Thumb entry={entry} outline={noticed.get(entry.stack.id)?.regions} />
-                    <span className="cap">
-                      <span className="name">{entry.label}</span>
-                      <span style={{ color: 'var(--warn)' }}>{findingText(noticed.get(entry.stack.id)!)}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          {stillUnseen.length > 0 ? (
-            <>
-              <p className="muted small" style={{ margin: 0 }}>
-                {stillUnseen.length === 1
-                  ? 'One selected series has not been opened full size yet:'
-                  : `${stillUnseen.length} selected series have not been opened full size yet:`}{' '}
-                open anything that could carry text — ultrasound, screen captures, reconstructions.
-              </p>
-              <div className="check-grid">
-                {stillUnseen.map((entry) => (
-                  <button
-                    key={entry.stack.id}
-                    className="check-item"
-                    title="Open for review — blank out burnt-in text and set the contrast"
-                    onClick={() => onOpen(entry)}
-                  >
-                    <Thumb entry={entry} />
-                    <span className="cap">
-                      <span className="name">{entry.label}</span>
-                      {entry.modality ?? '—'} · {entry.stack.slices.length} image
-                      {entry.stack.slices.length === 1 ? '' : 's'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            unseen.length === 0 && (
-              <p className="muted small" style={{ margin: 0 }}>
-                Every selected series has been opened full size. That is not the same as having read every image in
-                them — go back if any of these carry text you have not looked for.
-              </p>
-            )
-          )}
-
-          {findings !== null && (
-            <p className="muted small" style={{ margin: 0 }}>
-              Nothing was noticed in the rest. That check reads two images per series and finds obvious banners; it
-              does not find small print, text over anatomy, or anything on the images it did not look at.
-            </p>
+          {reorderable && (
+            <div className="check-side">
+              <OrderCheck studies={order} onReorder={onReorder} />
+            </div>
           )}
         </div>
 

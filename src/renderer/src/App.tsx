@@ -11,7 +11,7 @@ import { ReformatDialog } from './components/ReformatDialog'
 import { CaseStep, type CaseForm } from './components/CaseStep'
 import { InfoDialog } from './components/InfoDialog'
 import { ReviewStep } from './components/ReviewStep'
-import { moveBy } from './reorder'
+import { moveBy, moveTo } from './reorder'
 import { SeriesViewer } from './components/SeriesViewer'
 import { SourceStep } from './components/SourceStep'
 
@@ -105,11 +105,16 @@ export function App(): React.JSX.Element {
             .filter((stack) => stack.selected)
             .map((stack) => {
               const name = series.description ?? 'Unnamed series'
+              const studyName = study.studyDescription ?? 'Study'
               return {
                 stack,
                 label: series.stacks.length > 1 ? `${name} · ${stack.label}` : name,
                 modality: series.modality,
-                heading: `${study.studyDescription ?? 'Study'} · ${name}`
+                heading: `${studyName} · ${name}`,
+                studyId: study.id,
+                seriesId: series.id,
+                study: studyName,
+                series: name
               }
             })
         )
@@ -163,6 +168,26 @@ export function App(): React.JSX.Element {
           if (study.id !== studyId) return study
           const index = study.series.findIndex((series) => series.id === seriesId)
           return index === -1 ? study : { ...study, series: moveBy(study.series, index, delta) }
+        })
+      }
+    })
+  }
+
+  /**
+   * Put one series where another one is, which is what a drag in the order
+   * check means. The arrows move by one; a drop knows only what it landed on,
+   * and the series between them may be ones that strip does not show.
+   */
+  const reorderSeries = (studyId: string, seriesId: string, targetSeriesId: string): void => {
+    setIngest((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        studies: current.studies.map((study) => {
+          if (study.id !== studyId) return study
+          const from = study.series.findIndex((series) => series.id === seriesId)
+          const to = study.series.findIndex((series) => series.id === targetSeriesId)
+          return from === -1 || to === -1 ? study : { ...study, series: moveTo(study.series, from, to) }
         })
       }
     })
@@ -480,6 +505,7 @@ export function App(): React.JSX.Element {
           findings={findings}
           busy={busy}
           onOpen={(entry) => openViewer(entry.stack.id, entry.heading)}
+          onReorder={reorderSeries}
           onBack={() => setConfirming(false)}
           onConfirm={() => void anonymiseAndContinue()}
         />

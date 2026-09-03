@@ -14,6 +14,13 @@ export interface StackEntry {
   modality: string | null
   /** Study and series, the heading the viewer shows. */
   heading: string
+  /** Where in the tree this came from, which is what a reorder moves. */
+  studyId: string
+  seriesId: string
+  /** The study on its own, for a case that holds more than one. */
+  study: string
+  /** The series on its own, without the stack part of the label. */
+  series: string
 }
 
 /**

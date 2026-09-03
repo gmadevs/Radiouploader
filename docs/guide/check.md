@@ -30,6 +30,24 @@ viewer. Open one, close it, and it has left the list.
 When there is nothing left on the list it says so — and still asks. Opening a stack is not
 the same as having read every image in it.
 
+## The order, while the pictures are in front of you
+
+Beside the burnt-in check the dialog shows the whole selection **in the order it will be
+posted in** — one card per image set, the sets out of a split series boxed together, numbered
+as they will appear on the case.
+
+It is asked here because this is where the thumbnails already are. Recognising a series by
+its picture is quicker than by its name, and moving one is a drag: pick a card up and drop it
+on the card whose place it should take. The arrows under each card do the same thing one step
+at a time, which is what a keyboard has.
+
+A drag stays inside its own study — studies are a timeline, ordered by date. And the cards of
+a series that was split into several image sets move together, because they came out of one
+acquisition and the app has no way to say that one of them belongs somewhere else.
+
+The strip is not shown when there is nothing to arrange: a single series, or one in each
+study.
+
 ## What it will never tell you
 
 It will never call a selection clean.

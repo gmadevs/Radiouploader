@@ -34,6 +34,10 @@ is what a reader scrolls through.
 Studies have no arrows: they are ordered by date, oldest first, because the case is a
 timeline and the [interval between them](/guide/upload) is what carries the meaning.
 
+The order can also be changed — by dragging, against the thumbnails — at
+[the check before anonymising](/guide/check), which is the last screen before the images are
+rewritten.
+
 ## What a card says
 
 Under the preview, in the order that decides whether a series is worth uploading:

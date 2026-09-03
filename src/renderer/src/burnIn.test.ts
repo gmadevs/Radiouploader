@@ -29,7 +29,11 @@ function entry(id: string, masks: Stack['masks'] = []): StackEntry {
     },
     label: id,
     modality: 'US',
-    heading: id
+    heading: id,
+    studyId: 'study',
+    seriesId: id,
+    study: 'Study',
+    series: id
   }
 }
 
