@@ -229,6 +229,8 @@ export async function writeReformatted(
           const normal = toPatient(built.header, plan.frame.n)
           return normal === null ? null : describePlane(normal)
         })(),
+        // Every image of a reformat is cut on the plane that was asked for.
+        sharedPlane: true,
         bytes,
         // Written as plain samples, whatever the parent was stored as.
         compression: null,

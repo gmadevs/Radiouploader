@@ -1,5 +1,5 @@
 import { compressionOf } from '@shared/dicomImage'
-import { cross, describePlane, normalise, type Vec3 } from '@shared/geometry'
+import { cross, describePlane, dot, normalise, type Vec3 } from '@shared/geometry'
 import { nearestAgeOption } from '@shared/radiopaedia'
 import { canDecode } from '../codecs/decode'
 import type { ImageComponent, Series, SliceRef, Stack, StackKind, Study } from '@shared/types'
@@ -116,21 +116,59 @@ function dimensionKey(d: Dimensions): string {
   return [d.component, d.bValue ?? '-', d.echoNumber ?? '-', d.temporalIndex ?? '-'].join('|')
 }
 
+/** The direction an image looks, or null when it does not say. */
+function normalOf(orientation: number[] | null): Vec3 | null {
+  if (orientation === null || orientation.length !== 6) return null
+  const normal = cross(orientation.slice(0, 3) as Vec3, orientation.slice(3, 6) as Vec3)
+  return normal.every((v) => v === 0) ? null : normalise(normal)
+}
+
+/** Two normals this far apart are the same one, about a tenth of a degree. */
+const SAME_PLANE_COSINE = 0.9999
+
+/**
+ * Were all these images cut the same way?
+ *
+ * It matters because `sliceLocation` is ImagePositionPatient projected on the
+ * image's *own* normal, which is a coordinate on a shared axis only while there
+ * is one. A rotating MIP has none: sixty projections around the neck, each
+ * looking from its own angle, and each one's distance along its own normal
+ * traces a sine wave that climbs, comes back down and climbs again. Ordering by
+ * that deals the rotation out like a pack of cards — a run that turns smoothly
+ * on a workstation jumps from one side to the other and back here.
+ *
+ * Only a normal that positively disagrees counts. An image that does not say
+ * which way it points is left to the ones that do, because reading silence as
+ * disagreement would reorder every series with one such image in it.
+ */
+function sharePlane(units: Unit[]): boolean {
+  let first: Vec3 | null = null
+  for (const unit of units) {
+    const normal = normalOf(unit.instance.imageOrientation)
+    if (normal === null) continue
+    if (first === null) first = normal
+    else if (dot(first, normal) < SAME_PLANE_COSINE) return false
+  }
+  return true
+}
+
 /**
  * Order images within a stack. ImagePositionPatient projected on the slice
- * normal is preferred; InstanceNumber is the fallback for non-volumetric data.
+ * normal is preferred; InstanceNumber is the fallback for non-volumetric data,
+ * and for images that were not all cut the same way, where the projection is
+ * not a position on any one axis.
  *
  * StackID comes first, and only enhanced objects have one. A file that holds
  * three orthogonal localisers holds three volumes, and ordering their frames
  * against each other by position interleaves them into one that is no volume
  * at all — keeping them apart is the least this can do about that.
  */
-function sortSlices(units: Unit[]): Unit[] {
+function sortSlices(units: Unit[], byPosition: boolean): Unit[] {
   return [...units].sort((a, b) => {
     if (a.stackId !== b.stackId) {
       return (a.stackId ?? '').localeCompare(b.stackId ?? '', undefined, { numeric: true })
     }
-    if (a.sliceLocation !== null && b.sliceLocation !== null && a.sliceLocation !== b.sliceLocation) {
+    if (byPosition && a.sliceLocation !== null && b.sliceLocation !== null && a.sliceLocation !== b.sliceLocation) {
       return a.sliceLocation - b.sliceLocation
     }
     const byInstance = (a.instance.instanceNumber ?? 0) - (b.instance.instanceNumber ?? 0)
@@ -289,17 +327,21 @@ export function buildStacks(seriesId: string, instances: InstanceMeta[]): { stac
   const stacks: Stack[] = []
   for (const [, group] of groups) {
     const dims = dimensionsOf(group[0])
-    // Only look for implicit repetition when the series has no explicit time axis.
-    const repeated = varying.has('phase') ? null : splitByRepetition(group)
+    const shared = sharePlane(group)
+    // Only look for implicit repetition when the series has no explicit time
+    // axis — and only where a position means the same thing twice. Among
+    // projections taken from different directions, two that share a distance
+    // are two views that happen to face alike, not one slice acquired twice.
+    const repeated = varying.has('phase') || !shared ? null : splitByRepetition(group)
 
     if (repeated) {
       varying.add('phase')
       repeated.forEach((phaseUnits, i) => {
-        stacks.push(makeStack(seriesId, stacks.length, dims, i + 1, phaseUnits, varying))
+        stacks.push(makeStack(seriesId, stacks.length, dims, i + 1, phaseUnits, varying, shared))
       })
     } else {
       const phaseIndex = dims.temporalIndex
-      stacks.push(makeStack(seriesId, stacks.length, dims, phaseIndex, group, varying))
+      stacks.push(makeStack(seriesId, stacks.length, dims, phaseIndex, group, varying, shared))
     }
   }
 
@@ -340,11 +382,8 @@ function primaryKind(varying: Set<StackKind>): StackKind {
  * Oblique rather than a guess at the nearest.
  */
 function planeOf(orientation: number[] | null): string | null {
-  if (orientation === null) return null
-  const row = orientation.slice(0, 3) as Vec3
-  const column = orientation.slice(3, 6) as Vec3
-  const normal = cross(row, column)
-  return normal.every((v) => v === 0) ? null : describePlane(normalise(normal))
+  const normal = normalOf(orientation)
+  return normal === null ? null : describePlane(normal)
 }
 
 /**
@@ -379,9 +418,10 @@ function makeStack(
   dims: Dimensions,
   phaseIndex: number | null,
   units: Unit[],
-  varying: Set<StackKind>
+  varying: Set<StackKind>,
+  sharedPlane: boolean
 ): Stack {
-  const sorted = sortSlices(units)
+  const sorted = sortSlices(units, sharedPlane)
   const slices = sorted.flatMap(toSliceRefs)
   const unsupported = unsupportedReason(units)
   return {
@@ -401,7 +441,11 @@ function makeStack(
     masks: [],
     crop: null,
     window: null,
-    plane: planeOf(units[0].instance.imageOrientation),
+    // The first image's plane is the stack's only while they all share one;
+    // naming a rotating MIP after the projection that happens to come first
+    // says something about it that is not true of the rest.
+    plane: sharedPlane ? planeOf(units[0].instance.imageOrientation) : null,
+    sharedPlane,
     bytes: bytesOf(units),
     compression: compressionOf(units[0].instance.transferSyntaxUid),
     unsupported

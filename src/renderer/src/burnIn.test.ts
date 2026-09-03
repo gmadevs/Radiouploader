@@ -18,6 +18,7 @@ function entry(id: string, masks: Stack['masks'] = []): StackEntry {
       trimStart: 0,
       crop: null,
       plane: null,
+      sharedPlane: true,
       bytes: 0,
       compression: null,
       trimEnd: 0,

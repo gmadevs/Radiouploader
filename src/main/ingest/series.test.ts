@@ -46,6 +46,26 @@ function volume(slices: number, overrides: Partial<InstanceMeta> = {}): Instance
   return Array.from({ length: slices }, (_, i) => inst({ sliceLocation: i * 5, ...overrides }))
 }
 
+/**
+ * A rotating MIP: projections around the head-foot axis, each looking its own
+ * way, in the order the scanner made them.
+ *
+ * `sliceLocation` is what the app computes for one of these — the position
+ * projected on the image's own normal — and around a turn that is a sine wave
+ * rather than a run down an axis.
+ */
+function rotatingMip(count: number, offset = 0): InstanceMeta[] {
+  return Array.from({ length: count }, (_, i) => {
+    const angle = offset + (i * 2 * Math.PI) / count
+    return inst({
+      component: 'mip',
+      imageType: ['DERIVED', 'PRIMARY', 'MAX_IP'],
+      imageOrientation: [Math.cos(angle), Math.sin(angle), 0, 0, 0, -1],
+      sliceLocation: Number((30 * Math.sin(angle)).toFixed(4))
+    })
+  })
+}
+
 describe('classifyComponent', () => {
   it('reads the vendor flavour out of ImageType', () => {
     expect(classifyComponent(['ORIGINAL', 'PRIMARY', 'M', 'ND'], null)).toBe('magnitude')
@@ -232,6 +252,50 @@ describe('buildStacks — plain series', () => {
   it('does not mistake a two-slice localiser for a dynamic series', () => {
     const { stacks } = buildStacks('s', [inst({ sliceLocation: 0 }), inst({ sliceLocation: 0 })])
     expect(stacks).toHaveLength(1)
+  })
+})
+
+describe('buildStacks — projections taken from different directions', () => {
+  it('keeps a rotating MIP in the order it was made', () => {
+    const { stacks } = buildStacks('s', rotatingMip(12))
+    expect(stacks).toHaveLength(1)
+    const numbers = stacks[0].slices.map((slice) => slice.instanceNumber!)
+    expect(numbers).toEqual([...numbers].sort((a, b) => a - b))
+    // And not in order of a distance that turns with the image, which is what
+    // made a smooth rotation jump from one side to the other and back.
+    expect(stacks[0].slices.map((slice) => slice.sliceLocation)).not.toEqual(
+      [...stacks[0].slices.map((slice) => slice.sliceLocation!)].sort((a, b) => a - b)
+    )
+  })
+
+  it('says the images do not share a plane, and does not name one after the first of them', () => {
+    const { stacks } = buildStacks('s', rotatingMip(12))
+    expect(stacks[0].sharedPlane).toBe(false)
+    expect(stacks[0].plane).toBeNull()
+  })
+
+  it('does not read two projections that face alike as one slice acquired twice', () => {
+    // Four projections a quarter turn apart come to two distances, twice each,
+    // which is the shape a repeated dynamic acquisition has.
+    const { stacks, splitReason } = buildStacks('s', rotatingMip(4, Math.PI / 4))
+    expect(stacks).toHaveLength(1)
+    expect(splitReason).toBeNull()
+  })
+
+  it('leaves an ordinary volume alone — one plane, ordered by position', () => {
+    const { stacks } = buildStacks('s', volume(10))
+    expect(stacks[0].sharedPlane).toBe(true)
+    expect(stacks[0].plane).toBe('Axial')
+  })
+
+  it('reads an image that does not say which way it points as no disagreement', () => {
+    const { stacks } = buildStacks('s', [
+      inst({ sliceLocation: 0 }),
+      inst({ sliceLocation: 5, imageOrientation: null }),
+      inst({ sliceLocation: 10 })
+    ])
+    expect(stacks[0].sharedPlane).toBe(true)
+    expect(stacks[0].slices.map((slice) => slice.sliceLocation)).toEqual([0, 5, 10])
   })
 })
 

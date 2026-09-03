@@ -106,6 +106,11 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
   if (slices.length < 3) {
     throw new VolumeError('A reformat needs at least three images to have something to cut through')
   }
+  if (!stack.sharedPlane) {
+    throw new VolumeError(
+      'These images look from different directions — projections around the patient rather than slices through them, so there is no volume to cut'
+    )
+  }
 
   const spacing = { z: sliceSpacing(slices.map((slice) => slice.sliceLocation)), x: 0, y: 0 }
 

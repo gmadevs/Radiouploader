@@ -119,6 +119,17 @@ export interface Stack {
    */
   plane: string | null
   /**
+   * Whether every image here was cut the same way.
+   *
+   * False for a rotating MIP — a run of projections around the neck, each
+   * looking from its own angle — and for anything else whose images point in
+   * different directions. Two things hang off it: `sliceLocation` is a distance
+   * along the image's *own* normal, so it is a coordinate on a shared axis only
+   * while this is true, and a volume can only be stacked out of images that
+   * were cut the same way.
+   */
+  sharedPlane: boolean
+  /**
    * What this stack weighs on disk. A stack that is part of a multiframe file
    * gets its share of it rather than the whole, so the shares of a run split
    * into phases add up to the file instead of to four times it.

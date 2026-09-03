@@ -30,6 +30,7 @@ function stack(id: string, sliceCount: number): Stack {
     masks: [],
     crop: null,
     plane: 'Axial',
+    sharedPlane: true,
     bytes: 1024,
     compression: null,
     window: null,

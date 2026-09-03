@@ -72,6 +72,27 @@ no geometry and Hounsfield units that had quietly become stored values.
 
 Objects with no pixel data are rejected at ingest so they never appear as series to upload.
 
+### Ordering inside a stack
+
+Images are ordered by `ImagePositionPatient` (0020,0032) projected on the slice normal,
+which is steadier than `SliceLocation` (0020,1041) — many exporters leave that absent or
+inconsistent. `InstanceNumber` is the fallback.
+
+That projection is a coordinate on a shared axis only while every image in the stack was cut
+the same way, and one kind of series is not: a **rotating MIP**, where an MR or CT angiogram
+is exported as a run of projections around the patient, each with its own
+`ImageOrientationPatient` (0020,0037). Each one's distance along its *own* normal traces a
+sine wave — up, back down, up again — so ordering by it deals the rotation out like a pack of
+cards. A sixty-projection carotid run came through as 15, 16, 14, 17, 13, 18 …, which on
+screen is an image that jumps from one side to the other and back instead of turning.
+
+So the normals are compared first. Where they disagree the stack is ordered by
+`InstanceNumber` instead, it is not named after the plane of whichever projection came first,
+repeated distances in it are not read as a dynamic acquisition acquired twice, and a reformat
+of it is refused by name — there is no volume to cut through a set of projections. Only a
+normal that positively disagrees counts: an image that does not say which way it points is
+left to the ones that do.
+
 ## Why UIDs matter later
 
 Anonymisation regenerates UIDs deterministically, so every stack cut out of one original
