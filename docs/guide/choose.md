@@ -31,8 +31,16 @@ that shows the finding last.
 order the app posts them in is the order the case ends up with. What you leave the strip in
 is what a reader scrolls through.
 
-Studies have no arrows: they are ordered by date, oldest first, because the case is a
-timeline and the [interval between them](/guide/upload) is what carries the meaning.
+Studies are ordered by date, oldest first, because the case is a timeline and the
+[interval between them](/guide/upload) is what carries the meaning. **Studies of the same
+day get arrows too** — and only between each other. Two exams of one morning are nought days
+apart whichever order they go in, so nothing but the clock says which came first: the app
+reads `StudyTime`, falls back to the earliest acquisition time, and where neither is there
+leaves the choice to you. Across days there are no arrows, because that order is not a
+preference.
+
+When two studies share a date the heading shows the time as well, so what the app decided is
+visible rather than implied.
 
 The order can also be changed — by dragging, against the thumbnails — at
 [the check before anonymising](/guide/check), which is the last screen before the images are

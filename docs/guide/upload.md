@@ -70,6 +70,14 @@ goes in the caption instead — pre-filled as "Baseline", "3 months later", "1.5
 later". A study whose date could not be read is captioned "Date unknown" rather than given
 an invented interval.
 
+Two studies of the **same day** — a CT and the MR that followed it — are nought days apart
+whichever way round they go, so the date cannot order them and `StudyTime` (0008,0030) does.
+Where an exporter left that out, the earliest acquisition time in the study is used instead;
+where neither says, they keep the order they were read in and can be arranged by hand in
+[Choose what to upload](/guide/choose). Only the first of them is captioned "Baseline"; the
+rest read **"Same day"**, since the same word under both halves of a same-day comparison
+would say nothing about either.
+
 ## Upload
 
 ![The confirmation](/shots/08-done.png)

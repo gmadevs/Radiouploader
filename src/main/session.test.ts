@@ -52,6 +52,7 @@ function ingestWith(stacks: Stack[]): IngestResult {
         studyDescription: null,
         modality: 'MR',
         studyDate: null,
+    studyTime: null,
     patientAge: null,
     patientSex: null,
         intervalDays: 0,

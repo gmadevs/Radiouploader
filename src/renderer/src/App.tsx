@@ -174,6 +174,26 @@ export function App(): React.JSX.Element {
   }
 
   /**
+   * Move one study past its neighbour, where the two were taken the same day.
+   *
+   * Across days the order is not a preference: it is the timeline, and the
+   * intervals the captions carry are measured along it. Within a day it is a
+   * preference and nothing else says which way round — two exams of one morning
+   * are nought days apart whichever order they go in — so this is the only
+   * place the studies can be arranged by hand.
+   */
+  const moveStudy = (studyId: string, delta: number): void => {
+    setIngest((current) => {
+      if (!current) return current
+      const index = current.studies.findIndex((study) => study.id === studyId)
+      const to = index + delta
+      if (index === -1 || to < 0 || to >= current.studies.length) return current
+      if (current.studies[index].studyDate !== current.studies[to].studyDate) return current
+      return { ...current, studies: moveBy(current.studies, index, delta) }
+    })
+  }
+
+  /**
    * Put one series where another one is, which is what a drag in the order
    * check means. The arrows move by one; a drop knows only what it landed on,
    * and the series between them may be ones that strip does not show.
@@ -320,12 +340,12 @@ export function App(): React.JSX.Element {
         age: current.age || baseline?.patientAge || '',
         gender: current.gender || baseline?.patientSex || '',
         studies: Object.fromEntries(
-          studiesToUpload.map((study) => [
+          studiesToUpload.map((study, index) => [
             study.id,
             current.studies[study.id] ?? {
               modality: modalityFromDicom(study.modality),
               findings: '',
-              caption: multiple ? describeInterval(study.intervalDays) : ''
+              caption: multiple ? describeInterval(study.intervalDays, index === 0) : ''
             }
           ])
         )
@@ -441,6 +461,7 @@ export function App(): React.JSX.Element {
             }
             onSelectEverything={(selected) => mutateStacks(() => ({ selected }))}
             onMoveSeries={moveSeries}
+            onMoveStudy={moveStudy}
             onOpen={(stack, series, study) =>
               openViewer(stack.id, `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`)
             }

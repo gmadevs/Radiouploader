@@ -254,7 +254,7 @@ export function CaseStep({
             >
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                 <h3>{study.studyDescription ?? `Study ${i + 1}`}</h3>
-                <span className="badge">{describeInterval(study.intervalDays)}</span>
+                <span className="badge">{describeInterval(study.intervalDays, i === 0)}</span>
                 <span className="muted small">position {i + 2}</span>
               </div>
 
@@ -273,7 +273,7 @@ export function CaseStep({
                   Caption (plain text)
                   <input
                     value={entry.caption}
-                    placeholder={describeInterval(study.intervalDays)}
+                    placeholder={describeInterval(study.intervalDays, i === 0)}
                     onChange={(e) => update({ caption: e.target.value })}
                   />
                 </label>

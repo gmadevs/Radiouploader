@@ -1,5 +1,5 @@
 import type { Series, Stack, Study } from '@shared/types'
-import { describeInterval } from '@shared/interval'
+import { clockTime, describeInterval } from '@shared/interval'
 import { StackCard } from './StackCard'
 
 interface Props {
@@ -17,6 +17,8 @@ interface Props {
   onSelectEverything: (selected: boolean) => void
   /** Move one series past its neighbour, which is what reorders the case. */
   onMoveSeries: (studyId: string, seriesId: string, delta: number) => void
+  /** Move one study past a neighbour it shares a date with. */
+  onMoveStudy: (studyId: string, delta: number) => void
 }
 
 /**
@@ -30,6 +32,21 @@ interface Props {
 const CARD_WIDTH = 240
 const CARD_GAP = 12
 const ROW_PADDING = 32
+
+/**
+ * Is another study in this import on the same date?
+ *
+ * Two of one day are nought days apart whichever way round they go, so the date
+ * says nothing about which came first and the clock is what does.
+ */
+function sharesItsDate(studies: Study[], study: Study): boolean {
+  return study.studyDate !== null && studies.filter((other) => other.studyDate === study.studyDate).length > 1
+}
+
+/** Were these two taken the same day? Undefined at the ends of the list, and undated is not a match. */
+function sameDate(a: Study | undefined, b: Study): boolean {
+  return a !== undefined && a.studyDate !== null && a.studyDate === b.studyDate
+}
 
 const SPLIT_LABELS: Record<string, string> = {
   component: 'Split by image type',
@@ -48,7 +65,8 @@ export function ReviewStep({
   onReformat,
   onSelectAll,
   onSelectEverything,
-  onMoveSeries
+  onMoveSeries,
+  onMoveStudy
 }: Props): React.JSX.Element {
   const stacks = studies.flatMap((study) => study.series.flatMap((series) => series.stacks))
   const selectedCount = stacks.filter((stack) => stack.selected).length
@@ -88,7 +106,7 @@ export function ReviewStep({
         </div>
       )}
 
-      {studies.map((study) => (
+      {studies.map((study, studyIndex) => (
         <section key={study.id} style={{ marginBottom: 28 }}>
           <h2 style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
             {study.studyDescription ?? 'Study'}
@@ -96,8 +114,41 @@ export function ReviewStep({
             {/* The real date helps tell two close studies apart while choosing.
                 It is removed by anonymisation and never uploaded — only the
                 interval is, which is what the badge shows. */}
-            {study.studyDate && <span className="muted small">· {study.studyDate}</span>}
-            {studies.length > 1 && <span className="badge">{describeInterval(study.intervalDays)}</span>}
+            {study.studyDate && (
+              <span className="muted small">
+                · {study.studyDate}
+                {sharesItsDate(studies, study) && clockTime(study.studyTime) !== null
+                  ? ` ${clockTime(study.studyTime)}`
+                  : ''}
+              </span>
+            )}
+            {studies.length > 1 && (
+              <span className="badge">{describeInterval(study.intervalDays, studyIndex === 0)}</span>
+            )}
+            {/* Only between studies of one day. Across days the order is the
+                timeline the case is read as, not a matter of taste. */}
+            {(sameDate(studies[studyIndex - 1], study) || sameDate(studies[studyIndex + 1], study)) && (
+              <span className="reorder">
+                <button
+                  className="small ghost"
+                  disabled={!sameDate(studies[studyIndex - 1], study)}
+                  title="Move this study earlier in the case"
+                  aria-label={`Move ${study.studyDescription ?? 'this study'} earlier`}
+                  onClick={() => onMoveStudy(study.id, -1)}
+                >
+                  ←
+                </button>
+                <button
+                  className="small ghost"
+                  disabled={!sameDate(studies[studyIndex + 1], study)}
+                  title="Move this study later in the case"
+                  aria-label={`Move ${study.studyDescription ?? 'this study'} later`}
+                  onClick={() => onMoveStudy(study.id, 1)}
+                >
+                  →
+                </button>
+              </span>
+            )}
           </h2>
 
           {/* One strip per study, scrolling sideways: a study of thirty series

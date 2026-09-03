@@ -323,6 +323,15 @@ export interface Study {
   /** ISO yyyy-mm-dd read from the originals; null when the exporter dropped it. */
   studyDate: string | null
   /**
+   * Seconds since midnight, from StudyTime — or from the earliest acquisition
+   * in the study where the exporter left that out.
+   *
+   * What it is for is the order: two studies of one day are one day apart and
+   * nothing else tells them apart, so without this they arrive in whatever
+   * order their files happened to be read in.
+   */
+  studyTime: number | null
+  /**
    * Whole days between this study and the earliest one in the import. 0 for the
    * first study, null when either date is unknown. This is the interval a
    * follow-up case needs to preserve.

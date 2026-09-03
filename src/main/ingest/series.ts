@@ -180,14 +180,25 @@ function sortSlices(units: Unit[], byPosition: boolean): Unit[] {
   })
 }
 
+/**
+ * A DICOM TM as seconds since midnight.
+ *
+ * TM is HHMMSS.FFFFFF with everything after the hour optional, and exporters do
+ * write "1430", and colons that the standard does not allow. None of that is
+ * worth losing a study's place on the timeline over, so all of it is read.
+ */
+export function secondsOfDay(value: string | null): number | null {
+  if (value === null) return null
+  const m = /^(\d{2})(\d{2})?(\d{2}(?:\.\d+)?)?$/.exec(value.trim().replace(/:/g, ''))
+  if (m === null) return null
+  return Number(m[1]) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0)
+}
+
 /** Time key for ordering repeats of the same slice in a dynamic acquisition. */
 function temporalSortKey(unit: Unit): number {
   if (unit.triggerTime !== null) return unit.triggerTime
-  if (unit.acquisitionTime !== null) {
-    // DICOM TM is HHMMSS.FFFFFF — parse to seconds since midnight.
-    const m = /^(\d{2})(\d{2})(\d{2}(?:\.\d+)?)$/.exec(unit.acquisitionTime)
-    if (m) return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3])
-  }
+  const seconds = secondsOfDay(unit.acquisitionTime)
+  if (seconds !== null) return seconds
   return unit.frame ?? unit.instance.instanceNumber ?? 0
 }
 
@@ -515,19 +526,47 @@ function daysBetween(from: string, to: string): number {
 }
 
 /**
+ * When the study was taken, as seconds since midnight.
+ *
+ * StudyTime is what the question is asking and it is stated once per study.
+ * Where an exporter left it out, the earliest acquisition time in the study is
+ * the next best answer — the same question asked one level down, of the images
+ * themselves.
+ */
+function timeOf(instances: InstanceMeta[]): number | null {
+  const stated = secondsOfDay(instances.find((i) => i.studyTime !== null)?.studyTime ?? null)
+  if (stated !== null) return stated
+
+  let earliest: number | null = null
+  for (const instance of instances) {
+    const seconds = secondsOfDay(instance.acquisitionTime)
+    if (seconds !== null && (earliest === null || seconds < earliest)) earliest = seconds
+  }
+  return earliest
+}
+
+/**
  * Order studies as they were acquired and express each one as an offset from the
  * earliest. Radiopaedia presents a multi-study case as a timeline, and the
  * interval is the part that carries clinical meaning — the absolute dates are
  * both identifying and blanked by the anonymiser, so only the offsets survive.
  *
- * Studies with no readable date keep their original order and get a null
- * interval rather than being guessed at.
+ * The date is not always enough to order them: two studies of one morning — the
+ * CT and the MR that followed it — are the same date, and the interval between
+ * them is nought days whichever way round they go. So the clock breaks the tie,
+ * and where neither study says what time it was they keep the order they
+ * arrived in rather than being guessed at. Studies with no readable date at all
+ * go last, with a null interval.
  */
 function orderByDate(studies: Study[]): Study[] {
   const dated = studies.filter((s) => s.studyDate !== null)
   const undated = studies.filter((s) => s.studyDate === null)
 
-  dated.sort((a, b) => (a.studyDate! < b.studyDate! ? -1 : a.studyDate! > b.studyDate! ? 1 : 0))
+  dated.sort((a, b) => {
+    if (a.studyDate! !== b.studyDate!) return a.studyDate! < b.studyDate! ? -1 : 1
+    if (a.studyTime !== null && b.studyTime !== null) return a.studyTime - b.studyTime
+    return 0
+  })
   const earliest = dated[0]?.studyDate ?? null
 
   for (const study of dated) {
@@ -581,6 +620,7 @@ export function buildStudies(instances: InstanceMeta[]): Study[] {
       studyDescription: studyInstances[0].studyDescription,
       modality: studyInstances[0].modality,
       studyDate,
+      studyTime: timeOf(studyInstances),
       intervalDays: null,
       patientAge: patient.age,
       patientSex: patient.sex,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ageInYears, classifyComponent } from './dicom'
 import type { FrameMeta, InstanceMeta } from './dicom'
-import { buildStacks, buildStudies } from './series'
+import { buildStacks, buildStudies, secondsOfDay } from './series'
 
 let counter = 0
 
@@ -375,7 +375,7 @@ describe('buildStudies — the patient', () => {
 
 describe('buildStudies — multi-study cases', () => {
   /** One study of `slices` images on a given date. */
-  function study(uid: string, date: string | null, time = '090000'): InstanceMeta[] {
+  function study(uid: string, date: string | null, time: string | null = '090000'): InstanceMeta[] {
     return volume(5, { studyInstanceUid: uid, seriesInstanceUid: `${uid}.1`, studyDate: date, studyTime: time })
   }
 
@@ -411,6 +411,55 @@ describe('buildStudies — multi-study cases', () => {
   it('gives a single-study import a zero interval', () => {
     const studies = buildStudies(study('1.2.3.A', '2024-01-15'))
     expect(studies[0].intervalDays).toBe(0)
+  })
+
+  it('orders two studies of the same day by the clock', () => {
+    const studies = buildStudies([
+      ...study('1.2.3.PM', '2024-01-15', '161500'),
+      ...study('1.2.3.AM', '2024-01-15', '083000')
+    ])
+    expect(studies.map((s) => s.studyInstanceUid)).toEqual(['1.2.3.AM', '1.2.3.PM'])
+    // Both are the same day, and only the first of them is the baseline.
+    expect(studies.map((s) => s.intervalDays)).toEqual([0, 0])
+  })
+
+  it('falls back to the earliest acquisition when the exporter left StudyTime out', () => {
+    const studies = buildStudies([
+      ...volume(3, {
+        studyInstanceUid: '1.2.3.SECOND',
+        seriesInstanceUid: '1.2.3.SECOND.1',
+        studyDate: '2024-01-15',
+        studyTime: null,
+        acquisitionTime: '141000'
+      }),
+      ...volume(3, {
+        studyInstanceUid: '1.2.3.FIRST',
+        seriesInstanceUid: '1.2.3.FIRST.1',
+        studyDate: '2024-01-15',
+        studyTime: null,
+        acquisitionTime: '091500'
+      })
+    ])
+    expect(studies.map((s) => s.studyInstanceUid)).toEqual(['1.2.3.FIRST', '1.2.3.SECOND'])
+  })
+
+  it('leaves same-day studies in the order they arrived when neither says the time', () => {
+    const studies = buildStudies([
+      ...study('1.2.3.B', '2024-01-15', null),
+      ...study('1.2.3.A', '2024-01-15', null)
+    ])
+    expect(studies.map((s) => s.studyInstanceUid)).toEqual(['1.2.3.B', '1.2.3.A'])
+  })
+
+  it('reads the time off the study, in the forms exporters write it', () => {
+    expect(secondsOfDay('083000')).toBe(8 * 3600 + 30 * 60)
+    expect(secondsOfDay('083000.750')).toBe(8 * 3600 + 30 * 60 + 0.75)
+    expect(secondsOfDay('0830')).toBe(8 * 3600 + 30 * 60)
+    expect(secondsOfDay('08')).toBe(8 * 3600)
+    // Not a form the standard allows, and written by exporters anyway.
+    expect(secondsOfDay('08:30:00')).toBe(8 * 3600 + 30 * 60)
+    expect(secondsOfDay('not a time')).toBeNull()
+    expect(secondsOfDay(null)).toBeNull()
   })
 })
 

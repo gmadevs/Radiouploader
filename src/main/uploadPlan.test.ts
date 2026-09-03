@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Study } from '@shared/types'
-import { describeInterval } from '@shared/interval'
+import { clockTime, describeInterval } from '@shared/interval'
 import { defaultCaption, planStudies } from './uploadPlan'
 
 function study(id: string, intervalDays: number | null): Study {
@@ -10,6 +10,7 @@ function study(id: string, intervalDays: number | null): Study {
     studyDescription: null,
     modality: 'MR',
     studyDate: null,
+    studyTime: null,
     patientAge: null,
     patientSex: null,
     intervalDays,
@@ -28,6 +29,9 @@ const draft = (studyId: string, stackIds = ['s1']) => ({
 describe('describeInterval', () => {
   it('reads as a radiologist would write it', () => {
     expect(describeInterval(0)).toBe('Baseline')
+    // Two studies of one day: the second is not the baseline, and saying so is
+    // the only thing its caption has to add.
+    expect(describeInterval(0, false)).toBe('Same day')
     expect(describeInterval(1)).toBe('1 day later')
     expect(describeInterval(14)).toBe('14 days later')
     expect(describeInterval(46)).toBe('2 months later')
@@ -61,6 +65,19 @@ describe('planStudies', () => {
   it('carries the interval through for the caption', () => {
     const planned = planStudies(studies, [draft('a'), draft('c')])
     expect(planned.map((p) => p.intervalDays)).toEqual([0, 366])
+  })
+})
+
+describe('clockTime', () => {
+  it('reads seconds since midnight back as a clock', () => {
+    expect(clockTime(0)).toBe('00:00')
+    expect(clockTime(8 * 3600 + 30 * 60)).toBe('08:30')
+    expect(clockTime(16 * 3600 + 5 * 60 + 59)).toBe('16:05')
+  })
+
+  it('says nothing when the time is not known', () => {
+    expect(clockTime(null)).toBeNull()
+    expect(clockTime(Number.NaN)).toBeNull()
   })
 })
 
