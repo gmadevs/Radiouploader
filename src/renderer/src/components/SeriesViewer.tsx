@@ -197,6 +197,11 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
       setPending((rect) => {
         if (rect && rect.width >= MIN_MASK_SIDE && rect.height >= MIN_MASK_SIDE) {
           onChange({ masks: [...masks, rect] })
+          // The box you have just drawn is the one you are working on: its
+          // corners are there to be dragged, and Delete should take it away
+          // without hunting for it again. Until now it was only ever selected
+          // by the pointer happening to rest on it.
+          setChosen(masks.length)
         }
         return null
       })

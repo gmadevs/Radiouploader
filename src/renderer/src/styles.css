@@ -1,4 +1,9 @@
 :root {
+  /* The window is dark, and without saying so the scrollbars, the text fields
+     and the date pickers are drawn light: a white scroll track down the side of
+     a dark app, which reads as a rendering fault rather than as a choice. */
+  color-scheme: dark;
+
   --bg: #111418;
   --panel: #191e24;
   --panel-2: #212830;

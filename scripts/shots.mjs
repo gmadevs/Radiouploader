@@ -68,6 +68,18 @@ async function run() {
 
   win.webContents.reload()
   await new Promise((r) => win.webContents.once('did-finish-load', r))
+  /**
+   * Take the scrollbar out of the picture.
+   *
+   * macOS shows scrollbars only while scrolling — until a mouse is plugged in,
+   * when it shows them always. Chromium follows that, so a classic scrollbar
+   * appears down the right edge, takes fifteen pixels of layout with it and
+   * moves everything that is right-aligned or centred: eight of these ten PNGs
+   * were rewritten by connecting a mouse, with nothing in the app changed.
+   *
+   * Injected here rather than in the app, which needs its scrollbars.
+   */
+  await win.webContents.insertCSS('::-webkit-scrollbar { display: none }')
   await sleep(900)
 
   await shot('01-source', 'the first screen')
@@ -272,6 +284,17 @@ async function run() {
   }
 
   async function shot(name, description) {
+    /**
+     * Take the pointer out of the window first.
+     *
+     * The real cursor stays wherever the person at the machine left it, and a
+     * stack card under it opens the controls it keeps for a hover — which
+     * rewrote two of these PNGs between one run and the next with nothing in
+     * the app changed. Leaving the window clears every hover at once, and
+     * nothing here is mid-drag when a shot is taken.
+     */
+    win.webContents.sendInputEvent({ type: 'mouseLeave', x: 0, y: 0 })
+    await sleep(150)
     const image = await win.webContents.capturePage()
     await fs.writeFile(path.join(shotsDir, `${name}.png`), image.toPNG())
     console.log(`${name.padEnd(14)}: ${description}`)
