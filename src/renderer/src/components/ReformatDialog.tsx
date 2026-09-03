@@ -378,17 +378,27 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
 
           <div className="viewer-actions">
             <div className="tools">
-              {PROJECTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  className={projection === option.id ? 'small on' : 'small'}
-                  disabled={info === null}
-                  title={option.title}
-                  onClick={() => setProjection(option.id)}
-                >
-                  {option.label}
-                </button>
-              ))}
+              {PROJECTIONS.map((option) => {
+                // A projection through colour would take the red of one voxel
+                // and the green of another and paint a colour that is nowhere
+                // in the study. A colour series cuts; it does not project.
+                const throughColour = (info?.colour ?? false) && option.id !== 'slice'
+                return (
+                  <button
+                    key={option.id}
+                    className={projection === option.id ? 'small on' : 'small'}
+                    disabled={info === null || throughColour}
+                    title={
+                      throughColour
+                        ? 'These images are in colour, and a projection through colour mixes the colours of different voxels'
+                        : option.title
+                    }
+                    onClick={() => setProjection(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                )
+              })}
             </div>
             {level && (
               <span className="muted small" style={{ flex: 'none' }}>
@@ -406,7 +416,7 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
                 ? ''
                 : `${count} image${count === 1 ? '' : 's'} · ${step(spacing)} mm apart, interpolated from ${step(info.spacing.z)} mm slices${
                     info.anatomical ? '' : ' · these files do not say which way they face, so the planes are the acquisition’s'
-                  }`}
+                  }${info.colour ? ' · in colour, so it can be cut but not projected through' : ''}`}
             </span>
             <button className="primary" disabled={info === null || busy || count === 0} onClick={() => void add()}>
               Add to the case

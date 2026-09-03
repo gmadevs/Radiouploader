@@ -11,9 +11,10 @@ import type { Volume } from './reformat'
  * preview-sized frames precisely so that it does not have to carry this.
  *
  * Everything is checked before anything is read. A stack that cannot make a
- * volume says why — spacing that jumps, images of different sizes, colour — and
- * the answer is the same shape as the reason, so the user is told rather than
- * shown a reformat built on an assumption that did not hold.
+ * volume says why — spacing that jumps, images of different sizes, a colour
+ * table rather than colours — and the answer is the same shape as the reason,
+ * so the user is told rather than shown a reformat built on an assumption that
+ * did not hold.
  */
 
 /** Bigger than this and the volume is refused rather than allocated. */
@@ -84,15 +85,41 @@ function blank(
   window: { centre: number; width: number } | null
 ): void {
   if (masks.length === 0) return
-  const [fill] = blackSamples(header, window, samples)
+  const black = blackSamples(header, window, samples)
+  const channels = header.samplesPerPixel
 
   for (const mask of masks) {
     const left = Math.min(Math.max(Math.round(mask.x * header.columns), 0), header.columns)
     const top = Math.min(Math.max(Math.round(mask.y * header.rows), 0), header.rows)
     const right = Math.min(Math.max(Math.round((mask.x + mask.width) * header.columns), 0), header.columns)
     const bottom = Math.min(Math.max(Math.round((mask.y + mask.height) * header.rows), 0), header.rows)
-    for (let y = top; y < bottom; y++) samples.fill(fill, y * header.columns + left, y * header.columns + right)
+    for (let y = top; y < bottom; y++) {
+      const row = y * header.columns
+      if (channels === 1) {
+        samples.fill(black[0], row + left, row + right)
+        continue
+      }
+      // Black is three numbers here, and on a YBR image not three zeroes.
+      for (let x = left; x < right; x++) {
+        for (let c = 0; c < channels; c++) samples[(row + x) * channels + c] = black[c] ?? 0
+      }
+    }
   }
+}
+
+/**
+ * Colour written plane by plane, put back the way everything else here reads it.
+ *
+ * PlanarConfiguration 1 stores every red sample, then every green, then every
+ * blue. Interpolating that as if it were interleaved would blend the red of one
+ * pixel with the green of another two thirds of the image away.
+ */
+function interleave<T extends Int16Array | Uint16Array | Uint8Array>(samples: T, pixels: number, channels: number): T {
+  const out = new (samples.constructor as new (length: number) => T)(pixels * channels)
+  for (let c = 0; c < channels; c++) {
+    for (let i = 0; i < pixels; i++) out[i * channels + c] = samples[c * pixels + i]
+  }
+  return out
 }
 
 /**
@@ -116,8 +143,23 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
 
   const first = await readStoredSamples(slices[0].path, slices[0].frame)
   const header = first.header
-  if (header.samplesPerPixel !== 1) {
-    throw new VolumeError('Only greyscale images can be reformatted; this stack is in colour')
+  const channels = header.samplesPerPixel
+  if (channels !== 1 && channels !== 3) {
+    throw new VolumeError(`These images store ${channels} samples per pixel, which this app cannot stack into a volume`)
+  }
+  // Colour is carried through; what is refused is colour whose numbers are not
+  // the colour. A palette image stores indices into a lookup table, and half
+  // way between two indices is not half way between two colours — it is
+  // whatever the table happens to hold there.
+  if (channels === 1 && header.photometric.startsWith('PALETTE')) {
+    throw new VolumeError(
+      'These images are palette colour: the stored values are places in a colour table, so nothing between two of them means anything'
+    )
+  }
+  if (channels === 3 && header.photometric !== 'RGB') {
+    throw new VolumeError(
+      `These images are colour stored as ${header.photometric}, and only RGB colour can be reformatted`
+    )
   }
   if (header.pixelSpacing === null) {
     throw new VolumeError('These images do not say how big a pixel is, so a reformat would have no scale')
@@ -149,7 +191,7 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
       }
     : header
 
-  const voxels = cropped.rows * cropped.columns * slices.length
+  const voxels = cropped.rows * cropped.columns * slices.length * channels
   const bytes = voxels * (header.bitsAllocated <= 8 ? 1 : 2)
   if (bytes > MAX_BYTES) {
     throw new VolumeError(
@@ -165,19 +207,24 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
         : new Uint16Array(voxels)
 
   /** What is read from a file, before the crop takes a rectangle out of it. */
-  const perSlice = header.rows * header.columns
+  const perSlice = header.rows * header.columns * channels
   const masks = stack.masks ?? []
   // The lowest sample there is: air, background, whatever this modality calls
   // nothing. An oblique plane leaves the volume halfway across the picture and
   // this is what it finds out there.
   let low = Infinity
-  const read = first.samples.slice(0, perSlice)
+  const planar = channels > 1 && header.planarConfiguration === 1
+  const pixels = header.rows * header.columns
+
+  const read = planar
+    ? interleave(first.samples.slice(0, perSlice), pixels, channels)
+    : first.samples.slice(0, perSlice)
   blank(read, header, masks, stack.window)
-  const firstSlice = bounds ? cropSamples(read, header.columns, bounds) : read
+  const firstSlice = bounds ? cropSamples(read, header.columns, bounds, channels) : read
   samples.set(firstSlice, 0)
   for (const value of firstSlice) if (value < low) low = value
 
-  const perCropped = cropped.rows * cropped.columns
+  const perCropped = cropped.rows * cropped.columns * channels
   for (let i = 1; i < slices.length; i++) {
     const { header: other, samples: whole } = await readStoredSamples(slices[i].path, slices[i].frame)
     // Checked before the crop is taken, so a stack of mixed sizes is caught by
@@ -188,9 +235,9 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
     if (other.slope !== header.slope || other.intercept !== header.intercept) {
       throw new VolumeError('The images in this stack are not all in the same units, so a projection of them would not be either')
     }
-    const read = whole.slice(0, perSlice)
+    const read = planar ? interleave(whole.slice(0, perSlice), pixels, channels) : whole.slice(0, perSlice)
     blank(read, header, masks, stack.window)
-    const frame = bounds ? cropSamples(read, header.columns, bounds) : read
+    const frame = bounds ? cropSamples(read, header.columns, bounds, channels) : read
     samples.set(frame, i * perCropped)
     for (const value of frame) if (value < low) low = value
   }
@@ -201,6 +248,7 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
       columns: cropped.columns,
       rows: cropped.rows,
       depth: slices.length,
+      channels,
       spacing,
       low: Number.isFinite(low) ? low : 0
     },

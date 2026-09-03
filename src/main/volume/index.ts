@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { downscaleGrey, type GreyFrame } from '@shared/dicomImage'
+import { downscale, downscaleGrey, type DecodedFrame, type GreyFrame } from '@shared/dicomImage'
 import type {
   PreviewFrame,
   ReformatPlan,
@@ -69,7 +69,8 @@ export async function openVolume(stackId: string): Promise<VolumeInfo> {
     size: extent(built.volume),
     finestSpacing: pixelSpacingOf(built),
     frames: anatomical ?? ACQUISITION_FRAMES,
-    anatomical: anatomical !== null
+    anatomical: anatomical !== null,
+    colour: built.volume.channels > 1
   }
 }
 
@@ -91,6 +92,21 @@ export function previewReformat(request: ReformatRequestMessage, maxEdge: number
 
   const image = reformatSlice(open.built.volume, { ...request, pixelSpacing: pixelSpacingOf(open.built) })
   const { slope, intercept, photometric } = open.built.header
+
+  // Colour arrives as pixels rather than as values to be windowed: there is no
+  // window to apply to RGB, and a slider offering one would be a control that
+  // does nothing.
+  if (image.channels > 1) {
+    const rgba = new Uint8ClampedArray(image.width * image.height * 4)
+    for (let i = 0; i < image.width * image.height; i++) {
+      rgba[i * 4] = image.samples[i * 3]
+      rgba[i * 4 + 1] = image.samples[i * 3 + 1]
+      rgba[i * 4 + 2] = image.samples[i * 3 + 2]
+      rgba[i * 4 + 3] = 255
+    }
+    const frame: DecodedFrame = { width: image.width, height: image.height, rgba }
+    return { kind: 'colour', compressed: false, ...downscale(frame, maxEdge) }
+  }
 
   const values = new Float32Array(image.samples.length)
   for (let i = 0; i < values.length; i++) values[i] = image.samples[i] * slope + intercept
@@ -123,12 +139,14 @@ export async function commitReformat(plan: ReformatPlan): Promise<{ studyId: str
 
   const workDir = await session.workDir()
   const outputDir = path.join(workDir, 'reformatted', `${Date.now()}`)
+  const colour = open.built.volume.channels > 1
   const series = await writeReformatted(open.built, plan, outputDir, {
     seriesId: open.parent.series.id,
     seriesNumber: open.parent.series.seriesNumber,
     description: open.parent.series.description,
     modality: open.parent.series.modality,
-    window: plan.window ?? openingWindow()
+    // RGB has no window, and writing one onto it would be a tag that lies.
+    window: colour ? null : (plan.window ?? openingWindow())
   })
 
   const study = open.parent.study

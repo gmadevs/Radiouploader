@@ -250,6 +250,12 @@ export interface VolumeInfo {
   frames: Record<Plane, ReformatFrame>
   /** False when the file did not say where it was pointing and these are a guess. */
   anatomical: boolean
+  /**
+   * The volume is in colour, so it can be cut on any plane but not projected
+   * through: a maximum through RGB takes the red of one voxel and the green of
+   * another and paints a colour that is nowhere in the study.
+   */
+  colour: boolean
 }
 
 /**

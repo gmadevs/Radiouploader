@@ -16,11 +16,19 @@ import { AXES, boxRange, dot, isAxisAligned, type Frame, type Vec3 } from '@shar
  */
 
 export interface Volume {
-  /** Stored samples, slice by slice: index (z * rows + y) * columns + x. */
+  /** Stored samples: index ((z * rows + y) * columns + x) * channels + channel. */
   samples: ArrayLike<number>
   columns: number
   rows: number
   depth: number
+  /**
+   * Samples per voxel: 1 for greyscale, 3 for RGB.
+   *
+   * Colour is carried through rather than flattened to a grey. A DTI colour map
+   * says which way the fibres run *in the colour*, and a reformat of it that
+   * threw the colour away would be a reformat of nothing anyone asked for.
+   */
+  channels: number
   /** Millimetres between neighbouring columns, rows and slices. */
   spacing: { x: number; y: number; z: number }
   /** The lowest sample in the volume, which is what lies outside it. */
@@ -41,9 +49,11 @@ export interface ReformatRequest {
 }
 
 export interface ReformatSlice {
+  /** width * height * channels, interleaved. */
   samples: Float32Array
   width: number
   height: number
+  channels: number
   /** Millimetres per pixel, both axes; isotropic by construction. */
   spacing: number
 }
@@ -75,8 +85,8 @@ export function normalExtent(volume: Volume, frame: Frame): number {
  * edge value: an oblique plane leaves the box halfway across the picture, and
  * clamping would smear the last row of voxels across everything beyond it.
  */
-export function sampleAt(volume: Volume, x: number, y: number, z: number): number {
-  const { columns, rows, depth, samples } = volume
+export function sampleAt(volume: Volume, x: number, y: number, z: number, channel = 0): number {
+  const { columns, rows, depth, channels, samples } = volume
   if (x < 0 || y < 0 || z < 0 || x > columns - 1 || y > rows - 1 || z > depth - 1) return volume.low
 
   const x0 = Math.floor(x)
@@ -89,7 +99,8 @@ export function sampleAt(volume: Volume, x: number, y: number, z: number): numbe
   const fy = y - y0
   const fz = z - z0
 
-  const at = (xi: number, yi: number, zi: number): number => samples[(zi * rows + yi) * columns + xi]
+  const at = (xi: number, yi: number, zi: number): number =>
+    samples[((zi * rows + yi) * columns + xi) * channels + channel]
 
   const c00 = at(x0, y0, z0) * (1 - fx) + at(x1, y0, z0) * fx
   const c10 = at(x0, y1, z0) * (1 - fx) + at(x1, y1, z0) * fx
@@ -152,7 +163,15 @@ export function reformatSlice(volume: Volume, request: ReformatRequest): Reforma
   const steps = request.projection === 'slice' ? [centre] : slabSteps(volume, frame, centre, request.thickness)
   const count = steps.length
 
-  const samples = new Float32Array(width * height)
+  // A maximum through colour would take the red of one voxel, the green of
+  // another and the blue of a third, and paint a colour that is nowhere in the
+  // volume. The dialog does not offer it; this is the same statement in code.
+  const channels = volume.channels
+  if (channels > 1 && request.projection !== 'slice') {
+    throw new Error('A colour volume can be cut on any plane, but not projected through')
+  }
+
+  const samples = new Float32Array(width * height * channels)
   const { x: dx, y: dy, z: dz } = volume.spacing
 
   for (let iv = 0; iv < height; iv++) {
@@ -160,25 +179,27 @@ export function reformatSlice(volume: Volume, request: ReformatRequest): Reforma
     for (let iu = 0; iu < width; iu++) {
       const u = across.min + iu * spacing
 
-      let value = request.projection === 'minip' ? Infinity : request.projection === 'mip' ? -Infinity : 0
-      for (const n of steps) {
-        // p = u·U + v·V + n·N, in the volume's millimetres, then into voxels.
-        const px = (u * frame.u[0] + v * frame.v[0] + n * frame.n[0]) / dx
-        const py = (u * frame.u[1] + v * frame.v[1] + n * frame.n[1]) / dy
-        const pz = (u * frame.u[2] + v * frame.v[2] + n * frame.n[2]) / dz
-        const sample = sampleAt(volume, px, py, pz)
+      for (let c = 0; c < channels; c++) {
+        let value = request.projection === 'minip' ? Infinity : request.projection === 'mip' ? -Infinity : 0
+        for (const n of steps) {
+          // p = u·U + v·V + n·N, in the volume's millimetres, then into voxels.
+          const px = (u * frame.u[0] + v * frame.v[0] + n * frame.n[0]) / dx
+          const py = (u * frame.u[1] + v * frame.v[1] + n * frame.n[1]) / dy
+          const pz = (u * frame.u[2] + v * frame.v[2] + n * frame.n[2]) / dz
+          const sample = sampleAt(volume, px, py, pz, c)
 
-        if (request.projection === 'mip') value = Math.max(value, sample)
-        else if (request.projection === 'minip') value = Math.min(value, sample)
-        else value += sample
+          if (request.projection === 'mip') value = Math.max(value, sample)
+          else if (request.projection === 'minip') value = Math.min(value, sample)
+          else value += sample
+        }
+
+        samples[(iv * width + iu) * channels + c] =
+          request.projection === 'mean' || request.projection === 'slice' ? value / count : value
       }
-
-      samples[iv * width + iu] =
-        request.projection === 'mean' || request.projection === 'slice' ? value / count : value
     }
   }
 
-  return { samples, width, height, spacing }
+  return { samples, width, height, channels, spacing }
 }
 
 /** Where the first pixel of such an image sits, in the volume's millimetres. */

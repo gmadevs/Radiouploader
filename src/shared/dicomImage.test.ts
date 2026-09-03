@@ -510,6 +510,13 @@ describe('cropSamples', () => {
     expect(cut).toBeInstanceOf(Uint16Array)
   })
 
+  it('takes whole pixels out of colour, not a third of the width of them', () => {
+    // Two columns of RGB: pixel (x, y) is (x, y, 0).
+    const samples = new Uint8Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0])
+    const cut = cropSamples(samples, 2, { x: 1, y: 0, columns: 1, rows: 2 }, 3)
+    expect([...cut]).toEqual([1, 0, 0, 1, 1, 0])
+  })
+
   it('keeps a signed stack signed, since a CT that came back unsigned is air at 3000', () => {
     const cut = cropSamples(new Int16Array([-1000, -2, 5, 40]), 2, { x: 0, y: 0, columns: 1, rows: 2 })
     expect(cut).toBeInstanceOf(Int16Array)

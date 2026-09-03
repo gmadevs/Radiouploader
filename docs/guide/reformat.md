@@ -63,6 +63,25 @@ suggestion, and is used as it stands.
 The window is worked out once, when the volume is built, and then stays put: recomputing it
 per image would make every step through the stack a different picture.
 
+## Colour
+
+A colour series — a DTI directional map, a fused PET or a Doppler acquisition stored as RGB
+— can be **cut on any plane**, and the colours come through it: each channel is interpolated
+along its own axis, and the derived images are written as RGB.
+
+It cannot be **projected through**. A maximum through colour would take the red of one voxel,
+the green of another and the blue of a third and paint a colour that is nowhere in the study,
+so **MIP**, **MinIP** and **Mean** are turned off for a colour volume and **Slice** is what
+is left. There is no contrast control either: RGB samples are already the picture, and a
+window over them would be a slider that does nothing.
+
+Two kinds of colour are refused rather than reformatted. **Palette colour** stores an index
+into a lookup table instead of a colour, and half way between two indices is not half way
+between two colours — it is whatever the table happens to hold there. And colour stored as
+**YBR** in the file itself is refused by name, since only RGB is carried through. Colour that
+*arrives* as YBR inside a JPEG is fine: the decoder hands back RGB, and what the file said
+about the bitstream is not what the samples are.
+
 ## What the planes mean
 
 They are the **patient's**, not the array's. `ImageOrientationPatient` says which way the
@@ -107,7 +126,7 @@ A volume needs geometry that holds, and the dialog says which part did not:
 - **gaps that vary** by more than a tenth — a reformat of them would be stretched where the
   images are missing
 - **images of different sizes**, or in different units
-- **colour**, which has no single value to project
+- **palette colour**, or colour that is not RGB — see [Colour](#colour)
 - **no pixel spacing**, which leaves the result with no scale
 - **too large** — a volume over 512 MB is refused rather than allocated
 
@@ -115,7 +134,8 @@ A volume needs geometry that holds, and the dialog says which part did not:
 
 Areas you blanked on the parent are blanked in the volume **before** it is built, and the
 crop is taken before it too — so a banner erased on the axial images cannot come back
-through a coronal of them, and neither can a margin cut off them. The volume is the cropped
+through a coronal of them, and neither can a margin cut off them. On a colour series the
+blanking is done in all three channels, and black means what the file means by black. The volume is the cropped
 one throughout: it is that much smaller, and the derived images carry the position of the
 corner that was kept rather than the one that was thrown away. The window you chose comes
 with it. Rescale is preserved exactly: projections are taken on the stored

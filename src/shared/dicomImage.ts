@@ -493,16 +493,24 @@ export function cropFrameBytes(frameBytes: Uint8Array, geometry: PixelGeometry, 
   return out
 }
 
-/** The same cut, on samples that have already been read out of their bytes. */
+/**
+ * The same cut, on samples that have already been read out of their bytes.
+ *
+ * `channels` is how many samples one pixel is — three for RGB, where a row is
+ * three times as long as it has pixels and a cut that forgot it would take a
+ * third of the width and shear the colours across it.
+ */
 export function cropSamples<T extends Int16Array | Uint16Array | Uint8Array>(
   samples: T,
   columns: number,
-  bounds: CropBounds
+  bounds: CropBounds,
+  channels = 1
 ): T {
-  const out = new (samples.constructor as new (length: number) => T)(bounds.rows * bounds.columns)
+  const out = new (samples.constructor as new (length: number) => T)(bounds.rows * bounds.columns * channels)
+  const stride = bounds.columns * channels
   for (let y = 0; y < bounds.rows; y++) {
-    const from = (bounds.y + y) * columns + bounds.x
-    out.set(samples.subarray(from, from + bounds.columns) as T, y * bounds.columns)
+    const from = ((bounds.y + y) * columns + bounds.x) * channels
+    out.set(samples.subarray(from, from + stride) as T, y * stride)
   }
   return out
 }

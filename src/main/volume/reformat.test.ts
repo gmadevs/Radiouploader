@@ -18,14 +18,14 @@ function ramp(columns = 4, rows = 4, depth = 5, spacing = { x: 1, y: 1, z: 1 }):
   for (let z = 0; z < depth; z++) {
     for (let i = 0; i < rows * columns; i++) samples[z * rows * columns + i] = z
   }
-  return { samples, columns, rows, depth, spacing, low: 0 }
+  return { samples, columns, rows, depth, channels: 1, spacing, low: 0 }
 }
 
 /** A volume that is zero everywhere except one bright voxel. */
 function speck(at: { x: number; y: number; z: number }, value = 100): Volume {
   const samples = new Float32Array(8 * 8 * 8)
   samples[(at.z * 8 + at.y) * 8 + at.x] = value
-  return { samples, columns: 8, rows: 8, depth: 8, spacing: { x: 1, y: 1, z: 1 }, low: Math.min(0, value) }
+  return { samples, columns: 8, rows: 8, depth: 8, channels: 1, spacing: { x: 1, y: 1, z: 1 }, low: Math.min(0, value) }
 }
 
 describe('sampleAt', () => {
@@ -179,5 +179,62 @@ describe('slabOffsets', () => {
 
   it('gives one image for a volume thinner than the spacing', () => {
     expect(slabOffsets(ramp(4, 4, 2), FRAMES.axial, 10)).toHaveLength(1)
+  })
+})
+
+/**
+ * A colour volume whose every voxel is (z, y, x) as red, green and blue, so a
+ * sample can be checked channel by channel — and a channel read out of the
+ * wrong place shows up as the wrong colour rather than as a near-miss.
+ */
+function colours(size = 4): Volume {
+  const samples = new Float32Array(size * size * size * 3)
+  for (let z = 0; z < size; z++) {
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const at = ((z * size + y) * size + x) * 3
+        samples[at] = z
+        samples[at + 1] = y
+        samples[at + 2] = x
+      }
+    }
+  }
+  return { samples, columns: size, rows: size, depth: size, channels: 3, spacing: { x: 1, y: 1, z: 1 }, low: 0 }
+}
+
+describe('colour volumes', () => {
+  it('reads each channel from the voxel it belongs to', () => {
+    const volume = colours()
+    expect(sampleAt(volume, 1, 2, 3, 0)).toBe(3)
+    expect(sampleAt(volume, 1, 2, 3, 1)).toBe(2)
+    expect(sampleAt(volume, 1, 2, 3, 2)).toBe(1)
+  })
+
+  it('interpolates a channel along its own axis and leaves the others alone', () => {
+    const volume = colours()
+    expect(sampleAt(volume, 1, 2, 2.5, 0)).toBeCloseTo(2.5)
+    expect(sampleAt(volume, 1, 2, 2.5, 1)).toBe(2)
+    expect(sampleAt(volume, 1, 2, 2.5, 2)).toBe(1)
+  })
+
+  it('cuts a plane with its colours intact', () => {
+    const image = reformatSlice(colours(), {
+      frame: FRAMES.axial,
+      projection: 'slice',
+      thickness: 0,
+      offset: 2,
+      pixelSpacing: 1
+    })
+    expect(image.channels).toBe(3)
+    expect(image.samples).toHaveLength(image.width * image.height * 3)
+    // The pixel at (1, 2) of the plane through z = 2 is (2, 2, 1).
+    const at = ((2 * image.width) + 1) * 3
+    expect([image.samples[at], image.samples[at + 1], image.samples[at + 2]]).toEqual([2, 2, 1])
+  })
+
+  it('refuses to project through colour rather than mixing voxels together', () => {
+    expect(() =>
+      reformatSlice(colours(), { frame: FRAMES.axial, projection: 'mip', thickness: 4, offset: 2, pixelSpacing: 1 })
+    ).toThrow(/not projected through/)
   })
 })

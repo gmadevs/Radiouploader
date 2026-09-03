@@ -124,6 +124,7 @@ export async function writeReformatted(
   const offsets = slabOffsets(built.volume, plan.frame, plan.spacing)
   const label = describePlan(built, plan)
 
+  const channels = built.volume.channels
   const wide = built.header.bitsAllocated > 8
   const low = wide ? (built.header.signed ? -32768 : 0) : 0
   const high = wide ? (built.header.signed ? 32767 : 65535) : 255
@@ -145,7 +146,7 @@ export async function writeReformatted(
     )
     const dict = message.dict as unknown as Dict
 
-    const count = image.width * image.height
+    const count = image.width * image.height * channels
     const stored = wide ? new Uint8Array(count * 2) : new Uint8Array(count)
     const view = new DataView(stored.buffer)
     for (let i = 0; i < count; i++) {
@@ -158,6 +159,13 @@ export async function writeReformatted(
     dict['7FE00010'] = { vr: wide ? 'OW' : 'OB', Value: [stored.buffer as ArrayBuffer] }
     dict['00280010'] = { vr: 'US', Value: [image.height] }
     dict['00280011'] = { vr: 'US', Value: [image.width] }
+    // Said outright rather than inherited: the parent may have been stored
+    // plane by plane, and what is written here is interleaved whatever it was.
+    if (channels > 1) {
+      dict['00280002'] = { vr: 'US', Value: [channels] }
+      dict['00280004'] = { vr: 'CS', Value: ['RGB'] }
+      dict['00280006'] = { vr: 'US', Value: [0] }
+    }
     dict['00280030'] = { vr: 'DS', Value: decimals([image.spacing, image.spacing]) }
     delete dict['00280008']
 
@@ -186,6 +194,12 @@ export async function writeReformatted(
     if (parent.window) {
       dict['00281050'] = { vr: 'DS', Value: [round(parent.window.centre)] }
       dict['00281051'] = { vr: 'DS', Value: [round(parent.window.width)] }
+      delete dict['00281055']
+      delete dict['00283010']
+    } else if (channels > 1) {
+      // A window on RGB is a tag about values that are already the picture.
+      delete dict['00281050']
+      delete dict['00281051']
       delete dict['00281055']
       delete dict['00283010']
     }
