@@ -55,6 +55,10 @@ Homebrew quarantines what it downloads:
 ```bash
 brew install --cask gmadevs/radiouploader/radiouploader
 xattr -dr com.apple.quarantine /Applications/Radiouploader.app
+
+UPDATE
+
+brew upgrade radiouploader
 ```
 
 Older versions, and the notes that come with each, are on the [releases page](https://github.com/gmadevs/Radiouploader/releases).
