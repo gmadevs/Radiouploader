@@ -37,32 +37,39 @@ export function UpdateNotice({ update, onDismiss }: Props): React.JSX.Element | 
 
   return (
     <div className="notice update">
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <strong>Version {update.latest} is available.</strong>{' '}
-        <span className="muted">You are running {update.current}.</span>
-        {update.command && (
-          <div className="command" title="Homebrew installed this copy, so this is what upgrades it">
-            <code>{update.command}</code>
-          </div>
-        )}
+      <div className="update-head">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <strong>Version {update.latest} is available.</strong>{' '}
+          <span className="muted">You are running {update.current}.</span>
+        </div>
+        <div className="update-actions">
+          {update.command && (
+            <button className="small" onClick={() => copy(update.command!)}>
+              {copied ? 'Copied' : 'Copy command'}
+            </button>
+          )}
+          {update.url && (
+            <a href={update.url} target="_blank" rel="noreferrer">
+              <button className="small">{update.command ? 'Release notes' : 'Download'}</button>
+            </a>
+          )}
+          {onDismiss && (
+            <button className="small ghost" title="Stop offering this version" onClick={onDismiss}>
+              Not now
+            </button>
+          )}
+        </div>
       </div>
-      <div className="update-actions">
-        {update.command && (
-          <button className="small" onClick={() => copy(update.command!)}>
-            {copied ? 'Copied' : 'Copy command'}
-          </button>
-        )}
-        {update.url && (
-          <a href={update.url} target="_blank" rel="noreferrer">
-            <button className="small">{update.command ? 'Release notes' : 'Download'}</button>
-          </a>
-        )}
-        {onDismiss && (
-          <button className="small ghost" title="Stop offering this version" onClick={onDismiss}>
-            Not now
-          </button>
-        )}
-      </div>
+
+      {/* Its own row, the whole width of the notice. Beside the buttons it had
+          half of it, and the line that has to be pasted whole wrapped inside
+          the box — which is the thing that broke it the first time somebody
+          copied it off a screen. */}
+      {update.command && (
+        <div className="command" title="Homebrew installed this copy, so this is what upgrades it">
+          <code>{update.command}</code>
+        </div>
+      )}
     </div>
   )
 }

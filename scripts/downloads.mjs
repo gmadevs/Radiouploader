@@ -40,6 +40,13 @@ export const BREW_UNQUARANTINE = 'xattr -dr com.apple.quarantine /Applications/R
 /**
  * Moving an existing install to a newer release.
  *
+ * Two lines, like the install above, and for a reason worth writing down: the
+ * two were joined with `&&` once, and the single line that made is long enough
+ * to wrap in a narrow window. Copying it out of one takes the wrap with it, and
+ * the break lands mid-command — `xattr -dr com.apple.quarantine` on its own
+ * answers "Not enough arguments for option -d" and the path runs as a command
+ * of its own. Short lines survive being copied out of anything.
+ *
  * The quarantine step is repeated rather than assumed done: a cask upgrade is a
  * fresh download, and Homebrew marks it the way it marked the first one — so an
  * upgraded copy that keeps the flag is one macOS refuses to open, having opened
@@ -49,7 +56,7 @@ export const BREW_UNQUARANTINE = 'xattr -dr com.apple.quarantine /Applications/R
  * and `npm run links` wiped it on the next version bump, which is what happens
  * to anything written by hand inside a generated block.
  */
-export const BREW_UPGRADE = `brew upgrade --cask radiouploader && ${BREW_UNQUARANTINE}`
+export const BREW_UPGRADE = 'brew upgrade --cask radiouploader'
 
 /** The version the app is at, which is also the tag its release is under. */
 export const version = JSON.parse(

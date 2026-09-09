@@ -193,11 +193,12 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 /* A newer version exists. Quiet, on the accent rather than the warning colour:
    nothing is wrong, and the app it is sitting on top of works. */
 .notice.update {
-  display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap;
+  display: grid; gap: 0;
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
-.notice.update .update-actions { display: flex; gap: 6px; flex: none; align-items: center; }
+.update-head { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.update-actions { display: flex; gap: 6px; flex: none; align-items: center; }
 /* The command to paste, laid out as a terminal would show it. Wrapped at the
    spaces rather than scrolled sideways: half a command in a box with no
    scrollbar in sight reads as the whole of it. */

@@ -58,10 +58,17 @@ function bundlePath(): string {
 /**
  * The command that upgrades this install, or null when there is not one.
  *
- * The second half is not optional and not decoration. Homebrew quarantines
+ * The second line is not optional and not decoration. Homebrew quarantines
  * every cask download the way a browser would, and this app is unsigned, so an
  * upgraded copy that keeps the quarantine flag is one macOS refuses to open —
  * the same step the install instructions carry, at the same moment.
+ *
+ * Two lines rather than one joined with `&&`, because that one was 103
+ * characters and a command that long wraps in a narrow window. What is copied
+ * out of a wrapped rendering carries the wrap, the break lands mid-command, and
+ * `xattr -dr com.apple.quarantine` without its path answers "Not enough
+ * arguments for option -d" — which is a paste that failed, reported as though
+ * the app had given out a broken command. Neither line here reaches 62.
  */
 export async function upgradeCommand(): Promise<string | null> {
   if (process.platform !== 'darwin') return null
@@ -69,7 +76,12 @@ export async function upgradeCommand(): Promise<string | null> {
   const installedByBrew = await Promise.all(CASKROOMS.map(exists))
   if (!installedByBrew.some(Boolean)) return null
 
-  return `brew upgrade --cask radiouploader && xattr -dr com.apple.quarantine ${bundlePath()}`
+  // A cask installs to /Applications, where there is no space to worry about —
+  // but the path is read off this process rather than assumed, and a command
+  // handed over to be pasted has to survive whatever comes back.
+  const bundle = bundlePath()
+  const target = bundle.includes(' ') ? `'${bundle}'` : bundle
+  return `brew upgrade --cask radiouploader\nxattr -dr com.apple.quarantine ${target}`
 }
 
 async function latestRelease(): Promise<{ version: string; url: string } | null> {

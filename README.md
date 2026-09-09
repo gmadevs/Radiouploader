@@ -58,11 +58,12 @@ xattr -dr com.apple.quarantine /Applications/Radiouploader.app
 ```
 
 and to move an install already there onto this version — the app says so itself at
-launch, and the second half is there because a cask upgrade re-quarantines what it
+launch, and the second line is there because a cask upgrade re-quarantines what it
 downloads:
 
 ```bash
-brew upgrade --cask radiouploader && xattr -dr com.apple.quarantine /Applications/Radiouploader.app
+brew upgrade --cask radiouploader
+xattr -dr com.apple.quarantine /Applications/Radiouploader.app
 ```
 
 Older versions, and the notes that come with each, are on the [releases page](https://github.com/gmadevs/Radiouploader/releases).

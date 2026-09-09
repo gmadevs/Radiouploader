@@ -68,13 +68,23 @@ screen if it is newer than the one running. **Nothing is downloaded and nothing 
 installed**: this app is unsigned on every platform, and an installer it fetched and ran for
 itself would be an unsigned binary arriving over the wire with nobody having looked at it.
 
-Where Homebrew did the install, the notice carries the command that upgrades it — with the
-quarantine step attached, because a cask upgrade re-quarantines the app and an upgraded copy
-still carrying the flag is one macOS refuses to open:
+Where Homebrew did the install, the notice carries the command that upgrades it. Two lines,
+like the install: the second one is not optional, because a cask upgrade is a fresh download
+and Homebrew quarantines it exactly as it quarantined the first — an upgraded copy still
+carrying the flag is one macOS refuses to open, having opened the version before it every
+day.
 
 ```bash
-brew upgrade --cask radiouploader && xattr -dr com.apple.quarantine /Applications/Radiouploader.app
+brew upgrade --cask radiouploader
+xattr -dr com.apple.quarantine /Applications/Radiouploader.app
 ```
+
+::: tip Why not one line joined with `&&`
+It was, and it was 103 characters. A command that long wraps in a narrow terminal, whatever
+copies it out of a wrapped rendering takes the wrap with it, and the break lands in the
+middle: `xattr -dr com.apple.quarantine` on its own answers *"Not enough arguments for option
+-d"* and the path is left to run as a command of its own. Neither line above reaches 62.
+:::
 
 That command appears only where the **Caskroom really holds this app**. Plenty of people have
 Homebrew and installed by dragging the app out of the disk image; telling them to
