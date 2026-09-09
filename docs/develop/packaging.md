@@ -130,8 +130,30 @@ inside git.
 The tap is named in lower case because Homebrew lower-cases a tap name: `gmadevs/radiouploader`
 resolves to `homebrew-radiouploader`, and a repository named any other way is reached only
 through GitHub's own case-insensitivity, which is a redirect to depend on rather than a name
-to have. The cask itself is checked before it ships — `brew style` on it is clean, which is
-what catches a deprecated `depends_on` form or a stanza in the wrong order.
+to have.
+
+`brew style` on the cask is clean, and **that is not the check that matters**. A deprecated
+stanza is not a style offence: Homebrew prints it when it *reads* the cask, which means on
+somebody else's machine, in the middle of whatever they were doing. A `verified:` parameter
+in the `url` stanza went exactly that way — style stayed clean release after release while
+every `brew` command that so much as touched this tap printed two paragraphs asking the
+person who ran it to report the tap to its author. It was found by somebody upgrading.
+
+So the check is to load it, not only to lint it:
+
+```bash
+brew tap-new gmadevs/caskcheck --no-git
+node scripts/cask.mjs <version> <arm64 sha256> <x64 sha256> \
+  > "$(brew --repository gmadevs/caskcheck)/Casks/radiouploader.rb"
+brew info --cask gmadevs/caskcheck/radiouploader   # a deprecation prints here
+brew style gmadevs/caskcheck
+rm -rf "$(brew --repository gmadevs/caskcheck)"
+```
+
+A tap of its own, because Homebrew refuses a loose file — *"Homebrew requires casks to be in
+a tap"* — and a scratch one rather than the real clone, which the workflow overwrites anyway.
+`brew style` on a bare `.rb` outside a tap is no substitute: it answers with three offences
+about Sorbet sigils and frozen string literals, none of which apply to a cask.
 
 ## The icon
 

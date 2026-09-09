@@ -39,6 +39,13 @@ for (const [name, sha] of [['arm64', armSha], ['x64', intelSha]]) {
 /**
  * One URL with two holes in it, which is how a cask carries both architectures.
  * `#{version}` and `#{arch}` are Ruby's, filled in when Homebrew reads the cask.
+ *
+ * No `verified:` beside it. It named the repository the download really comes
+ * from, for a URL Homebrew could not tell was the project's own; Homebrew does
+ * that check itself now and deprecated the parameter, so every brew command
+ * that so much as read this tap printed two paragraphs asking whoever ran it to
+ * report the tap to its author. Which is a fair description of what it was:
+ * this line, on their screen, three commands deep.
  */
 const URL_TEMPLATE = `${REPO}/releases/download/v#{version}/Radiouploader-#{version}#{arch}.dmg`
 
@@ -69,8 +76,7 @@ process.stdout.write(`cask "radiouploader" do
   sha256 arm:   "${armSha}",
          intel: "${intelSha}"
 
-  url "${URL_TEMPLATE}",
-      verified: "github.com/gmadevs/Radiouploader/"
+  url "${URL_TEMPLATE}"
   name "Radiouploader"
   desc "Prepares DICOM studies and uploads them to Radiopaedia as draft cases"
   homepage "${REPO}"
