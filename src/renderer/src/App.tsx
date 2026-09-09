@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AppInfo, BurnInFinding, CaseSummary, IngestResult, Progress, Series, Stack } from '@shared/types'
+import type { AppInfo, BurnInFinding, CaseSummary, IngestResult, Progress, Series, Stack, UpdateStatus } from '@shared/types'
 import { keptCount } from '@shared/selection'
+import { fractionDone } from '@shared/transfer'
+import { describeTransfer } from './transferText'
 import { AccountBar } from './components/AccountBar'
 import { quotaExhausted, type AccountState } from './quota'
 import { describeInterval } from '@shared/interval'
@@ -47,21 +49,32 @@ export function App(): React.JSX.Element {
   const [result, setResult] = useState<{ caseId: string; url: string } | null>(null)
   const [account, setAccount] = useState<AccountState>({ authenticated: false, username: null, quota: null })
   /** The stack open in the viewer, by id so it follows the edits made to it. */
-  const [viewing, setViewing] = useState<{ stackId: string; heading: string } | null>(null)
+  const [viewing, setViewing] = useState<{ stackId: string; heading: string; modality: string | null } | null>(null)
   /** Stacks opened full size, so the burnt-in check knows what went unlooked at. */
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set())
   /** The burnt-in check, which stands between the review step and anonymisation. */
   const [confirming, setConfirming] = useState(false)
   /** The stack whose reformat dialog is open, with the heading it shows. */
-  const [reformatting, setReformatting] = useState<{ stackId: string; seriesId: string; heading: string } | null>(
-    null
-  )
+  const [reformatting, setReformatting] = useState<{
+    stackId: string
+    seriesId: string
+    heading: string
+    modality: string | null
+  } | null>(null)
   /** What the pixel check noticed, or null while it is still looking. */
   const [findings, setFindings] = useState<BurnInFinding[] | null>(null)
   /** The account's draft cases, or null until they have been read. */
   const [drafts, setDrafts] = useState<CaseSummary[] | null>(null)
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [showInfo, setShowInfo] = useState(false)
+  /** What the launch-time check found; null until it answers. */
+  const [update, setUpdate] = useState<UpdateStatus | null>(null)
+  /**
+   * Waved away for now. Kept apart from the version itself, so the Info dialog
+   * still says a release exists after the banner has been sent off the home
+   * screen — dismissing a notice is not the same as there being nothing there.
+   */
+  const [updateDismissed, setUpdateDismissed] = useState(false)
 
   /**
    * Reasons the account cannot take a case right now. Checked before importing
@@ -95,6 +108,25 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     void window.api.appInfo().then(setInfo).catch(() => setInfo(null))
   }, [])
+
+  // At launch, once. A check that cannot reach GitHub answers with nothing to
+  // report, so there is no failure here to handle or to show.
+  useEffect(() => {
+    void window.api
+      .checkForUpdate()
+      .then(setUpdate)
+      .catch(() => setUpdate(null))
+  }, [])
+
+  const dismissUpdate = (): void => {
+    setUpdateDismissed(true)
+    if (update?.latest) void window.api.skipUpdate(update.latest)
+  }
+
+  const setUpdateChecks = (enabled: boolean): void => {
+    setUpdate((current) => (current ? { ...current, enabled } : current))
+    void window.api.setUpdateChecks(enabled)
+  }
 
   /** The selection, flattened, with the labels the check and the viewer need. */
   const selectedEntries = useMemo<StackEntry[]>(
@@ -238,8 +270,8 @@ export function App(): React.JSX.Element {
   }
 
   /** Opening a stack is what the burnt-in check counts as having looked at it. */
-  const openViewer = (stackId: string, heading: string): void => {
-    setViewing({ stackId, heading })
+  const openViewer = (stackId: string, heading: string, modality: string | null): void => {
+    setViewing({ stackId, heading, modality })
     setOpened((current) => new Set(current).add(stackId))
   }
 
@@ -445,6 +477,8 @@ export function App(): React.JSX.Element {
             }}
             onDropPaths={(paths) => void runIngest(paths)}
             info={info}
+            update={updateDismissed ? null : update}
+            onDismissUpdate={dismissUpdate}
           />
         )}
 
@@ -463,7 +497,11 @@ export function App(): React.JSX.Element {
             onMoveSeries={moveSeries}
             onMoveStudy={moveStudy}
             onOpen={(stack, series, study) =>
-              openViewer(stack.id, `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`)
+              openViewer(
+                stack.id,
+                `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`,
+                series.modality
+              )
             }
             onReformat={async (stack, series, study) => {
               // The volume is built in the main process from its own copy of
@@ -473,7 +511,8 @@ export function App(): React.JSX.Element {
               setReformatting({
                 stackId: stack.id,
                 seriesId: series.id,
-                heading: `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`
+                heading: `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`,
+                modality: series.modality
               })
             }}
             onKeepOnePhase={(series) => {
@@ -514,7 +553,14 @@ export function App(): React.JSX.Element {
         )}
       </main>
 
-      {showInfo && <InfoDialog info={info} onClose={() => setShowInfo(false)} />}
+      {showInfo && (
+        <InfoDialog
+          info={info}
+          update={update}
+          onSetUpdateChecks={setUpdateChecks}
+          onClose={() => setShowInfo(false)}
+        />
+      )}
 
       {/* Hidden while the viewer is up rather than stacked behind it, so one
           Escape closes one thing and the list is re-read on the way back. */}
@@ -525,7 +571,7 @@ export function App(): React.JSX.Element {
           unseen={unseen}
           findings={findings}
           busy={busy}
-          onOpen={(entry) => openViewer(entry.stack.id, entry.heading)}
+          onOpen={(entry) => openViewer(entry.stack.id, entry.heading, entry.modality)}
           onReorder={reorderSeries}
           onBack={() => setConfirming(false)}
           onConfirm={() => void anonymiseAndContinue()}
@@ -536,6 +582,7 @@ export function App(): React.JSX.Element {
         <ReformatDialog
           stack={reformatStack}
           heading={reformatting.heading}
+          modality={reformatting.modality}
           onClose={() => setReformatting(null)}
           // The main process has already put it in the tree it reads; this is
           // the same insertion in the copy the picker draws from.
@@ -561,6 +608,7 @@ export function App(): React.JSX.Element {
         <SeriesViewer
           stack={viewedStack}
           heading={viewing.heading}
+          modality={viewing.modality}
           onChange={(patch) => mutateStacks((stack) => (stack.id === viewedStack.id ? patch : null))}
           onClose={() => setViewing(null)}
         />
@@ -569,16 +617,35 @@ export function App(): React.JSX.Element {
       <footer className="footer">
         {error && <span className="notice error">{error}</span>}
 
+        {/* Wide enough for the line under the bar to stay on one line: it says
+            how much has gone, how fast and how long is left, and a figure that
+            wraps mid-phrase is one nobody reads twice. */}
         {progress && (
-          <div style={{ flex: '0 1 300px' }}>
+          <div style={{ flex: '0 1 520px', minWidth: 0 }}>
             <div className="small muted" style={{ marginBottom: 4 }}>
               {progress.phase}
               {progress.total > 0 ? ` ${progress.done}/${progress.total}` : ''}
               {progress.detail ? ` — ${progress.detail}` : ''}
             </div>
             <div className="progress">
-              <div style={{ width: progress.total > 0 ? `${(progress.done / progress.total) * 100}%` : '100%' }} />
+              {/* An upload's bar is its bytes, not its files: the counter above
+                  restarts at every series, and forty localisers weigh what one
+                  reconstruction does. Everything else has nothing better. */}
+              <div
+                style={{
+                  width: progress.transfer
+                    ? `${fractionDone(progress.transfer) * 100}%`
+                    : progress.total > 0
+                      ? `${(progress.done / progress.total) * 100}%`
+                      : '100%'
+                }}
+              />
             </div>
+            {progress.transfer && (
+              <div className="small muted" style={{ marginTop: 4 }}>
+                {describeTransfer(progress.transfer)}
+              </div>
+            )}
           </div>
         )}
 

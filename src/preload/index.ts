@@ -11,6 +11,7 @@ import type {
   ReformatRequestMessage,
   Series,
   StackSelection,
+  UpdateStatus,
   VolumeInfo
 } from '@shared/types'
 
@@ -18,6 +19,16 @@ import type {
 const api = {
   /** Version, OS and architecture, for the home screen and bug reports. */
   appInfo: (): Promise<AppInfo> => ipcRenderer.invoke('app:info'),
+  /**
+   * Whether a newer release exists. The only request the app makes on its own,
+   * and it can be turned off; nothing is downloaded either way.
+   */
+  checkForUpdate: (): Promise<UpdateStatus> => ipcRenderer.invoke('update:check'),
+  /** Stop offering this version. A later one is offered again. */
+  skipUpdate: (version: string): Promise<void> => ipcRenderer.invoke('update:skip', version),
+  setUpdateChecks: (enabled: boolean): Promise<void> => ipcRenderer.invoke('update:enable', enabled),
+  /** Put text on the clipboard; a file:// page has no navigator.clipboard. */
+  copyText: (text: string): Promise<void> => ipcRenderer.invoke('clipboard:write', text),
   pickSource: (kind: 'folder' | 'zip'): Promise<string[] | null> => ipcRenderer.invoke('source:pick', kind),
   /**
    * Resolve a dropped File to its path. Electron 32 removed the non-standard

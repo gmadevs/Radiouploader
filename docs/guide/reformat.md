@@ -47,8 +47,13 @@ will scroll past.
 ## The contrast
 
 Drag on the result pane — right widens, down raises the centre, the same as everywhere else,
-and the numbers beside the buttons say where it has got to. Whatever is on screen when you
-press **Add to the case** is written to the derived images.
+and the readout beside the buttons says where it has got to, as **W** width **/ L** level.
+Whatever is on screen when you press **Add to the case** is written to the derived images.
+
+On a CT the row of [named windows](/guide/review#the-ct-presets) is here too, and it earns
+its place twice over: a MIP through a 10 mm slab is read at a wider window than the slices it
+was built from, so the window that suited the source series is rarely the one the reformat
+wants.
 
 The window it opens with is the file's own `WindowCenter` / `WindowWidth`, but **only if
 that window shows the data**. Some series carry one that describes something else: a 3D

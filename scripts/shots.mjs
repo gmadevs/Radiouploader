@@ -6,9 +6,10 @@
  * which no longer exists. These are regenerated from the current build with one
  * command instead — `npm run shots` — and written straight into docs/public.
  *
- * Sign-in, the folder picker and the upload are stubbed at the IPC layer, so no
- * test hook exists in the app itself and everything between them is the real
- * wiring: real ingest, real preview decoding, real anonymisation.
+ * Sign-in, the folder picker, the upload and the update check are stubbed at the
+ * IPC layer, so no test hook exists in the app itself and everything between
+ * them is the real wiring: real ingest, real preview decoding, real
+ * anonymisation.
  *
  * Run with: npm run shots
  */
@@ -62,6 +63,10 @@ async function run() {
     quota: { draftCaseCount: 0, allowedDraftCases: 5 }
   }))
   stub('source:pick', () => [sampleDir])
+  // Whether a release exists on GitHub is not a property of this build, and a
+  // banner that appears the day after a release would rewrite these PNGs with
+  // nothing in the app changed. Stubbed for the same reason sign-in is.
+  stub('update:check', () => ({ current: '1.0.0', latest: null, url: null, command: null, enabled: true }))
   // The only step that would leave this computer. Everything it needs from the
   // response is what the confirmation screen prints.
   stub('upload:run', () => ({ caseId: '000000', url: 'https://radiopaedia.org/cases/000000' }))

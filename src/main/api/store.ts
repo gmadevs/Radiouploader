@@ -6,6 +6,13 @@ import type { OAuthConfig, TokenSet } from './oauth'
 export interface StoredConfig {
   oauth?: OAuthConfig
   tokens?: TokenSet
+  /**
+   * The launch-time update check: whether it runs, and the version that was
+   * waved away so it is not offered again. Neither is a secret, so both sit in
+   * the plain part of the file — a config the user cannot read is one they
+   * cannot check the app against.
+   */
+  updates?: { enabled?: boolean; skipped?: string }
 }
 
 function configPath(): string {
@@ -21,7 +28,8 @@ function configPath(): string {
 export async function saveConfig(config: StoredConfig): Promise<void> {
   const canEncrypt = safeStorage.isEncryptionAvailable()
   const payload: Record<string, unknown> = {
-    oauth: config.oauth ? { ...config.oauth, clientSecret: undefined } : undefined
+    oauth: config.oauth ? { ...config.oauth, clientSecret: undefined } : undefined,
+    updates: config.updates
   }
 
   if (canEncrypt) {
@@ -42,7 +50,10 @@ export async function loadConfig(): Promise<StoredConfig> {
   }
 
   const parsed = JSON.parse(raw) as Record<string, unknown>
-  const config: StoredConfig = { oauth: parsed.oauth as OAuthConfig | undefined }
+  const config: StoredConfig = {
+    oauth: parsed.oauth as OAuthConfig | undefined,
+    updates: parsed.updates as StoredConfig['updates']
+  }
 
   if (typeof parsed.secrets === 'string' && safeStorage.isEncryptionAvailable()) {
     try {

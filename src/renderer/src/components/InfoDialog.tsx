@@ -1,8 +1,12 @@
-import type { AppInfo } from '@shared/types'
-import { APP_NAME, APP_TAGLINE, ISSUES_URL, supportMailto } from '../about'
+import type { AppInfo, UpdateStatus } from '@shared/types'
+import { APP_NAME, APP_TAGLINE, ISSUES_URL, RELEASES_URL, supportMailto } from '../about'
+import { UpdateNotice } from './UpdateNotice'
 
 interface Props {
   info: AppInfo | null
+  /** What the launch-time check found, or null while it has not answered. */
+  update: UpdateStatus | null
+  onSetUpdateChecks: (enabled: boolean) => void
   onClose: () => void
 }
 
@@ -26,7 +30,7 @@ const STEPS: { title: string; body: string }[] = [
   {
     title: 'Open for review',
     body:
-      'Opens a series full size. Erase drags a black box over burnt-in text — a patient banner, an annotation — and it is painted into the pixels of every image in that series before upload. Contrast sets the window the images are read at. Anonymisation cleans the tags; the pixels are your job.'
+      'Opens a series full size. Erase drags a black box over burnt-in text — a patient banner, an annotation — and it is painted into the pixels of every image in that series before upload. Contrast sets the window the images are read at, and a CT gets the usual named windows — brain, lung, bone — as buttons. Anonymisation cleans the tags; the pixels are your job.'
   },
   {
     title: 'One last look',
@@ -41,7 +45,7 @@ const STEPS: { title: string; body: string }[] = [
 ]
 
 /** Version, a short tutorial, and where to report what went wrong. */
-export function InfoDialog({ info, onClose }: Props): React.JSX.Element {
+export function InfoDialog({ info, update, onSetUpdateChecks, onClose }: Props): React.JSX.Element {
   return (
     <div className="viewer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="info" role="dialog" aria-label={`About ${APP_NAME}`}>
@@ -67,6 +71,37 @@ export function InfoDialog({ info, onClose }: Props): React.JSX.Element {
             <strong>Check the images before you upload.</strong> The anonymiser works on DICOM tags. Text burnt into
             the pixels is invisible to it — blank it yourself with Open for review.
           </div>
+
+          <h3 style={{ marginTop: 4 }}>Updates</h3>
+          {update?.latest ? (
+            <UpdateNotice update={update} />
+          ) : (
+            <p className="muted small" style={{ margin: 0 }}>
+              {/* Not "you are up to date": a check that could not reach GitHub
+                  answers exactly as one that found nothing, and this app does
+                  not dress a silence up as a result. */}
+              {update?.enabled === false
+                ? 'The check at launch is off, so this build has not been compared with anything.'
+                : 'Nothing newer was found when the app started.'}{' '}
+              <a href={RELEASES_URL} target="_blank" rel="noreferrer">
+                Releases on GitHub
+              </a>
+            </p>
+          )}
+          <label className="setting">
+            <input
+              type="checkbox"
+              checked={update?.enabled !== false}
+              onChange={(e) => onSetUpdateChecks(e.target.checked)}
+            />
+            <span>
+              Look for a newer version at launch
+              <span className="muted small" style={{ display: 'block' }}>
+                Asks GitHub for the number of the latest release. Nothing about you, your account or your studies is
+                sent, and nothing is downloaded — the upgrade is yours to run.
+              </span>
+            </span>
+          </label>
 
           <h3 style={{ marginTop: 4 }}>Something went wrong?</h3>
           <p className="muted small" style={{ margin: 0 }}>

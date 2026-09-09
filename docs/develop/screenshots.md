@@ -39,8 +39,11 @@ comes from a seeded generator, so regenerating produces identical files rather t
 
 ## How the driving works
 
-`scripts/shots.mjs` stubs exactly three things at the IPC layer — sign-in, the folder
-picker, and the upload — so **the app itself carries no test hook**. Everything between them
+`scripts/shots.mjs` stubs exactly four things at the IPC layer — sign-in, the folder
+picker, the upload, and the update check — so **the app itself carries no test hook**. The
+update check is stubbed for the same reason as the rest: whether a newer release exists on
+GitHub is not a property of this build, and a banner appearing the day after a release would
+rewrite these PNGs with nothing in the app changed. Everything between them
 is the real wiring: real ingest, real preview decoding, real anonymisation with real
 warnings.
 

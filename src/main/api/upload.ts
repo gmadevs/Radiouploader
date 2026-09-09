@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises'
-import type { Progress } from '@shared/types'
 import type { RadiopaediaClient } from './client'
 import { RADIOPAEDIA_ORIGIN } from './oauth'
 
@@ -26,6 +25,24 @@ interface PresignedUpload {
 export interface UploadFile {
   outputPath: string
   sha256: string
+  /** What the anonymised file weighs, which is what the upload actually costs. */
+  byteLength: number
+}
+
+/**
+ * One file done, reported as it happens.
+ *
+ * The bytes are here because files are the wrong unit for how long an upload
+ * has left: forty localisers go in the time one reconstruction takes. And a
+ * file Radiopaedia already held is marked rather than counted as sent — it
+ * crossed no network, so folding it into a speed would report one that was
+ * never reached.
+ */
+export interface StackProgress {
+  done: number
+  total: number
+  bytes: number
+  alreadyThere: boolean
 }
 
 /**
@@ -39,7 +56,7 @@ export async function uploadStack(
   caseId: string,
   studyId: string,
   files: UploadFile[],
-  onProgress?: (p: Progress) => void
+  onProgress?: (p: StackProgress) => void
 ): Promise<void> {
   if (files.length === 0) return
 
@@ -60,9 +77,9 @@ export async function uploadStack(
   // through the uploads array rather than completion order.
   let done = 0
   let cursor = 0
-  const report = (): void => {
+  const report = (index: number, alreadyThere: boolean): void => {
     done++
-    onProgress?.({ phase: 'uploading', done, total: files.length })
+    onProgress?.({ done, total: files.length, bytes: files[index].byteLength, alreadyThere })
   }
 
   async function putWorker(): Promise<void> {
@@ -70,7 +87,7 @@ export async function uploadStack(
       const index = cursor++
       const upload = uploads[index]
       if (upload.status === 'already_uploaded') {
-        report()
+        report(index, true)
         continue
       }
       if (!upload.url) throw new Error(`No presigned URL for ${files[index].outputPath}`)
@@ -84,7 +101,7 @@ export async function uploadStack(
       if (!res.ok) {
         throw new Error(`S3 upload failed for ${files[index].outputPath}: ${res.status} ${res.statusText}`)
       }
-      report()
+      report(index, false)
     }
   }
 

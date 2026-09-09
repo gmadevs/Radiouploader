@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { AppInfo } from '@shared/types'
+import type { AppInfo, UpdateStatus } from '@shared/types'
 import { APP_NAME, APP_TAGLINE } from '../about'
+import { UpdateNotice } from './UpdateNotice'
 // Inlined as a data URI rather than emitted beside the bundle: the window is
 // loaded from a file:// URL, where the page's own 'self' does not cover a
 // sibling file, and the CSP in index.html allows data: for images.
@@ -14,9 +15,20 @@ interface Props {
   blocked: { reason: string } | null
   /** Null until the main process answers; the heading renders without it. */
   info: AppInfo | null
+  /** Null until the check answers, and while it has nothing to say. */
+  update: UpdateStatus | null
+  onDismissUpdate: () => void
 }
 
-export function SourceStep({ onPick, onDropPaths, busy, blocked, info }: Props): React.JSX.Element {
+export function SourceStep({
+  onPick,
+  onDropPaths,
+  busy,
+  blocked,
+  info,
+  update,
+  onDismissUpdate
+}: Props): React.JSX.Element {
   const [over, setOver] = useState(false)
 
   return (
@@ -30,6 +42,8 @@ export function SourceStep({ onPick, onDropPaths, busy, blocked, info }: Props):
             the layout still while the main process answers. */}
         <p className="muted small">{info ? `Version ${info.version} · ${info.os} · ${info.arch}` : ' '}</p>
       </div>
+
+      {update?.latest && <UpdateNotice update={update} onDismiss={onDismissUpdate} />}
 
       <div
         className={over ? 'drop over' : 'drop'}

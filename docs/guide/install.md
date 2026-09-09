@@ -61,6 +61,32 @@ Radiopaedia tokens are in the **login keychain**, which no cask may touch. Sign 
 app first, or delete the *Radiouploader* entry in Keychain Access.
 :::
 
+## Staying up to date
+
+At launch the app asks GitHub for the number of the latest release, and says so on the home
+screen if it is newer than the one running. **Nothing is downloaded and nothing is
+installed**: this app is unsigned on every platform, and an installer it fetched and ran for
+itself would be an unsigned binary arriving over the wire with nobody having looked at it.
+
+Where Homebrew did the install, the notice carries the command that upgrades it — with the
+quarantine step attached, because a cask upgrade re-quarantines the app and an upgraded copy
+still carrying the flag is one macOS refuses to open:
+
+```bash
+brew upgrade --cask radiouploader && xattr -dr com.apple.quarantine /Applications/Radiouploader.app
+```
+
+That command appears only where the **Caskroom really holds this app**. Plenty of people have
+Homebrew and installed by dragging the app out of the disk image; telling them to
+`brew upgrade` would hand them a command that cannot work, so they get the release page
+instead.
+
+**Not now** silences that version — a later one is offered again — and the check itself can
+be turned off under **Info → Updates**. It is the one request the app makes on its own:
+a release number comes back, and nothing about you, your account or your studies goes out.
+A check that cannot reach GitHub says nothing rather than reporting a failure about the
+app's own housekeeping, which is also why the dialog never claims you are up to date.
+
 ## Register an application
 
 The app talks to Radiopaedia as **you**, with credentials you register yourself. Go to

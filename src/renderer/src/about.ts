@@ -7,6 +7,9 @@ export const APP_TAGLINE = 'Unofficial case uploader for radiopaedia.org'
 
 export const ISSUES_URL = 'https://github.com/gmadevs/Radiouploader/issues'
 
+/** Where a new version comes from, since the app downloads nothing itself. */
+export const RELEASES_URL = 'https://github.com/gmadevs/Radiouploader/releases'
+
 /** Plus-addressed, so mail about the app sorts itself into its own label. */
 export const SUPPORT_EMAIL = 'gmadeveloping+radiouploader@gmail.com'
 

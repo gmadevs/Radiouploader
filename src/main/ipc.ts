@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { BrowserWindow, clipboard, dialog, ipcMain } from 'electron'
 // Inlined at build time. app.getVersion() reports Electron's own version
 // whenever the app is started without its package.json beside it, which is
 // exactly the case when the app is driven by a script.
@@ -14,6 +14,8 @@ import type {
   ReformatPlan,
   ReformatRequestMessage,
   StackSelection,
+  Transfer,
+  UpdateStatus,
   VolumeInfo
 } from '@shared/types'
 import { anonymiseStacks, summariseWarnings } from './anon'
@@ -25,6 +27,7 @@ import { uploadStack } from './api/upload'
 import { ingest } from './ingest'
 import { MAX_PREVIEW_EDGE, MAX_VIEWER_EDGE, clearPreviewHeaders, readPreviewFrame } from './preview'
 import { session } from './session'
+import { checkForUpdate, setUpdateChecks, skipVersion } from './update'
 import { closeVolume, commitReformat, openVolume, planCount, previewReformat } from './volume'
 import { planStudies, type StudyDraftInput } from './uploadPlan'
 
@@ -64,6 +67,17 @@ export function registerIpc(): void {
     arch: process.arch,
     electron: process.versions.electron
   }))
+
+  // Version, and what it would take to move off it. Nothing is downloaded and
+  // nothing is installed — see src/main/update.ts for why not.
+  ipcMain.handle('update:check', async (): Promise<UpdateStatus> => checkForUpdate(version))
+  ipcMain.handle('update:skip', async (_e, skipped: string) => skipVersion(skipped))
+  ipcMain.handle('update:enable', async (_e, enabled: boolean) => setUpdateChecks(enabled))
+
+  // The upgrade command, onto the clipboard. navigator.clipboard is not
+  // available to a page loaded from file://, and this is the whole of what the
+  // renderer would want it for.
+  ipcMain.handle('clipboard:write', (_e, text: string) => clipboard.writeText(text))
 
   ipcMain.handle('source:pick', async (_e, kind: 'folder' | 'zip') => {
     const result = await dialog.showOpenDialog({
@@ -210,9 +224,32 @@ export function registerIpc(): void {
       }
     }
 
+    // What each stack sends, worked out before anything goes. The total has to
+    // be known from the first byte or the bar and the time remaining spend the
+    // upload learning how big the job is, which is when they were needed.
+    const filesByStack = new Map(
+      stacks.map((stack) => [
+        stack.id,
+        stack.slices
+          .map((slice) => bySource.get(key(slice.path, slice.frame)))
+          .filter((f): f is NonNullable<typeof f> => f !== undefined)
+      ])
+    )
+
     // Studies are created oldest first so the case timeline reads in order.
     let seriesDone = 0
-    const seriesTotal = planned.reduce((n, p) => n + p.stackIds.length, 0)
+    const uploading = planned.flatMap((p) => p.stackIds).filter((id) => (filesByStack.get(id)?.length ?? 0) > 0)
+    const seriesTotal = uploading.length
+    const transfer: Transfer = {
+      sent: 0,
+      skipped: 0,
+      total: uploading.reduce((n, id) => n + (filesByStack.get(id) ?? []).reduce((m, f) => m + f.byteLength, 0), 0),
+      elapsedMs: 0
+    }
+    // From here rather than from the handler's first line: the quota check and
+    // the draft listing above are the network answering, not the upload
+    // running, and folding them in would report a speed the transfer never had.
+    const startedAt = Date.now()
 
     for (const plan of planned) {
       const studyId = await c.createStudy(caseId, {
@@ -224,17 +261,21 @@ export function registerIpc(): void {
 
       for (const stackId of plan.stackIds) {
         const stack = stacks.find((s) => s.id === stackId)
-        if (!stack) continue
-
-        const files = stack.slices
-          .map((slice) => bySource.get(key(slice.path, slice.frame)))
-          .filter((f): f is NonNullable<typeof f> => f !== undefined)
-        if (files.length === 0) continue
+        const files = filesByStack.get(stackId) ?? []
+        if (!stack || files.length === 0) continue
 
         seriesDone++
-        await uploadStack(c, caseId, studyId, files, (p) =>
-          broadcast({ ...p, detail: `${stack.label} — series ${seriesDone}/${seriesTotal}` })
-        )
+        await uploadStack(c, caseId, studyId, files, (p) => {
+          if (p.alreadyThere) transfer.skipped += p.bytes
+          else transfer.sent += p.bytes
+          broadcast({
+            phase: 'uploading',
+            done: p.done,
+            total: p.total,
+            detail: `${stack.label} — series ${seriesDone}/${seriesTotal}`,
+            transfer: { ...transfer, elapsedMs: Date.now() - startedAt }
+          })
+        })
       }
     }
 

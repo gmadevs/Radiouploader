@@ -15,7 +15,7 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { BREW_INSTALL, BREW_UNQUARANTINE, REPO, downloads, version } from './downloads.mjs'
+import { BREW_INSTALL, BREW_UNQUARANTINE, BREW_UPGRADE, REPO, downloads, version } from './downloads.mjs'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const readme = path.join(root, 'README.md')
@@ -66,6 +66,14 @@ function block(v) {
     '```bash',
     BREW_INSTALL,
     BREW_UNQUARANTINE,
+    '```',
+    '',
+    'and to move an install already there onto this version — the app says so itself at',
+    'launch, and the second half is there because a cask upgrade re-quarantines what it',
+    'downloads:',
+    '',
+    '```bash',
+    BREW_UPGRADE,
     '```',
     '',
     `Older versions, and the notes that come with each, are on the [releases page](${REPO}/releases).`,

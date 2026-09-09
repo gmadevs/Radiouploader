@@ -80,6 +80,23 @@ would say nothing about either.
 
 ## Upload
 
+While it runs, the bar in the footer measures the upload in **bytes rather than in images**:
+forty localisers weigh what one reconstruction does, so a bar counting files says nothing
+about how long is left. Under it: how much has gone of how much there is, the speed, and the
+time remaining.
+
+The speed is the average over the whole upload rather than the last second — a rate taken
+from the file in flight swings by an order of magnitude between a 40 kB localiser and a
+12 MB reconstruction, and a time remaining computed from that is one nobody can plan around.
+Neither figure appears for the first second or two, while the connection is still being set
+up and any number would be wrong. The estimate is rounded and hedged on purpose: it is an
+average over a network that is not steady, and "3:47 left" would claim a precision it does
+not have.
+
+Radiopaedia deduplicates by hash, so a file it already holds is never sent. Those bytes
+count as done and are named separately — *"40 MB already there"* — because a bar that fills
+in no time otherwise reads as one that has broken.
+
 ![The confirmation](/shots/08-done.png)
 
 The case is created as a **draft**, so nothing is published until you say so on

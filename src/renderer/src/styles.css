@@ -190,6 +190,28 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 .notice.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
 .notice.error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .notice.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+/* A newer version exists. Quiet, on the accent rather than the warning colour:
+   nothing is wrong, and the app it is sitting on top of works. */
+.notice.update {
+  display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.notice.update .update-actions { display: flex; gap: 6px; flex: none; align-items: center; }
+/* The command to paste, laid out as a terminal would show it. Wrapped at the
+   spaces rather than scrolled sideways: half a command in a box with no
+   scrollbar in sight reads as the whole of it. */
+.command {
+  margin-top: 8px; padding: 7px 9px; border-radius: 6px;
+  background: var(--bg); border: 1px solid var(--border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.command code { color: var(--text); }
+
+/* A checkbox with an explanation under its label, for the one setting there is. */
+.setting { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; cursor: pointer; }
+.setting input[type='checkbox'] { width: auto; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
 
 .account { margin-left: auto; display: flex; align-items: center; gap: 10px; position: relative; }
 .account .badge.full { color: var(--danger); border-color: var(--danger); }
@@ -262,7 +284,7 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 .tools .spacer { flex: 1; }
 /* Not scoped to the header: the reformat dialog puts a set of these by the
    footer, and a chosen tool has to look chosen wherever it sits. */
-.tools button.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600; }
+.tools button.on, .presets button.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600; }
 
 .viewer-stage {
   flex: 1; min-height: 0; display: grid; place-items: center;
@@ -351,6 +373,10 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 .viewer-slider input[type='range'] { flex: 1; padding: 0; border: none; background: transparent; accent-color: var(--accent); }
 .viewer-actions { display: flex; align-items: center; gap: 8px; }
 .viewer-actions .spacer { flex: 1; }
+/* The CT windows, as a row that wraps rather than one that scrolls: eight
+   buttons fit a wide window and stack on a narrow one, and a preset nobody can
+   see is a preset nobody uses. */
+.presets { flex-wrap: wrap; gap: 6px; }
 
 /* The home screen names the app before it asks for anything. */
 .home { display: grid; justify-items: center; gap: 22px; }
@@ -360,6 +386,10 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
    'self' does not cover a sibling file — data: does, and the CSP already says so. */
 .home-logo { width: 96px; height: 96px; margin-bottom: 10px; }
 .home-title h1 { font-size: 28px; margin: 0; letter-spacing: -0.01em; }
+/* Bounded here rather than on the notice itself: the same notice appears inside
+   the Info dialog, where a width of its own made the dialog wider than itself
+   and cut every paragraph in it off at the right edge. */
+.home > .notice.update { width: min(720px, 100%); }
 .home-title p { margin: 0; }
 
 .steps > button { flex: none; margin-left: 10px; }

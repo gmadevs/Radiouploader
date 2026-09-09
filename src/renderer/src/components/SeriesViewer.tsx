@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CropRect, MaskRect, PreviewFrame, Stack, WindowLevel } from '@shared/types'
 import { keptCount, toggleDropped } from '@shared/selection'
+import { CT_WINDOW_PRESETS, matchingPreset, usesHounsfield } from '@shared/windowPresets'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
 import { MIN_MASK_SIDE, moveMask, resizeMask, type MaskHandle } from '../maskEdit'
 import { useWheelScrub } from '../wheelScrub'
@@ -9,6 +10,11 @@ interface Props {
   stack: Stack
   /** Series and study the stack came from, so the header says what is open. */
   heading: string
+  /**
+   * The series' modality. Only a CT states its pixels in Hounsfield units, so
+   * only a CT can be handed a window by number rather than by dragging.
+   */
+  modality: string | null
   onChange: (patch: {
     masks?: MaskRect[]
     crop?: CropRect | null
@@ -65,7 +71,7 @@ const show = (value: number): string => String(Math.round(value * 10) / 10)
  * it away, and what goes is shaded rather than hidden. A cut you cannot see
  * past is one you cannot aim.
  */
-export function SeriesViewer({ stack, heading, onChange, onClose }: Props): React.JSX.Element {
+export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const [stage, setStage] = useState<{ width: number; height: number } | null>(null)
@@ -91,6 +97,12 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
   const greyscale = frame?.kind === 'grey'
   // The stack's window if one was chosen, otherwise whatever the file asks for.
   const level: WindowLevel | null = stack.window ?? (frame?.kind === 'grey' ? frame.window : null)
+  /**
+   * The named windows, on a CT and nowhere else — they are Hounsfield units,
+   * and on an MR the same numbers name a different picture on every study.
+   */
+  const presets = usesHounsfield(modality) && greyscale
+  const preset = presets ? matchingPreset(level) : null
 
   useEffect(() => {
     const slice = stack.slices[index]
@@ -549,6 +561,30 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
             )}
           </div>
 
+          {presets && (
+            <div className="viewer-row presets">
+              <span className="muted small" style={{ flex: 'none' }}>
+                Window
+              </span>
+              {CT_WINDOW_PRESETS.map((option) => (
+                <button
+                  key={option.name}
+                  className={preset?.name === option.name ? 'small on' : 'small ghost'}
+                  title={`${option.hint} — width ${option.window.width}, centre ${option.window.centre} HU`}
+                  onClick={() => onChange({ window: option.window })}
+                >
+                  {option.name}
+                </button>
+              ))}
+              <span className="muted small" style={{ flex: 'none' }}>
+                {/* The presets are a starting point, and saying so is the
+                    difference between a window that suits the case and one that
+                    suits the average case. */}
+                or drag with Contrast
+              </span>
+            </div>
+          )}
+
           <div className="viewer-actions">
             <span className="muted small">
               {tool === 'crop'
@@ -563,7 +599,11 @@ export function SeriesViewer({ stack, heading, onChange, onClose }: Props): Reac
             {/* Beside the button that undoes it, rather than on a row of its own. */}
             {greyscale && level && (
               <span className="muted small" style={{ flex: 'none' }}>
-                {show(level.centre)} / {show(level.width)}
+                {/* Labelled W/L rather than a bare pair of numbers: which way
+                    round they went was anyone's guess, and a preset lighting up
+                    beside them makes the guess worth settling. */}
+                {preset ? `${preset.name} · ` : ''}W {show(level.width)} / L {show(level.centre)}
+                {presets ? ' HU' : ''}
               </span>
             )}
             {masks.length > 0 && (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AXES, boxRange, cross, dot, negate, rotate, square, type Frame, type Vec3 } from '@shared/geometry'
 import type { PreviewFrame, Projection, ReformatPlan, Series, Stack, VolumeInfo, WindowLevel } from '@shared/types'
+import { CT_WINDOW_PRESETS, matchingPreset, usesHounsfield } from '@shared/windowPresets'
 import { previewErrorText } from '../dicomPreview'
 import { ReformatPanel } from './ReformatPanel'
 
@@ -8,6 +9,8 @@ interface Props {
   stack: Stack
   /** Study and series, so the dialog says what is being cut up. */
   heading: string
+  /** The series' modality: a CT can be windowed by number, nothing else can. */
+  modality: string | null
   onAdded: (studyId: string, series: Series) => void
   onClose: () => void
 }
@@ -70,7 +73,7 @@ function turnOthers(planes: Record<PaneId, Frame>, about: PaneId, radians: numbe
  * The volume itself stays in the main process — a chest CT is hundreds of
  * megabytes — so all of this is four requests for four preview-sized images.
  */
-export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): React.JSX.Element {
+export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: Props): React.JSX.Element {
   const [info, setInfo] = useState<VolumeInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -172,6 +175,9 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
 
   const result = frames.result ?? null
   const level = window_ ?? (result?.kind === 'grey' ? result.window : null)
+  /** Named windows on a CT only; elsewhere the numbers name a different picture. */
+  const presets = usesHounsfield(modality) && result?.kind === 'grey'
+  const preset = presets ? matchingPreset(level) : null
 
   /** Windowing by drag: right widens, down raises the centre, as everywhere else. */
   const dragFrom = useRef<WindowLevel | null>(null)
@@ -376,6 +382,30 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
             <span className="n">{step(spacing)} mm</span>
           </div>
 
+          {presets && (
+            <div className="viewer-row presets">
+              <span className="muted small" style={{ flex: 'none' }}>
+                Window
+              </span>
+              {CT_WINDOW_PRESETS.map((option) => (
+                <button
+                  key={option.name}
+                  className={preset?.name === option.name ? 'small on' : 'small ghost'}
+                  title={`${option.hint} — width ${option.window.width}, centre ${option.window.centre} HU`}
+                  onClick={() => setWindow(option.window)}
+                >
+                  {option.name}
+                </button>
+              ))}
+              <span className="muted small" style={{ flex: 'none' }}>
+                {/* A MIP is read at a wider window than the slices it came
+                    from, which is the reason these are here as well as in the
+                    viewer: the picture being built is not the one reviewed. */}
+                or drag the image
+              </span>
+            </div>
+          )}
+
           <div className="viewer-actions">
             <div className="tools">
               {PROJECTIONS.map((option) => {
@@ -402,7 +432,8 @@ export function ReformatDialog({ stack, heading, onAdded, onClose }: Props): Rea
             </div>
             {level && (
               <span className="muted small" style={{ flex: 'none' }}>
-                {step(level.centre)} / {step(level.width)}
+                {preset ? `${preset.name} · ` : ''}W {step(level.width)} / L {step(level.centre)}
+                {presets ? ' HU' : ''}
               </span>
             )}
             {window_ && (

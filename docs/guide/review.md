@@ -98,8 +98,27 @@ measurement made on Radiopaedia still means what it says.
 ## Contrast
 
 Pick **Contrast** and drag on the image: right widens the window, down raises its centre,
-the same directions every DICOM viewer uses. The numbers beside the buttons say where it
-has got to.
+the same directions every DICOM viewer uses. The readout at the bottom right says where it
+has got to, as **W** width **/ L** level.
+
+### The CT presets
+
+A CT viewer carries a row of named windows under the scrubber — Brain, Subdural, Stroke,
+Temporal bone, Lung, Soft tissue, Liver, Bone — and one click sets the window to it. The
+button stays lit while the picture is the one it names, and goes out as soon as the window
+is dragged off it, so what the row says is always what is on screen.
+
+They are the conventional widths and centres, the ones on a reporting workstation's own
+toolbar, and each is a starting point rather than an answer: a nodule against pleura and an
+early infarct both want something narrower than the preset that gets you to them.
+
+The row appears on **CT and nothing else**, and that is not an oversight. These numbers are
+Hounsfield units, an absolute scale that only CT states its pixels on; on MR the stored
+values are the scanner's own, so "80 / 40" would name a different picture on every study and
+a fixed list would be a list of wrong answers. Drag there, as before.
+
+The same row sits in the [reformat dialog](/guide/reformat), where it matters for a second
+reason: a MIP through a slab is read at a wider window than the slices it was built from.
 
 The chosen window is written to `WindowCenter` / `WindowWidth` (0028,1050 / 0028,1051), and
 any `WindowCenterWidthExplanation` or `VOILUTSequence` that would contradict it is dropped.

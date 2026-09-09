@@ -37,6 +37,20 @@ export const BREW_INSTALL = 'brew install --cask gmadevs/radiouploader/radiouplo
 /** What the install above needs afterwards, since the app is not signed. */
 export const BREW_UNQUARANTINE = 'xattr -dr com.apple.quarantine /Applications/Radiouploader.app'
 
+/**
+ * Moving an existing install to a newer release.
+ *
+ * The quarantine step is repeated rather than assumed done: a cask upgrade is a
+ * fresh download, and Homebrew marks it the way it marked the first one — so an
+ * upgraded copy that keeps the flag is one macOS refuses to open, having opened
+ * the version before it every day.
+ *
+ * Generated into the README rather than typed there. It was typed there once,
+ * and `npm run links` wiped it on the next version bump, which is what happens
+ * to anything written by hand inside a generated block.
+ */
+export const BREW_UPGRADE = `brew upgrade --cask radiouploader && ${BREW_UNQUARANTINE}`
+
 /** The version the app is at, which is also the tag its release is under. */
 export const version = JSON.parse(
   fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')
@@ -75,6 +89,7 @@ export function downloads(v = version) {
     releases: `${REPO}/releases`,
     brew: BREW_INSTALL,
     brewUnquarantine: BREW_UNQUARANTINE,
+    brewUpgrade: BREW_UPGRADE,
     platforms: [
       {
         id: 'mac',

@@ -374,9 +374,63 @@ export interface AnonResult {
   errors: { path: string; reason: string }[]
 }
 
+/**
+ * How much of an upload has gone, in bytes and in time.
+ *
+ * Files are counted, but files are not what an upload takes: a series of forty
+ * localisers goes in the time one reconstruction takes, so a bar counting
+ * images says nothing about how long is left. Bytes do.
+ */
+export interface Transfer {
+  /** Bytes actually put on the wire. */
+  sent: number
+  /**
+   * Bytes Radiopaedia already held. It deduplicates by hash, so re-uploading a
+   * series sends nothing — done, and never part of the speed.
+   */
+  skipped: number
+  /** Bytes the whole upload has to account for, known before it starts. */
+  total: number
+  /** Milliseconds since the upload began, the main process's clock. */
+  elapsedMs: number
+}
+
 export interface Progress {
   phase: 'scanning' | 'parsing' | 'anonymising' | 'uploading'
   done: number
   total: number
   detail?: string
+  /**
+   * Set on the uploading phase only, and covering the whole upload rather than
+   * the series in flight — a speed and a time remaining that reset at every
+   * series are a speed and a time remaining nobody can use.
+   */
+  transfer?: Transfer
+}
+
+/**
+ * What the launch-time check found on GitHub.
+ *
+ * `null` for `latest` means either that there is nothing newer or that the
+ * check could not run — an app that cannot reach GitHub says nothing rather
+ * than showing a failure the user did not ask for.
+ */
+export interface UpdateStatus {
+  /** The version running now. */
+  current: string
+  /** A newer release, or null. */
+  latest: string | null
+  /** Where its notes are, for the button that opens them. */
+  url: string | null
+  /**
+   * The command that upgrades this particular install, ready to paste.
+   *
+   * Only set where the install was really made by the Homebrew cask — checked
+   * against the Caskroom rather than guessed from the platform. Telling someone
+   * who dragged the app out of a disk image to run `brew upgrade` gives them a
+   * command that cannot work.
+   */
+  command: string | null
+  /** Whether the check runs at launch at all; false after the user turns it off. */
+  enabled: boolean
 }
