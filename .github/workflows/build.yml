@@ -207,8 +207,12 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The installers, and only them. Downloading every artifact of the run
+      # also brought the install job's screenshots, and the 1.3.2 draft went up
+      # with an installed.png among its downloads.
       - uses: actions/download-artifact@v8
         with:
+          pattern: radiouploader-*
           path: artifacts
 
       # Drafted rather than published, so the installers can be checked before
