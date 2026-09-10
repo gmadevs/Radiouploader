@@ -63,7 +63,8 @@ be enabled on an account by hand and costs a little more.
 
 `up` prints the instance and when it expires. `connect` waits for the instance to reach
 Session Manager and for its desktop to finish installing, then opens a tunnel and prints
-where to point Windows App, the user, and the password. Download the installer inside the
+where to point Windows App and which user to sign in as. The password goes on the clipboard,
+not on the screen, where a terminal's scrollback would keep it. Download the installer inside the
 instance, from the releases page, with its browser: a file that arrived that way is the one
 SmartScreen reacts to.
 

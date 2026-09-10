@@ -412,7 +412,14 @@ async function connect(id) {
   console.log(`\n${system.name}, until ${local(expires)}`)
   console.log(`Windows App → Add PC → localhost:${port}`)
   console.log(`user             : ${system.user}`)
-  console.log(`password         : ${password ?? '(not found in the user data)'}`)
+  // On the clipboard rather than on the screen: a terminal keeps its scrollback,
+  // and whatever records a session records the password along with it.
+  if (!password) console.log('password         : not found in the instance user data')
+  else if (toClipboard(password)) console.log('password         : on the clipboard, to paste when Windows App asks')
+  else {
+    console.log('password         : no clipboard here; read it with')
+    console.log(`  aws ec2 describe-instance-attribute --instance-id ${id} --attribute userData --region ${REGION} --query UserData.Value --output text | base64 --decode | grep password`)
+  }
   console.log('Ctrl+C closes the tunnel.\n')
 
   const tunnel = spawn('aws', [
@@ -434,6 +441,19 @@ async function connect(id) {
   prompt.close()
   if (/^y/i.test(answer.trim())) await down([id])
   else console.log(`left running until ${local(expires)}: npm run lab -- down ${id} when you are done`)
+}
+
+/** The first clipboard this machine has; false when it has none. */
+function toClipboard(text) {
+  const tools = {
+    darwin: [['pbcopy']],
+    win32: [['clip']],
+    linux: [['wl-copy'], ['xclip', '-selection', 'clipboard']]
+  }[process.platform] ?? []
+  return tools.some(([command, ...args]) => {
+    const result = spawnSync(command, args, { input: text })
+    return !result.error && result.status === 0
+  })
 }
 
 async function localPort() {
