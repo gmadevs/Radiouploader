@@ -1,4 +1,4 @@
-name: Build
+name: Build and install
 
 # Runs on demand, and on a version tag so a release gets installers attached.
 # Not on every push: macOS and Windows runners bill at 10x and 2x on a private

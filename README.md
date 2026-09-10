@@ -8,7 +8,8 @@
 [![Platform: macOS, Linux, Windows](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square)](https://gmadevs.github.io/Radiouploader/develop/packaging)
 [![Status: stable](https://img.shields.io/badge/status-stable-brightgreen?style=flat-square)](https://gmadevs.github.io/Radiouploader/limitations)
 [![Docs](https://img.shields.io/badge/docs-gmadevs.github.io-4c9aff?style=flat-square)](https://gmadevs.github.io/Radiouploader/)
-[![Build](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml/badge.svg)](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml)
+[![Build and install](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml/badge.svg)](https://github.com/gmadevs/Radiouploader/actions/workflows/build.yml)
+[![Installers tested on macOS, Windows, Ubuntu and Debian](https://img.shields.io/badge/installers%20tested-macOS%20%7C%20Windows%20%7C%20Ubuntu%20%7C%20Debian-2ea44f?style=flat-square)](https://gmadevs.github.io/Radiouploader/develop/packaging#installing-what-was-built)
 [![Tests](https://github.com/gmadevs/Radiouploader/actions/workflows/test.yml/badge.svg)](https://github.com/gmadevs/Radiouploader/actions/workflows/test.yml)
 [![CodeQL](https://github.com/gmadevs/Radiouploader/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/gmadevs/Radiouploader/security/code-scanning)
 [![GitGuardian](https://github.com/gmadevs/Radiouploader/actions/workflows/gitguardian.yml/badge.svg)](https://github.com/gmadevs/Radiouploader/actions/workflows/gitguardian.yml)
@@ -92,7 +93,13 @@ npm test           # unit tests plus anonymiser and decoder integration tests
 npm run smoke      # boots the built app, fails on console errors
 npm run shots      # regenerates the documentation screenshots
 npm run docs:dev   # the documentation site, locally
+npm run lab        # a throwaway Windows or Ubuntu desktop on EC2, to try an installer on
 ```
+
+Before a release is drafted, every installer it will offer is installed the way a user would
+install it — on macOS, Windows, Ubuntu and bare Debian and Ubuntu images — and the app is
+opened from where the install left it, then removed:
+[installing what was built](https://gmadevs.github.io/Radiouploader/develop/packaging#installing-what-was-built).
 
 More in [build and run](https://gmadevs.github.io/Radiouploader/develop/build).
 
