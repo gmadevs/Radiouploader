@@ -269,6 +269,26 @@ the second thing the job found. Ubuntu 24.04 renamed the package, and there plai
 died on `undefined symbol: snd_device_name_get_hint`. Debian 12 and Ubuntu 22.04 have no
 `libasound2t64` and take the second name, which is still a real package there.
 
+## The secret scan
+
+`.github/workflows/gitguardian.yml` runs ggshield on every push and every pull request: a
+secret that reaches a public repository is public the moment it lands, and deleting it in a
+later commit does not take it back. So it scans **every commit a push carries**, not only
+the last — a secret added in one commit and removed in the next never shows at the tip, and
+is still in the history anyone can read.
+
+That rests on one variable. ggshield builds a push's range from `GITHUB_PUSH_BASE_SHA`, and
+the workflow used to set it to `github.event.base`, a field no push event has. ggshield took
+the empty string it received for a commit, git answered the range `..HEAD` with nothing, and
+the scan fell back to the tip: since the workflow was written, every push of several commits
+had all but its last go unscanned, under a green run that said no secrets were found. It was
+noticed because a log said `Commits to scan: 1` after a push of three. The variable now gets
+`github.event.before`, the commit the push started from.
+
+**`Commits to scan` in the log should match the push.** When it does not, the run is not
+covering what its result claims. Pull requests were never affected: ggshield compares them
+with their target branch, through a different variable.
+
 ## Documentation
 
 The site you are reading is built by `.github/workflows/docs.yml` on every push to `main`
