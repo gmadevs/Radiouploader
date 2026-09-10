@@ -52,8 +52,13 @@ deb:
   # electron-builder's default list, and the two libraries it leaves out that
   # the binary links against: ALSA and Mesa's gbm. A desktop always has both; a
   # minimal Debian or Ubuntu does not, and there apt installed the package and
-  # left a binary that could not load. libasound2 by its old name, which
-  # Ubuntu 24.04's libasound2t64 still answers to.
+  # left a binary that could not load.
+  #
+  # ALSA is asked for by its new name first. On Ubuntu 24.04 plain libasound2
+  # is only a name two packages answer to, and apt chose liboss4-salsa-asound2 —
+  # an OSS emulation that lacks half of ALSA — so the binary loaded and died on
+  # its first missing symbol. Older releases have no libasound2t64 and take the
+  # second name, which is still a real package there.
   depends:
     - libgtk-3-0
     - libnotify4
@@ -64,7 +69,7 @@ deb:
     - libatspi2.0-0
     - libuuid1
     - libsecret-1-0
-    - libasound2
+    - libasound2t64 | libasound2
     - libgbm1
 win:
   target:

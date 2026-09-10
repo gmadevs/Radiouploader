@@ -365,12 +365,21 @@ async function launch() {
     if (!page) throw new Problem(`no window after 90 s\n${output}`)
 
     cdp = await connect(page.webSocketDebuggerUrl)
+    // Which world an error came from: the page, the preload's isolated world, or
+    // something Electron made on the way. An error from a context already gone
+    // by the time the script connected is said to be so.
+    const contexts = new Map()
+    const where = (id) => contexts.get(id) ?? `context ${id}, gone before the script connected`
     cdp.on(({ method, params }) => {
-      if (method === 'Runtime.consoleAPICalled' && ['error', 'assert'].includes(params.type)) {
-        problems.push(`console: ${params.args.map((arg) => arg.value ?? arg.description ?? '').join(' ')}`)
+      if (method === 'Runtime.executionContextCreated') {
+        const { id, name, origin, auxData } = params.context
+        contexts.set(id, `${auxData?.isDefault ? 'page' : (auxData?.type ?? 'context')} ${name || origin || id}`)
+      } else if (method === 'Runtime.consoleAPICalled' && ['error', 'assert'].includes(params.type)) {
+        const text = params.args.map((arg) => arg.value ?? arg.description ?? '').join(' ')
+        problems.push(`console, in ${where(params.executionContextId)}: ${text}`)
       } else if (method === 'Runtime.exceptionThrown') {
         const details = params.exceptionDetails
-        problems.push(`exception: ${details.exception?.description ?? details.text}`)
+        problems.push(`exception, in ${where(details.executionContextId)}: ${details.exception?.description ?? details.text}`)
       } else if (method === 'Log.entryAdded' && params.entry.level === 'error') {
         problems.push(`log: ${params.entry.text}${params.entry.url ? ` (${params.entry.url})` : ''}`)
       } else if (method === 'Inspector.targetCrashed') {

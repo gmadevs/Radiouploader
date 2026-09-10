@@ -260,9 +260,14 @@ libraries Electron cannot start without: ALSA (`libasound2`) and Mesa's buffer m
 (`libgbm1`). A desktop always has both, which is how the omission goes unnoticed; a minimal
 Debian 12, Ubuntu 22.04 or Ubuntu 24.04 does not, and there apt installed the package
 cleanly and left a binary that could not load. The
-[install job](#installing-what-was-built) found it the first time it ran. `libasound2` is
-asked for by its old name on purpose: Ubuntu 24.04 renamed the package `libasound2t64`, and
-the new one still answers to the old name, as `libgtk-3-0t64` does for the default list.
+[install job](#installing-what-was-built) found it the first time it ran.
+
+ALSA is written `libasound2t64 | libasound2`, new name first, and the order is the fix for
+the second thing the job found. Ubuntu 24.04 renamed the package, and there plain
+`libasound2` is only a name that two packages answer to: apt picked
+`liboss4-salsa-asound2`, an OSS emulation that lacks half of ALSA, and the binary loaded and
+died on `undefined symbol: snd_device_name_get_hint`. Debian 12 and Ubuntu 22.04 have no
+`libasound2t64` and take the second name, which is still a real package there.
 
 ## Documentation
 
