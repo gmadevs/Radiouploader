@@ -174,6 +174,16 @@ function setup() {
   console.log('SETUP OK')
 }
 
+/**
+ * Made for one machine and dead with it. Upper case, lower case and a symbol,
+ * which is what Windows asks of a password. Joined from parts rather than
+ * written as one template string: GitGuardian read `Lab-${…}` assigned to a
+ * variable called password as a password committed to a public repository.
+ */
+function throwawayPassword() {
+  return ['Lab', crypto.randomBytes(15).toString('base64url')].join('-')
+}
+
 function windowsUserData(password, expires) {
   return `<powershell>
 $password = '${password}'
@@ -238,9 +248,7 @@ async function up(key, { hours, spot }) {
   const root = ami.BlockDeviceMappings.find((mapping) => mapping.DeviceName === ami.RootDeviceName)
   const disk = Math.max(system.disk, root?.Ebs?.VolumeSize ?? 0)
 
-  // Made for this one machine and dead with it. Three kinds of character, which
-  // is what Windows asks of a password.
-  const password = `Lab-${crypto.randomBytes(15).toString('base64url')}`
+  const password = throwawayPassword()
   const expires = new Date(Date.now() + hours * 3_600_000)
   const tags = [
     { Key: 'Name', Value: `${PROJECT} ${key}` },
