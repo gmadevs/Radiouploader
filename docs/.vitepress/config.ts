@@ -73,6 +73,7 @@ export default withMermaid(
           items: [
             { text: 'Build and run', link: '/develop/build' },
             { text: 'Packaging and release', link: '/develop/packaging' },
+            { text: 'Trying an installer', link: '/develop/lab' },
             { text: 'Screenshots', link: '/develop/screenshots' }
           ]
         },
