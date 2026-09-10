@@ -255,6 +255,15 @@ The deb carries a **maintainer** address, set in `electron-builder.yml`, because
 to build without one and falls back to the author's email. It is the same address the app
 shows in its problem-report dialog.
 
+It also carries its own **dependency list**, because electron-builder's leaves out two
+libraries Electron cannot start without: ALSA (`libasound2`) and Mesa's buffer manager
+(`libgbm1`). A desktop always has both, which is how the omission goes unnoticed; a minimal
+Debian 12, Ubuntu 22.04 or Ubuntu 24.04 does not, and there apt installed the package
+cleanly and left a binary that could not load. The
+[install job](#installing-what-was-built) found it the first time it ran. `libasound2` is
+asked for by its old name on purpose: Ubuntu 24.04 renamed the package `libasound2t64`, and
+the new one still answers to the old name, as `libgtk-3-0t64` does for the default list.
+
 ## Documentation
 
 The site you are reading is built by `.github/workflows/docs.yml` on every push to `main`

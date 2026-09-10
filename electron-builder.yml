@@ -48,6 +48,24 @@ linux:
     - target: deb
       arch: [x64, arm64]
   category: Science
+deb:
+  # electron-builder's default list, and the two libraries it leaves out that
+  # the binary links against: ALSA and Mesa's gbm. A desktop always has both; a
+  # minimal Debian or Ubuntu does not, and there apt installed the package and
+  # left a binary that could not load. libasound2 by its old name, which
+  # Ubuntu 24.04's libasound2t64 still answers to.
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+    - libasound2
+    - libgbm1
 win:
   target:
     - target: nsis
