@@ -87,9 +87,121 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # Each installer installed the way somebody downloading it would, on a machine
+  # that did not build it; the app that install left behind is opened and
+  # checked from outside, then removed. `npm run smoke` proves out/ boots, and
+  # this proves the packages do. It stands between the build and the draft, so a
+  # release whose installer does not install is never drafted.
+  install:
+    name: Install ${{ matrix.name }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    # A deb is also installed into a bare image. A runner has hundreds of
+    # libraries preinstalled, and any of them can satisfy a dependency the
+    # package forgot to declare; an image with nothing in it cannot. Empty for
+    # the rest, which then run on the runner itself.
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: dmg, Apple silicon
+            os: macos-latest
+            format: dmg
+            artifact: radiouploader-macOS
+          - name: dmg, Intel
+            os: macos-15-intel
+            format: dmg
+            artifact: radiouploader-macOS
+          - name: Windows installer
+            os: windows-latest
+            format: nsis
+            artifact: radiouploader-Windows
+          - name: AppImage x64
+            os: ubuntu-24.04
+            format: appimage
+            artifact: radiouploader-Linux
+          - name: AppImage arm64
+            os: ubuntu-24.04-arm
+            format: appimage
+            artifact: radiouploader-Linux
+          # On the runner itself, as a user and not as root: the one Linux run
+          # where the sandbox and the AppArmor profile the deb installs are real.
+          - name: deb, Ubuntu 24.04
+            os: ubuntu-24.04
+            format: deb
+            artifact: radiouploader-Linux
+          - name: deb, clean Debian 12
+            os: ubuntu-24.04
+            container: debian:12
+            format: deb
+            artifact: radiouploader-Linux
+          - name: deb, clean Ubuntu 22.04
+            os: ubuntu-24.04
+            container: ubuntu:22.04
+            format: deb
+            artifact: radiouploader-Linux
+          - name: deb arm64, clean Ubuntu 24.04
+            os: ubuntu-24.04-arm
+            container: ubuntu:24.04
+            format: deb
+            artifact: radiouploader-Linux
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # The runners carry a Node of their own, the bare images none, and the
+      # script wants 22 for its WebSocket.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.artifact }}
+          path: pkg
+
+      - name: Install
+        run: node scripts/installed.mjs ${{ matrix.format }} install pkg
+
+      # After the install, never before it: xvfb brings half of X with it, which
+      # would quietly supply a library the deb forgot to ask for. FUSE is what an
+      # AppImage mounts itself with, and Ubuntu 24.04 does not ship it.
+      - name: Give Linux a display
+        if: runner.os == 'Linux'
+        run: |
+          sudo=$(command -v sudo || true)
+          packages=(xvfb xauth)
+          if [ "${{ matrix.format }}" = appimage ]; then packages+=(libfuse2t64); fi
+          $sudo apt-get update -q
+          $sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -q "${packages[@]}"
+
+      - name: Launch
+        run: >
+          ${{ runner.os == 'Linux' && 'xvfb-run -a -s "-screen 0 1600x1000x24"' || '' }}
+          node scripts/installed.mjs ${{ matrix.format }} launch pkg
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: installed-${{ matrix.name }}
+          path: installed.png
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # A dmg is uninstalled by dragging the app to the Bin and an AppImage by
+      # deleting it, which leaves nothing for a test to look for.
+      - name: Uninstall
+        if: matrix.format == 'nsis' || matrix.format == 'deb'
+        run: node scripts/installed.mjs ${{ matrix.format }} uninstall pkg
+
   release:
     name: Draft release
-    needs: build
+    needs: [build, install]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

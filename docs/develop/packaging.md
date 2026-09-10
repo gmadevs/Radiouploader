@@ -38,8 +38,9 @@ git push origin main --follow-tags
 
 Then four things happen, and only the third is yours:
 
-1. the tag starts `build.yml`: three runners, three sets of installers, and a **drafted**
-   release with them attached;
+1. the tag starts `build.yml`: three runners, three sets of installers, each of them
+   [installed and opened](#installing-what-was-built) on a machine that did not build it,
+   and a **drafted** release with them attached;
 2. nobody can download any of it, because the release is a draft;
 3. you open the installers — at least the one for the machine you are on — and press
    **Publish release**;
@@ -55,6 +56,51 @@ The one window to be careful about is between the bump and step 3: the documenta
 builds from `package.json` on any push touching `docs/`, so it can offer links to files that
 do not exist yet. That is the reason to publish on the same pass as the tag, and it is the
 same argument as [the download links](#the-download-links) below.
+
+## Installing what was built
+
+```bash
+node scripts/installed.mjs <dmg|nsis|deb|appimage> <install|launch|uninstall> <dir>
+```
+
+Between the build and the draft, `build.yml` installs every installer the way somebody
+downloading it would, opens the app that install left behind, and removes it again.
+`npm run smoke` proves `out/` boots under the development Electron; this proves the files
+people download do. The release job waits for it, so a release whose installer does not
+install is never drafted.
+
+| Job | Runs on | What it is there to catch |
+|---|---|---|
+| dmg, Apple silicon and Intel | `macos-latest`, `macos-15-intel` | a disk image holding the other architecture's binary, which would open under Rosetta and go unnoticed |
+| Windows installer | `windows-latest` | an install that registers nothing to uninstall, or an uninstall that leaves files behind |
+| AppImage, x64 and arm64 | `ubuntu-24.04`, `ubuntu-24.04-arm` | an app that does not start from its own mount |
+| deb, Ubuntu 24.04 | `ubuntu-24.04`, as a user | the sandbox and the AppArmor profile the package installs |
+| deb, clean Debian 12, Ubuntu 22.04, arm64 Ubuntu 24.04 | a bare container | a dependency the package forgot to declare |
+
+**A runner is not a clean machine.** It has hundreds of libraries preinstalled, and any of
+them can satisfy a dependency the deb never asked for. So the deb is also installed into bare
+images with apt, which fetches what the package declares and nothing else, and `ldd` then
+looks for a library the binary links against that nobody brought. The display those jobs
+need is installed *after* the package for the same reason: xvfb pulls in half of X.
+
+Everything in a container runs as root, and Chromium will not start as root with its sandbox
+on. Those runs pass `--no-sandbox` and say so in the log: they prove the package installs and
+the app boots, and the run on the runner itself is the one that says anything about the
+sandbox.
+
+The app is started with `--remote-debugging-port` and a profile of its own, and read over
+the DevTools protocol: the three things the smoke test reads, and every console error,
+exception and failed load since start-up, which the protocol hands over to whoever connects
+late. Nothing is added to the app for it, which is the rule the
+[screenshots](/develop/screenshots) keep. Each run uploads the screenshot it took.
+
+The installers are looked up by the names `scripts/downloads.mjs` gives the download links,
+not globbed for, so a renamed artifact fails the build rather than a download.
+
+What no job can test is **Gatekeeper and SmartScreen**. Both react to a file a browser
+downloaded, and both answer with a dialog; that is still what opening the draft by hand is
+for. On a Mac the script can be run against a dmg without touching an installed copy — the
+app goes to a temporary folder, never `/Applications`.
 
 ## The download links
 

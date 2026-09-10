@@ -70,9 +70,10 @@ export const version = JSON.parse(
  * "Setup" in the middle. Checked against the files a real tag produced rather
  * than read off the documentation — v0.1.0-beta.1 for all three, and v1.0.0
  * again for the mac pair, which is where dropping the suffix could have moved
- * a name.
+ * a name. `scripts/installed.mjs` looks for exactly these among what every
+ * build produces, so a rename now fails the build rather than a download.
  */
-const ASSETS = {
+export const ASSETS = {
   macArm: (v) => `Radiouploader-${v}-arm64.dmg`,
   macIntel: (v) => `Radiouploader-${v}.dmg`,
   appImage: (v) => `Radiouploader-${v}.AppImage`,
