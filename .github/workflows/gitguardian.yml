@@ -31,7 +31,14 @@ jobs:
           # What the push or the pull request actually changed. Without these
           # ggshield has no range and falls back to scanning the last commit.
           GITHUB_PUSH_BEFORE_SHA: ${{ github.event.before }}
-          GITHUB_PUSH_BASE_SHA: ${{ github.event.base }}
+          # The one ggshield builds a push's range from. It was set to
+          # github.event.base, a field no push event has: it arrived as an empty
+          # string, ggshield took that for a commit, asked git for "..HEAD", got
+          # nothing back and scanned the tip alone — so every commit of a push
+          # but its last went unscanned, and the run still said no secrets were
+          # found. Where there is no commit before, as on a dispatch, it names
+          # the default branch, which is where ggshield itself would fall back.
+          GITHUB_PUSH_BASE_SHA: ${{ github.event.before || github.event.repository.default_branch }}
           GITHUB_PULL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
