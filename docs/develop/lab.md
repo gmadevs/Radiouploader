@@ -21,10 +21,10 @@ one — the study `npm run sample` writes is what to upload from it.
 
 ## The systems
 
-| `up` takes | What starts | Instance | ~$/hour in Frankfurt |
+| `up` takes | What starts | Instance | ~$/hour in London |
 |---|---|---|---|
-| `windows-2025` | Windows Server 2025 | `t3.large`, 8 GB | 0.13 |
-| `windows-2022` | Windows Server 2022 | `t3.large`, 8 GB | 0.13 |
+| `windows-2025` | Windows Server 2025 | `t3.large`, 8 GB | 0.12 |
+| `windows-2022` | Windows Server 2022 | `t3.large`, 8 GB | 0.12 |
 | `ubuntu-2404` | Ubuntu 24.04 with XFCE | `t3.medium`, 4 GB | 0.05 |
 | `ubuntu-2204` | Ubuntu 22.04 with XFCE | `t3.medium`, 4 GB | 0.05 |
 
@@ -41,14 +41,19 @@ would cost money to keep.
 ## Once
 
 1. An AWS account, with a **budget alert** set in Billing before anything is launched.
-2. A user in IAM Identity Center, and on the Mac:
+2. An IAM user with console access, `AdministratorAccess` and MFA — not the root user — and
+   on the Mac:
    ```bash
    brew install awscli
    brew install --cask session-manager-plugin
-   aws configure sso
+   aws login --profile lab
+   export AWS_PROFILE=lab
    ```
-   Short-lived credentials from SSO, never an access key — least of all anywhere near this
-   repository, which is public.
+   `aws login`, in AWS CLI 2.32 and later, signs in through the browser as that user and
+   hands the CLI credentials that last minutes and renew themselves for twelve hours — never
+   an access key, least of all anywhere near this repository, which is public. IAM Identity
+   Center would do the same, but on a single account it offers no permission sets until an
+   AWS Organization has been created around it.
 3. **Windows App** from the Mac App Store, which is the remote-desktop client for both.
 4. `npm run lab -- setup`, which creates, if they are not there already:
    - a role for the instances that lets their agent reach Session Manager and nothing more;
@@ -56,8 +61,10 @@ would cost money to keep.
      lab's `project` tag;
    - a security group in the default VPC with **no inbound rule at all**.
 
-The region is `eu-central-1` unless `AWS_REGION` says otherwise. Milan is closer, but has to
-be enabled on an account by hand and costs a little more.
+The region is `eu-west-2`, London, unless `AWS_REGION` says otherwise. A new account came
+with 1280 on-demand vCPUs there and five in Frankfurt — two lab machines at once, and no
+third — and a remote desktop does not notice the difference in distance. Milan is closer
+still, but has to be enabled on an account by hand.
 
 ## A session
 

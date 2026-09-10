@@ -21,7 +21,9 @@ import net from 'node:net'
 import readline from 'node:readline/promises'
 import { spawn, spawnSync } from 'node:child_process'
 
-const REGION = process.env.AWS_REGION ?? 'eu-central-1'
+// London rather than Frankfurt: a new account came with 1280 on-demand vCPUs
+// there and 5 in Frankfurt, which is two lab machines at once and no third.
+const REGION = process.env.AWS_REGION ?? 'eu-west-2'
 const PROJECT = 'radiouploader-lab'
 const INSTANCE_ROLE = `${PROJECT}-instance`
 const SCHEDULER_ROLE = `${PROJECT}-scheduler`
@@ -87,7 +89,7 @@ function aws(args, { quiet = [] } = {}) {
   if (result.status !== 0) {
     const message = result.stderr.trim()
     if (quiet.some((code) => message.includes(code))) return null
-    const hint = /sso|expired|credentials/i.test(message) ? '\nsign in first: aws sso login' : ''
+    const hint = /login|sso|expired|credentials/i.test(message) ? '\nsign in first: aws login --profile lab' : ''
     throw new Problem(`aws ${args[0]} ${args[1]}: ${message}${hint}`)
   }
   return result.stdout.trim() ? JSON.parse(result.stdout) : {}
