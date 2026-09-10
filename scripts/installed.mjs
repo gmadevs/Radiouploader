@@ -75,11 +75,13 @@ function installer() {
   }[format]
   const name = names[machineArch()]
   if (!name) throw new Problem(`nobody downloads a ${format} for ${machineArch()}`)
-  const file = path.resolve(dir, name(version))
-  if (!fs.existsSync(file)) {
-    throw new Problem(`${name(version)} is not in ${dir}, which holds: ${fs.readdirSync(dir).join(', ')}`)
-  }
-  return file
+  // GitHub turns spaces in an asset's name into dots when the release takes it,
+  // so NSIS's "Radiouploader Setup 1.3.1.exe" is downloaded as
+  // "Radiouploader.Setup.1.3.1.exe". Straight from a build it still has spaces.
+  const files = fs.readdirSync(dir)
+  const found = files.find((file) => file.replaceAll(' ', '.') === name(version))
+  if (!found) throw new Problem(`${name(version)} is not in ${dir}, which holds: ${files.join(', ')}`)
+  return path.resolve(dir, found)
 }
 
 // Not /Applications: where the app sits changes nothing about whether it opens,
@@ -322,6 +324,14 @@ async function launch() {
     // app boots; the jobs outside a container are the ones that test the sandbox.
     args.push('--no-sandbox')
     console.log('running as root, so with --no-sandbox: this run says nothing about the sandbox')
+  }
+  if (process.platform === 'linux') {
+    // Ubuntu 24.04 lets only programs AppArmor names use user namespaces, which
+    // is what the sandbox needs. A pass means something different on a machine
+    // where that restriction was turned off, so the log says which this was.
+    const restrict = '/proc/sys/kernel/apparmor_restrict_unprivileged_userns'
+    const value = fs.existsSync(restrict) ? fs.readFileSync(restrict, 'utf8').trim() : 'absent'
+    console.log(`userns restricted by AppArmor: ${value}`)
   }
 
   const port = await freePort()
