@@ -74,6 +74,7 @@ export default withMermaid(
             { text: 'Build and run', link: '/develop/build' },
             { text: 'Packaging and release', link: '/develop/packaging' },
             { text: 'Trying an installer', link: '/develop/lab' },
+            { text: 'Live tests', link: '/develop/live-tests' },
             { text: 'Screenshots', link: '/develop/screenshots' }
           ]
         },

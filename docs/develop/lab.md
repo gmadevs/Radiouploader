@@ -14,6 +14,9 @@ removing the app from Settings, an AppImage opened with a double-click, a sign-i
 Radiopaedia with a keyring behind it. `scripts/lab.mjs` rents a desktop on EC2 for that, for
 as long as the trying takes, and makes sure it does not outlive it.
 
+What has been tried, on which system and with which installer, is kept in
+[live tests](/develop/live-tests), along with the machines still to try.
+
 ::: danger Sample data only
 An instance is a computer in somebody else's building. Nothing from a real patient goes on
 one — the study `npm run sample` writes is what to upload from it.
