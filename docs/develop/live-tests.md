@@ -33,7 +33,7 @@ from one.
 | 2026-09-11 | 1.3.3 | macOS 15.7.9, Intel | Homebrew cask, upgraded from 1.3.1 | the maintainer's Mac | ✅ Upgraded with `brew upgrade` and the quarantine step, signed in, uploaded. Not uninstalled |
 | 2026-09-11 | 1.3.3 | Windows Server 2025, build 26100 | Setup `.exe` x64 | `npm run lab -- up windows-2025` | ✅ Downloaded with Edge, installed, signed in, uploaded — the draft checked on Radiopaedia — and uninstalled from Settings. No SmartScreen warning appeared. Start menu not checked |
 | 2026-09-11 | 1.3.3 | Ubuntu 24.04, XFCE | AppImage x64 | `npm run lab -- up ubuntu-2404` | ✅ Downloaded with Firefox, started after `chmod +x` under AppArmor's user-namespace restriction, signed in, uploaded. `libfuse2t64` was already installed — the lab's xrdp depends on it — so FUSE was not put to the test |
-| 2026-09-11 | 1.3.3 | Ubuntu 24.04, XFCE | deb amd64 | the same machine | ⚠️ Installed with apt and started, but listed in the Science menu with no icon — [#8](https://github.com/gmadevs/Radiouploader/issues/8). Removed completely with `apt remove` |
+| 2026-09-11 | 1.3.3 | Ubuntu 24.04, XFCE | deb amd64 | the same machine | ⚠️ Installed with apt and started, but listed in the Science menu with no icon — [#8](https://github.com/gmadevs/Radiouploader/issues/8), fixed after 1.3.3. Removed completely with `apt remove` |
 
 **No SmartScreen warning on Windows Server says nothing yet about Windows 10 or 11.** A
 server edition may not check downloaded apps the way a client Windows does by default, so the
