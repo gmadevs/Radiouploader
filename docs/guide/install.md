@@ -131,6 +131,10 @@ and shows the address, with a button to copy it: open it in any browser, authori
 the code back as usual. When the browser was asked and still shows nothing, the same button
 is there, quieter, above the code field.
 
+Every other link the app opens — release notes, your case on Radiopaedia after an upload, the
+issue tracker, the support address — does the same in a dialog: what it could not open, and a
+button to copy it.
+
 The draft-case quota is read at sign-in and shown next to your username. It is what blocks
 importing when the account is full, before you spend time on a study you could not upload.
 

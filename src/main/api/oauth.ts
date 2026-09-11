@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import http from 'node:http'
 import { AddressInfo } from 'node:net'
-import { shell } from 'electron'
+import { openExternally, openOrOffer } from '../openLink'
 
 export const RADIOPAEDIA_ORIGIN = 'https://radiopaedia.org'
 const AUTHORIZE_URL = `${RADIOPAEDIA_ORIGIN}/oauth/authorize`
@@ -127,18 +127,11 @@ export async function exchangeCode(config: OAuthConfig, code: string, codeVerifi
  * Open the authorization page in the user's own browser, and say whether that
  * worked.
  *
- * On Linux Electron hands the address to xdg-open, and a minimal system running
- * the AppImage may have none — then openExternal rejects. Thrown, that left
- * sign-in on its first screen with no address to go to by hand, so the caller
- * is told instead and shows the address.
+ * Thrown, a failure left sign-in on its first screen with no address to go to
+ * by hand, so the caller is told instead and shows the address in its panel.
  */
 export async function openAuthorizationPage(pending: PendingAuthorization): Promise<boolean> {
-  try {
-    await shell.openExternal(pending.url)
-    return true
-  } catch {
-    return false
-  }
+  return openExternally(pending.url)
 }
 
 /**
@@ -188,7 +181,10 @@ export async function authorizeViaLoopback(config: OAuthConfig): Promise<TokenSe
 
     server.on('error', reject)
     server.listen(Number(redirect.port || 80), '127.0.0.1', () => {
-      void openAuthorizationPage(pending)
+      // No panel waits for a code here to show the address in, so where no
+      // browser opens a dialog offers it; otherwise this listener would sit out
+      // its five minutes with nobody on the way.
+      void openOrOffer(pending.url)
     })
 
     // Give the user a bounded window to complete sign-in rather than leaking a listener.

@@ -1,6 +1,7 @@
 import path from 'node:path'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { registerIpc } from './ipc'
+import { openOrOffer } from './openLink'
 import { session } from './session'
 import { MINIMUM, openingBounds, rememberWindow } from './windowState'
 
@@ -34,9 +35,10 @@ function createWindow(): BrowserWindow {
 
   rememberWindow(win)
 
-  // External links open in the user's browser, never inside the app shell.
+  // External links open in the user's browser, never inside the app shell —
+  // and where the system cannot open one, the address is offered instead.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url)
+    void openOrOffer(url, win)
     return { action: 'deny' }
   })
 
