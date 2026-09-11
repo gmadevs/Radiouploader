@@ -27,6 +27,8 @@ await import(path.join(root, 'out/main/index.js'))
 
 const problems = []
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+/** The bytes of the last PNG written, which the next one must not repeat. */
+let lastShot = null
 
 app.whenReady().then(run).catch((err) => {
   console.error(err)
@@ -82,37 +84,44 @@ async function run() {
    * moves everything that is right-aligned or centred: eight of these ten PNGs
    * were rewritten by connecting a mouse, with nothing in the app changed.
    *
-   * Injected here rather than in the app, which needs its scrollbars.
+   * Injected here rather than in the app, which needs its scrollbars. The caret
+   * goes the same way: a focused field blinks, and a capture that waits for the
+   * picture to hold still would wait on it for ever.
    */
-  await win.webContents.insertCSS('::-webkit-scrollbar { display: none }')
+  await win.webContents.insertCSS('::-webkit-scrollbar { display: none } * { caret-color: transparent !important }')
   await sleep(900)
 
   await shot('01-source', 'the first screen')
 
   await click('Choose folder')
   await settle(4000)
-  await shot('02-review', 'the review step')
+  await shot('02-review', 'the review step', `document.querySelectorAll('.series').length > 0 && !document.querySelector('.progress')`)
 
   // Trim lives behind a hover, so it is clicked rather than pointed at.
   await evaluate(`document.querySelectorAll('.trim-toggle')[0]?.click()`)
   await sleep(600)
-  await shot('03-trim', 'the trim controls')
+  await shot('03-trim', 'the trim controls', `!!document.querySelector('.trim')`)
   await click('Done')
   await sleep(400)
 
   await openReformatOn('Chest 1.0 mm')
   await settle(6000)
   await click('MIP')
-  await sleep(1200)
-  await shot('09-reformat', 'a coronal MIP of the chest CT')
+  await shot('09-reformat', 'a coronal MIP of the chest CT', isOn('MIP'))
   await click('Cancel')
   await sleep(500)
 
   await openViewerOn('Upper abdomen')
   await settle(2500)
-  await shot('04-viewer', 'the ultrasound, banner and all')
+  await shot(
+    '04-viewer',
+    'the ultrasound, banner and all',
+    `!!document.querySelector('.viewer-stage canvas') && !document.querySelector('.reformat-grid')`
+  )
 
   await click('Erase')
+  // A drag that lands before the tool has changed does the old tool's work.
+  await until(isOn('Erase'), 'the eraser to be the tool in hand')
   await dragOverBanner()
   await sleep(700)
   await shot('05-erase', 'the banner blanked')
@@ -120,28 +129,36 @@ async function run() {
   // The crop stays on for the rest of the run, so the steps after this one are
   // driven with a stack that really has been cut down.
   await click('Crop')
+  await until(isOn('Crop'), 'the crop to be the tool in hand')
   // Round the sector: the strip above it is the margin the banner was sitting
   // in, and the point of the picture is that it can be cut rather than blanked.
   await dragOnCanvas({ x: 0.02, y: 0.17 }, { x: 0.99, y: 0.95 })
   await sleep(700)
-  await shot('10-crop', 'the sector kept and the margins cut away')
+  await shot('10-crop', 'the sector kept and the margins cut away', `!!document.querySelector('.crop')`)
 
   await click('Done')
   await sleep(600)
 
   await click('Anonymise and continue')
   await settle(2500)
-  await shot('06-check', 'the check before anonymising')
+  await shot('06-check', 'the check before anonymising', hasButton('I have checked — anonymise'))
 
   await click('I have checked — anonymise')
   await settle(6000)
+  await until(
+    `[...document.querySelectorAll('label.field')].some((l) => l.childNodes[0]?.textContent?.trim().startsWith('Title'))`,
+    'the case form'
+  )
   await fillCaseForm()
-  await sleep(600)
-  await shot('07-case', 'the case form')
+  await shot(
+    '07-case',
+    'the case form',
+    `[...document.querySelectorAll('label.field input')].some((i) => i.value === 'Solitary pulmonary nodule, six months on')`
+  )
 
   await click('Upload to Radiopaedia')
   await settle(2500)
-  await shot('08-done', 'the confirmation')
+  await shot('08-done', 'the confirmation', `!!document.querySelector('a[href$="/cases/000000/edit"]')`)
 
   if (problems.length > 0) {
     console.error('PROBLEMS:\n' + problems.join('\n'))
@@ -173,16 +190,43 @@ async function run() {
     problems.push(`still busy after ${budget}ms`)
   }
 
+  /** Press a button once it is there and enabled: a busy machine renders it late. */
   async function click(label) {
-    const result = await evaluate(`(() => {
-      const b = [...document.querySelectorAll('button')].find((e) => e.textContent.trim() === ${JSON.stringify(label)})
-      if (!b) return 'missing'
-      if (b.disabled) return 'disabled'
-      b.click()
-      return 'ok'
-    })()`)
+    const deadline = Date.now() + 15_000
+    let result
+    do {
+      result = await evaluate(`(() => {
+        const b = [...document.querySelectorAll('button')].find((e) => e.textContent.trim() === ${JSON.stringify(label)})
+        if (!b) return 'missing'
+        if (b.disabled) return 'disabled'
+        b.click()
+        return 'ok'
+      })()`)
+      if (result === 'ok') break
+      await sleep(250)
+    } while (Date.now() < deadline)
     if (result !== 'ok') problems.push(`button ${JSON.stringify(label)}: ${result}`)
     await sleep(400)
+  }
+
+  /** Wait for the page to say something is so, or record what never became so. */
+  async function until(expression, what, budget = 15_000) {
+    const deadline = Date.now() + budget
+    while (Date.now() < deadline) {
+      if (await evaluate(expression)) return
+      await sleep(250)
+    }
+    problems.push(`gave up waiting for ${what}`)
+  }
+
+  /** A page expression: the button with this label is the one switched on. */
+  function isOn(label) {
+    return `[...document.querySelectorAll('button.on')].some((b) => b.textContent.trim() === ${JSON.stringify(label)})`
+  }
+
+  /** A page expression: a button with this label is on screen. */
+  function hasButton(label) {
+    return `[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === ${JSON.stringify(label)})`
   }
 
   /** Open the reformat dialog on the series whose description contains `name`. */
@@ -288,20 +332,61 @@ async function run() {
     if (result !== 'ok') problems.push(`case form: ${result}`)
   }
 
-  async function shot(name, description) {
-    /**
-     * Take the pointer out of the window first.
-     *
-     * The real cursor stays wherever the person at the machine left it, and a
-     * stack card under it opens the controls it keeps for a hover — which
-     * rewrote two of these PNGs between one run and the next with nothing in
-     * the app changed. Leaving the window clears every hover at once, and
-     * nothing here is mid-drag when a shot is taken.
-     */
-    win.webContents.sendInputEvent({ type: 'mouseLeave', x: 0, y: 0 })
-    await sleep(150)
-    const image = await win.webContents.capturePage()
-    await fs.writeFile(path.join(shotsDir, `${name}.png`), image.toPNG())
-    console.log(`${name.padEnd(14)}: ${description}`)
+  /**
+   * Capture the window once it shows the step the shot is named after.
+   *
+   * A fixed wait before capturing is a guess at how long the app will take, and
+   * on a busy machine the guess came up short: one run wrote six of these PNGs
+   * each showing the screen of the step before, and still said SHOTS OK. So a
+   * capture waits for three things instead — the page to be in the state the
+   * shot is of, where `ready` says what that is; the picture to differ from the
+   * last one written; and the picture to hold still across three captures in a
+   * row, which images still decoding and panes still drawing do not. A shot
+   * that never gets there is not written, and the run fails naming it.
+   */
+  async function shot(name, description, ready) {
+    const deadline = Date.now() + 30_000
+    let waiting = 'the page to be ready'
+    let last = null
+    let steady = 0
+    while (Date.now() < deadline) {
+      await sleep(400)
+      if (ready && !(await evaluate(ready))) {
+        waiting = 'the page to be ready'
+        last = null
+        steady = 0
+        continue
+      }
+      /**
+       * Take the pointer out of the window first.
+       *
+       * The real cursor stays wherever the person at the machine left it, and a
+       * stack card under it opens the controls it keeps for a hover — which
+       * rewrote two of these PNGs between one run and the next with nothing in
+       * the app changed. Leaving the window clears every hover at once, and
+       * nothing here is mid-drag when a shot is taken.
+       */
+      win.webContents.sendInputEvent({ type: 'mouseLeave', x: 0, y: 0 })
+      const png = (await win.webContents.capturePage()).toPNG()
+      if (lastShot && png.equals(lastShot)) {
+        waiting = 'the window to show something other than the previous shot'
+        last = null
+        steady = 0
+        continue
+      }
+      if (last && png.equals(last)) steady++
+      else {
+        waiting = 'the picture to hold still'
+        last = png
+        steady = 0
+      }
+      if (steady >= 2) {
+        await fs.writeFile(path.join(shotsDir, `${name}.png`), png)
+        lastShot = png
+        console.log(`${name.padEnd(14)}: ${description}`)
+        return
+      }
+    }
+    problems.push(`${name}: not written — gave up after 30 s waiting for ${waiting}`)
   }
 }

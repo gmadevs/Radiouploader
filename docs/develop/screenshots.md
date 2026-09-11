@@ -54,3 +54,24 @@ move.
 
 The script fails loudly if a button it expects is missing or disabled, which makes it a
 second smoke test: if the wizard breaks, `npm run shots` stops producing pictures of it.
+
+## Waiting for the screen, not the clock
+
+**A capture waits until the window shows the step it is named after.** The script used to
+wait a fixed time after each click, and on a busy Mac that came up short: one run wrote six
+PNGs that each showed the screen of the step before, and still reported success. Now every
+capture waits for three things before it is written:
+
+- the page to be in the state the shot is of — the review step's series listed, the MIP
+  button switched on, the case form filled in, the confirmation link on screen;
+- the picture to differ from the last PNG written;
+- the picture to hold still across three captures in a row, which a pane still drawing or a
+  thumbnail still decoding does not.
+
+A shot that never gets there within 30 seconds is not written, and the run fails naming it.
+Before a drag, the script also waits for the tool it needs to be the one switched on, since
+a drag that lands before the tool has changed does the old tool's work. A text caret is
+hidden along with the scrollbars, because a blinking one would never hold still.
+
+It was checked the way it went wrong: two runs, and a third with every CPU core kept busy,
+each byte-identical to the committed PNGs.
