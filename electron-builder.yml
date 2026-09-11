@@ -30,6 +30,10 @@ asarUnpack:
   # answer for.
   - node_modules/@cornerstonejs/**
 mac:
+  # Named outright. With resources/icons present electron-builder built the icns
+  # from that Linux set, which stops at 512, and 1.3.4's first draft had a Mac
+  # icon with no Retina layer; the install job now checks for it.
+  icon: resources/icon.png
   target:
     - target: dmg
       arch: [arm64, x64]
@@ -76,6 +80,8 @@ deb:
     - libasound2t64 | libasound2
     - libgbm1
 win:
+  # Named outright for the same reason as the Mac's: the Linux set is not its source.
+  icon: resources/icon.png
   target:
     - target: nsis
       arch: [x64]

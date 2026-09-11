@@ -118,6 +118,22 @@ const macOS = {
       throw new Problem(`${path.basename(installer())} holds a binary for ${archs.join(' + ')}, not ${expected}`)
     }
     console.log(`architectures  : ${archs.join(' + ')}`)
+
+    // The Dock and the Finder draw the icon at up to 512 points, which on a
+    // Retina screen is 1024 pixels. 1.3.4's first draft built its icns from the
+    // Linux icon set, which stops at 512, and only a byte count noticed.
+    const app = path.join(APPLICATIONS, `${PRODUCT}.app`)
+    const iconFile = read('plutil', ['-extract', 'CFBundleIconFile', 'raw', '-o', '-', path.join(app, 'Contents', 'Info.plist')])
+      .stdout.trim()
+      .replace(/\.icns$/, '')
+    const iconset = fs.mkdtempSync(path.join(os.tmpdir(), 'radiouploader-iconset-'))
+    run('iconutil', ['-c', 'iconset', path.join(app, 'Contents', 'Resources', `${iconFile}.icns`), '-o', `${iconset}/icon.iconset`])
+    const layers = fs.readdirSync(`${iconset}/icon.iconset`)
+    fs.rmSync(iconset, { recursive: true, force: true })
+    if (!layers.includes('icon_512x512@2x.png')) {
+      throw new Problem(`the app icon has no 1024-pixel layer, so a Retina Dock draws it blurred: ${layers.join(', ')}`)
+    }
+    console.log(`app icon       : ${layers.length} layers, up to 512@2x`)
   },
 
   locate() {
