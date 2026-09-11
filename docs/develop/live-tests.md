@@ -28,7 +28,7 @@ from one.
 
 | Date | Version | System | Installer | Where | Result |
 |---|---|---|---|---|---|
-| 2026-09-09 | 1.3.1 | macOS 15.7.9, Intel | Homebrew cask (Intel dmg) | the maintainer's Mac | ✅ Works, in daily use |
+| 2026-09-09 | 1.3.1 | macOS 15.7.9, Intel | Homebrew cask (Intel dmg) | the maintainer's Mac | ✅ Installed, signed in, uploaded; in daily use. Not uninstalled |
 | 2026-09-11 | 1.3.2 | Ubuntu 22.04, XFCE | AppImage x64 | `npm run lab -- up ubuntu-2204` | ❌ Sign-in could not reach a browser on a system without `xdg-open` — [#7](https://github.com/gmadevs/Radiouploader/issues/7), fixed in 1.3.3 |
 
 ## To do for 1.3.3
