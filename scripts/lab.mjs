@@ -218,7 +218,9 @@ echo "tester:$password" | chpasswd
 export DEBIAN_FRONTEND=noninteractive
 apt="apt-get -y -q -o DPkg::Lock::Timeout=600"
 $apt update
-$apt install xfce4 xfce4-terminal dbus-x11 xrdp gnome-keyring
+# xdg-utils because every real desktop has it, and nothing opens a link without
+# it: the app's sign-in could not reach a browser on the first machine this made.
+$apt install xfce4 xfce4-terminal dbus-x11 xrdp gnome-keyring xdg-utils
 # Ubuntu's firefox package rather than snap install: it installs the same snap,
 # and also the /usr/bin/firefox launcher and the x-www-browser alternative. A
 # bare snap registers neither, and /snap/bin/firefox cannot stand in for them —
