@@ -207,7 +207,7 @@ const debian = {
     asRoot('apt-get', ['update', '-q'])
     asRoot('apt-get', ['install', '-y', '-q', installer()])
 
-    const { exe, pkg, link } = debian.locate()
+    const { exe, pkg, link, desktop } = debian.locate()
     // ldd sees only what is linked, not what is opened later, but a library
     // missing here is one the app cannot start without.
     const missing = read('ldd', [exe]).stdout.split('\n').filter((line) => line.includes('not found'))
@@ -215,6 +215,30 @@ const debian = {
       throw new Problem(`installed, but ${pkg} did not bring what the binary links against:\n${missing.join('\n')}`)
     }
     if (!exists(link)) throw new Problem(`no ${link}, so typing the name in a terminal finds nothing`)
+
+    // A menu finds the icon by name, and only in a size the hicolor theme lists.
+    // The deb once installed its icon at 1024 alone, which the theme does not
+    // list, and the entry showed none (#8).
+    const icon = fs.readFileSync(desktop, 'utf8').match(/^Icon=(.+)$/m)?.[1]?.trim()
+    const theme = '/usr/share/icons/hicolor'
+    if (!icon) throw new Problem(`${desktop} names no icon`)
+    if (path.isAbsolute(icon)) {
+      if (!fs.existsSync(icon)) throw new Problem(`${desktop} names the icon ${icon}, which is not there`)
+      console.log(`menu icon      : ${icon}`)
+    } else if (!fs.existsSync(`${theme}/index.theme`)) {
+      console.log('menu icon      : not checked, this system has no hicolor theme')
+    } else {
+      const declared = [...fs.readFileSync(`${theme}/index.theme`, 'utf8').matchAll(/^\[([^\]]+)\]$/gm)]
+        .map((match) => match[1])
+        .filter((section) => section !== 'Icon Theme')
+      const found = declared.filter((dir) =>
+        ['png', 'svg', 'xpm'].some((extension) => fs.existsSync(`${theme}/${dir}/${icon}.${extension}`))
+      )
+      if (found.length === 0) {
+        throw new Problem(`the menu entry's icon, ${icon}, is in none of the sizes the hicolor theme declares`)
+      }
+      console.log(`menu icon      : ${icon} in ${found.join(', ')}`)
+    }
 
     // Which of the two sandboxes the post-install script chose. Said rather than
     // checked: it depends on the kernel the package landed on.

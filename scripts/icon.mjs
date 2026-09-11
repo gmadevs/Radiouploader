@@ -55,7 +55,16 @@ const OUTPUTS = [
     shape: SHAPE,
     targets: [path.join(resources, 'icon.png'), path.join(root, 'docs/public/favicon.png')]
   },
-  { size: 256, shape: 256, targets: [path.join(root, 'src/renderer/src/assets/logo.png')] }
+  { size: 256, shape: 256, targets: [path.join(root, 'src/renderer/src/assets/logo.png')] },
+  // Linux looks an icon up by name in the hicolor theme, and only in the sizes
+  // that theme declares, 512 being its largest for applications: the deb once
+  // carried the 1024 cut alone and its menu entry showed no icon (#8).
+  // electron-builder installs each of these by the size in its file name.
+  ...[16, 24, 32, 48, 64, 128, 256, 512].map((size) => ({
+    size,
+    shape: Math.round((size * SHAPE) / SIZE),
+    targets: [path.join(resources, 'icons', `${size}x${size}.png`)]
+  }))
 ]
 
 app.whenReady().then(run).catch((err) => {

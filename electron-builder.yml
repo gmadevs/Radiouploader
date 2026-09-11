@@ -38,6 +38,10 @@ mac:
   hardenedRuntime: true
   gatekeeperAssess: false
 linux:
+  # The sizes the hicolor theme declares, cut by npm run icon. Left to itself,
+  # electron-builder installed the 1024 icon alone, in a directory the theme
+  # does not list, and the menu entry had no icon (#8).
+  icon: resources/icons
   # fpm refuses to build a deb without a maintainer, and takes it from the
   # author's email otherwise. This is the address the app already shows in its
   # problem-report dialog; a deb published to strangers is no place for another.

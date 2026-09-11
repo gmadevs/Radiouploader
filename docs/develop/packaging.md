@@ -221,6 +221,13 @@ larger than its neighbours in the Dock — and writes both `resources/icon.png` 
 documentation's `favicon.png`. There is no image library in the project and none is added
 for this: Chromium is already here and a canvas does the whole job.
 
+It also cuts the sizes Linux looks in, 16 to 512 pixels, into `resources/icons/`, which is
+where electron-builder is pointed for Linux. A menu finds an icon by name in the hicolor
+theme, and hicolor declares no directory above 512 for applications: the deb used to carry
+the 1024 icon alone, and its entry sat in the menu with no icon
+([#8](https://github.com/gmadevs/Radiouploader/issues/8)). The install job now checks, on
+every build, that the icon the deb's menu entry names exists in a size hicolor declares.
+
 Cutting it out by hand would work once and go stale the day the artwork changes, which is
 the same argument the [screenshots](/develop/screenshots) are generated for.
 
