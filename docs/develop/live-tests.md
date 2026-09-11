@@ -29,8 +29,13 @@ from one.
 | Date | Version | System | Installer | Where | Result |
 |---|---|---|---|---|---|
 | 2026-09-09 | 1.3.1 | macOS 15.7.9, Intel | Homebrew cask (Intel dmg) | the maintainer's Mac | ✅ Installed, signed in, uploaded; in daily use. Not uninstalled |
-| 2026-09-11 | 1.3.3 | macOS 15.7.9, Intel | Homebrew cask, upgraded from 1.3.1 | the maintainer's Mac | ✅ Upgraded with `brew upgrade` and the quarantine step, signed in, uploaded. Not uninstalled |
 | 2026-09-11 | 1.3.2 | Ubuntu 22.04, XFCE | AppImage x64 | `npm run lab -- up ubuntu-2204` | ❌ Sign-in could not reach a browser on a system without `xdg-open` — [#7](https://github.com/gmadevs/Radiouploader/issues/7), fixed in 1.3.3 |
+| 2026-09-11 | 1.3.3 | macOS 15.7.9, Intel | Homebrew cask, upgraded from 1.3.1 | the maintainer's Mac | ✅ Upgraded with `brew upgrade` and the quarantine step, signed in, uploaded. Not uninstalled |
+| 2026-09-11 | 1.3.3 | Windows Server 2025, build 26100 | Setup `.exe` x64 | `npm run lab -- up windows-2025` | ✅ Downloaded with Edge, installed, signed in, uploaded — the draft checked on Radiopaedia — and uninstalled from Settings. No SmartScreen warning appeared. Start menu not checked |
+
+**No SmartScreen warning on Windows Server says nothing yet about Windows 10 or 11.** A
+server edition may not check downloaded apps the way a client Windows does by default, so the
+install guide keeps its *More info → Run anyway* step until a client Windows has been tried.
 
 ## To do for 1.3.3
 
@@ -40,8 +45,7 @@ having tried.
 
 | | Command | System | Installer | What it is there to show |
 |---|---|---|---|---|
-| ☐ | `npm run lab -- up windows-2025` | Windows Server 2025 | Setup `.exe` x64 | SmartScreen on a downloaded installer, the installer's own window, the Start menu, uninstalling from Settings |
-| ☐ | `npm run lab -- up windows-2022` | Windows Server 2022 | Setup `.exe` x64 | The same on the base Windows 10 shares |
+| ☐ | `npm run lab -- up windows-2022` | Windows Server 2022 | Setup `.exe` x64 | The same on the base Windows 10 shares, and the Start menu entry the 2025 test did not look at |
 | ☐ | `npm run lab -- up ubuntu-2204` | Ubuntu 22.04, XFCE | AppImage x64 | The #7 fix where it was found: run `sudo apt remove xdg-utils` first, since the lab now installs it |
 | ☐ | `npm run lab -- up ubuntu-2204` | Ubuntu 22.04, XFCE | deb amd64 | Installing from the browser download, the menu entry, `apt remove` |
 | ☐ | `npm run lab -- up ubuntu-2404` | Ubuntu 24.04, XFCE | AppImage x64 | The sandbox under AppArmor's user-namespace restriction, from a real desktop session |
