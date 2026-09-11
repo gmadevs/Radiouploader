@@ -32,6 +32,8 @@ from one.
 | 2026-09-11 | 1.3.2 | Ubuntu 22.04, XFCE | AppImage x64 | `npm run lab -- up ubuntu-2204` | ❌ Sign-in could not reach a browser on a system without `xdg-open` — [#7](https://github.com/gmadevs/Radiouploader/issues/7), fixed in 1.3.3 |
 | 2026-09-11 | 1.3.3 | macOS 15.7.9, Intel | Homebrew cask, upgraded from 1.3.1 | the maintainer's Mac | ✅ Upgraded with `brew upgrade` and the quarantine step, signed in, uploaded. Not uninstalled |
 | 2026-09-11 | 1.3.3 | Windows Server 2025, build 26100 | Setup `.exe` x64 | `npm run lab -- up windows-2025` | ✅ Downloaded with Edge, installed, signed in, uploaded — the draft checked on Radiopaedia — and uninstalled from Settings. No SmartScreen warning appeared. Start menu not checked |
+| 2026-09-11 | 1.3.3 | Ubuntu 24.04, XFCE | AppImage x64 | `npm run lab -- up ubuntu-2404` | ✅ Downloaded with Firefox, started after `chmod +x` under AppArmor's user-namespace restriction, signed in, uploaded. `libfuse2t64` was already installed — the lab's xrdp depends on it — so FUSE was not put to the test |
+| 2026-09-11 | 1.3.3 | Ubuntu 24.04, XFCE | deb amd64 | the same machine | ⚠️ Installed with apt and started, but listed in the Science menu with no icon — [#8](https://github.com/gmadevs/Radiouploader/issues/8). Removed completely with `apt remove` |
 
 **No SmartScreen warning on Windows Server says nothing yet about Windows 10 or 11.** A
 server edition may not check downloaded apps the way a client Windows does by default, so the
@@ -48,8 +50,6 @@ having tried.
 | ☐ | `npm run lab -- up windows-2022` | Windows Server 2022 | Setup `.exe` x64 | The same on the base Windows 10 shares, and the Start menu entry the 2025 test did not look at |
 | ☐ | `npm run lab -- up ubuntu-2204` | Ubuntu 22.04, XFCE | AppImage x64 | The #7 fix where it was found: run `sudo apt remove xdg-utils` first, since the lab now installs it |
 | ☐ | `npm run lab -- up ubuntu-2204` | Ubuntu 22.04, XFCE | deb amd64 | Installing from the browser download, the menu entry, `apt remove` |
-| ☐ | `npm run lab -- up ubuntu-2404` | Ubuntu 24.04, XFCE | AppImage x64 | The sandbox under AppArmor's user-namespace restriction, from a real desktop session |
-| ☐ | `npm run lab -- up ubuntu-2404` | Ubuntu 24.04, XFCE | deb amd64 | The AppArmor profile the deb installs, and `libasound2t64` pulled in by apt |
 
 One machine can take both of its rows: install the AppImage, then the deb, in the same
 session. Windows costs about twelve cents an hour and Ubuntu about five.
@@ -61,3 +61,4 @@ session. Windows costs about twelve cents an hour and Ubuntu about five.
 | macOS on Apple silicon | dmg arm64 | No Apple silicon Mac to hand, and a Mac on EC2 is a dedicated host billed by the day |
 | Linux on arm64 | AppImage and deb arm64 | The lab has no arm64 systems yet; a Graviton instance would do it |
 | Windows 10 and 11 themselves | Setup `.exe` x64 | EC2 has only Windows Server; a local virtual machine would |
+| An Ubuntu desktop without FUSE 2 | AppImage | Every lab machine has it, because xrdp depends on it, so the step a fresh Ubuntu desktop needs before an AppImage will start cannot be seen there |
