@@ -83,16 +83,40 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
  * "went wrong", for which the answer is null.
  */
 function aws(args, { quiet = [] } = {}) {
-  const result = spawnSync('aws', [...args, '--region', REGION, '--output', 'json'], { encoding: 'utf8' })
+  const result = spawnSync('aws', [...args, '--region', REGION, '--output', 'json', ...profileArgs()], { encoding: 'utf8' })
   if (result.error?.code === 'ENOENT') throw new Problem('the AWS CLI is not installed: brew install awscli')
   if (result.error) throw new Problem(`aws: ${result.error.message}`)
   if (result.status !== 0) {
     const message = result.stderr.trim()
     if (quiet.some((code) => message.includes(code))) return null
-    const hint = /login|sso|expired|credentials/i.test(message) ? '\nsign in first: aws login --profile lab' : ''
-    throw new Problem(`aws ${args[0]} ${args[1]}: ${message}${hint}`)
+    throw new Problem(`aws ${args[0]} ${args[1]}: ${message}${signInHint(message)}`)
   }
   return result.stdout.trim() ? JSON.parse(result.stdout) : {}
+}
+
+/**
+ * The CLI profile: AWS_PROFILE when it is set, and otherwise `lab` when this
+ * machine has one. A new terminal window without the export used to end in
+ * "Unable to locate credentials" and advice to sign in again, on a login that
+ * was still good.
+ */
+let profile
+function profileArgs() {
+  if (profile === undefined) {
+    if (process.env.AWS_PROFILE) profile = process.env.AWS_PROFILE
+    else {
+      const listed = spawnSync('aws', ['configure', 'list-profiles'], { encoding: 'utf8' })
+      const profiles = listed.status === 0 ? listed.stdout.split('\n').map((line) => line.trim()) : []
+      profile = profiles.includes('lab') ? 'lab' : null
+    }
+  }
+  return profile ? ['--profile', profile] : []
+}
+
+function signInHint(message) {
+  if (!/login|sso|expired|credentials/i.test(message)) return ''
+  if (!profile) return '\nno AWS profile to use: sign in with aws login --profile lab, then run this again'
+  return `\nsign in again: aws login --profile ${profile}`
 }
 
 /**
@@ -439,7 +463,8 @@ async function connect(id) {
     '--target', id,
     '--document-name', 'AWS-StartPortForwardingSession',
     '--parameters', JSON.stringify({ portNumber: ['3389'], localPortNumber: [String(port)] }),
-    '--region', REGION
+    '--region', REGION,
+    ...profileArgs()
   ], { stdio: 'inherit' })
   // Ctrl+C is for the tunnel; this process stays to ask what comes next.
   const ignore = () => {}

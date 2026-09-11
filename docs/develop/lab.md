@@ -47,8 +47,9 @@ would cost money to keep.
    brew install awscli
    brew install --cask session-manager-plugin
    aws login --profile lab
-   export AWS_PROFILE=lab
    ```
+   The script uses that `lab` profile by itself whenever `AWS_PROFILE` is not set, so a new
+   terminal window needs no export.
    `aws login`, in AWS CLI 2.32 and later, signs in through the browser as that user and
    hands the CLI credentials that last minutes and renew themselves for twelve hours — never
    an access key, least of all anywhere near this repository, which is public. IAM Identity
