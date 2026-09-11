@@ -16,7 +16,7 @@ first launch needs one extra step:
 |---|---|
 | **macOS** | Gatekeeper blocks an unsigned app: `xattr -dr com.apple.quarantine /Applications/Radiouploader.app`, or allow it in System Settings → Privacy & Security (Control-click → Open on macOS 14 and earlier) |
 | **Windows** | SmartScreen warns until the binary builds reputation: More info → Run anyway |
-| **Linux** | `chmod +x` the AppImage, or install the deb |
+| **Linux** | `chmod +x` the AppImage, or install the deb. The AppImage also needs FUSE 2, which Ubuntu no longer installs by default: `sudo apt install libfuse2t64` on 24.04, `sudo apt install libfuse2` on 22.04 |
 
 Signing needs an Apple Developer ID ($99/year) and an Authenticode certificate. Neither is
 in place — see [packaging](/develop/packaging). That is what the extra step is for; it says
