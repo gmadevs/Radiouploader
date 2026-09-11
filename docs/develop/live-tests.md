@@ -29,6 +29,7 @@ from one.
 | Date | Version | System | Installer | Where | Result |
 |---|---|---|---|---|---|
 | 2026-09-09 | 1.3.1 | macOS 15.7.9, Intel | Homebrew cask (Intel dmg) | the maintainer's Mac | ✅ Installed, signed in, uploaded; in daily use. Not uninstalled |
+| 2026-09-11 | 1.3.3 | macOS 15.7.9, Intel | Homebrew cask, upgraded from 1.3.1 | the maintainer's Mac | ✅ Upgraded with `brew upgrade` and the quarantine step, signed in, uploaded. Not uninstalled |
 | 2026-09-11 | 1.3.2 | Ubuntu 22.04, XFCE | AppImage x64 | `npm run lab -- up ubuntu-2204` | ❌ Sign-in could not reach a browser on a system without `xdg-open` — [#7](https://github.com/gmadevs/Radiouploader/issues/7), fixed in 1.3.3 |
 
 ## To do for 1.3.3
@@ -39,7 +40,6 @@ having tried.
 
 | | Command | System | Installer | What it is there to show |
 |---|---|---|---|---|
-| ☐ | `brew upgrade --cask radiouploader` | macOS 15.7.9, Intel | Homebrew cask | 1.3.3 on the Mac already in use, through the upgrade the app itself offers |
 | ☐ | `npm run lab -- up windows-2025` | Windows Server 2025 | Setup `.exe` x64 | SmartScreen on a downloaded installer, the installer's own window, the Start menu, uninstalling from Settings |
 | ☐ | `npm run lab -- up windows-2022` | Windows Server 2022 | Setup `.exe` x64 | The same on the base Windows 10 shares |
 | ☐ | `npm run lab -- up ubuntu-2204` | Ubuntu 22.04, XFCE | AppImage x64 | The #7 fix where it was found: run `sudo apt remove xdg-utils` first, since the lab now installs it |
