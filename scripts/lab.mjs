@@ -219,11 +219,19 @@ export DEBIAN_FRONTEND=noninteractive
 apt="apt-get -y -q -o DPkg::Lock::Timeout=600"
 $apt update
 $apt install xfce4 xfce4-terminal dbus-x11 xrdp gnome-keyring
+# Ubuntu's firefox package rather than snap install: it installs the same snap,
+# and also the /usr/bin/firefox launcher and the x-www-browser alternative. A
+# bare snap registers neither, and /snap/bin/firefox cannot stand in for them —
+# it is a link to snap, which picks the app by the name it was called by. The
+# desktop's Web Browser button and anything opening a link both failed with
+# "Couldn't find a suitable web browser".
 snap wait system seed.loaded
-snap install firefox
+$apt install firefox
 
 echo xfce4-session > /home/tester/.xsession
-chown tester:tester /home/tester/.xsession
+mkdir -p /home/tester/.config/xfce4
+echo WebBrowser=firefox > /home/tester/.config/xfce4/helpers.rc
+chown -R tester:tester /home/tester/.xsession /home/tester/.config
 usermod -aG ssl-cert xrdp
 systemctl enable xrdp
 systemctl restart xrdp
