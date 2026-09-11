@@ -84,8 +84,12 @@ const api = {
     scope: string | null
     usesOutOfBandFlow: boolean
   }> => ipcRenderer.invoke('auth:status'),
-  /** Opens the authorization page. needsCode marks the out-of-band flow. */
-  beginSignIn: (): Promise<{ needsCode: boolean }> => ipcRenderer.invoke('auth:beginSignIn'),
+  /**
+   * Opens the authorization page. needsCode marks the out-of-band flow, which
+   * also returns the address and whether the system could open it.
+   */
+  beginSignIn: (): Promise<{ needsCode: boolean; url?: string; opened?: boolean }> =>
+    ipcRenderer.invoke('auth:beginSignIn'),
   completeSignIn: (
     code: string
   ): Promise<{ username: string | null; quota: { draftCaseCount: number; allowedDraftCases: number | null } | null }> =>

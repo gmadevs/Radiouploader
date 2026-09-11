@@ -27,6 +27,9 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
   const [scope, setScope] = useState('')
   const [code, setCode] = useState('')
   const [awaitingCode, setAwaitingCode] = useState(false)
+  const [authUrl, setAuthUrl] = useState<string | null>(null)
+  const [opened, setOpened] = useState(true)
+  const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,6 +67,9 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
       .then((res) => {
         if (res.needsCode) {
           // Out-of-band: Radiopaedia shows the code, the user brings it back.
+          setAuthUrl(res.url ?? null)
+          setOpened(res.opened !== false)
+          setCopied(false)
           setAwaitingCode(true)
           return
         }
@@ -71,6 +77,14 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setBusy(false))
+  }
+
+  const copyAddress = (): void => {
+    if (!authUrl) return
+    void window.api.copyText(authUrl).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    })
   }
 
   const completeSignIn = (): void => {
@@ -147,10 +161,31 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
             </>
           ) : (
             <>
-              <p className="muted small" style={{ margin: 0 }}>
-                Authorise the application in the browser window that just opened, then paste the code Radiopaedia
-                shows you.
-              </p>
+              {/* Never "the window that just opened": the system taking the address
+                  is not proof a browser appeared, so the address stays in reach
+                  either way, and where it plainly did not open it is shown whole. */}
+              {opened ? (
+                <p className="muted small" style={{ margin: 0 }}>
+                  Authorise the application in your browser, then paste the code Radiopaedia shows you.
+                </p>
+              ) : (
+                <div className="notice warn">
+                  This computer did not open a browser. Copy the address below, open it in a browser yourself,
+                  authorise the application there, then paste the code Radiopaedia shows you.
+                </div>
+              )}
+              {authUrl && !opened && (
+                <div className="command" title="Radiopaedia's page for authorising this application">
+                  <code>{authUrl}</code>
+                </div>
+              )}
+              {authUrl && (
+                <div>
+                  <button className="small ghost" disabled={busy} onClick={copyAddress}>
+                    {copied ? 'Copied' : opened ? 'No browser window? Copy the address' : 'Copy the address'}
+                  </button>
+                </div>
+              )}
               <label className="field">
                 Authorization code
                 <input

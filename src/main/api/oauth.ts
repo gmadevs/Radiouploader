@@ -123,9 +123,22 @@ export async function exchangeCode(config: OAuthConfig, code: string, codeVerifi
   return postToken(params)
 }
 
-/** Open the authorization page in the user's own browser. */
-export async function openAuthorizationPage(pending: PendingAuthorization): Promise<void> {
-  await shell.openExternal(pending.url)
+/**
+ * Open the authorization page in the user's own browser, and say whether that
+ * worked.
+ *
+ * On Linux Electron hands the address to xdg-open, and a minimal system running
+ * the AppImage may have none — then openExternal rejects. Thrown, that left
+ * sign-in on its first screen with no address to go to by hand, so the caller
+ * is told instead and shows the address.
+ */
+export async function openAuthorizationPage(pending: PendingAuthorization): Promise<boolean> {
+  try {
+    await shell.openExternal(pending.url)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**

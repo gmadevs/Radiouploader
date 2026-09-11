@@ -43,6 +43,15 @@ export interface UserQuota {
   allowedDraftCases: number | null
 }
 
+export interface SignInStart {
+  /** The out-of-band flow: Radiopaedia shows a code and the user brings it back. */
+  needsCode: boolean
+  /** The authorization page, for opening by hand. Out-of-band only. */
+  url?: string
+  /** Whether the system took the address. True is not proof a window appeared. */
+  opened?: boolean
+}
+
 /** Thrown for non-2xx API responses, carrying the status so callers can react to 429. */
 export class RadiopaediaApiError extends Error {
   constructor(readonly status: number, message: string, readonly body: string) {
@@ -79,10 +88,11 @@ export class RadiopaediaClient {
    *
    * With an https redirect URI the code returns to a loopback listener and this
    * completes the sign-in on its own. With the out-of-band URN there is nowhere
-   * for the code to land, so this only opens the browser and the caller must
-   * follow up with completeSignIn() once the user has pasted the code.
+   * for the code to land, so this opens the browser if it can, hands back the
+   * address either way, and the caller follows up with completeSignIn() once
+   * the user has pasted the code.
    */
-  async beginSignIn(): Promise<{ needsCode: boolean }> {
+  async beginSignIn(): Promise<SignInStart> {
     if (!this.usesOutOfBandFlow) {
       this.tokens = await authorizeViaLoopback(this.config)
       await this.persist()
@@ -90,8 +100,8 @@ export class RadiopaediaClient {
     }
 
     this.pending = buildAuthorization(this.config)
-    await openAuthorizationPage(this.pending)
-    return { needsCode: true }
+    const opened = await openAuthorizationPage(this.pending)
+    return { needsCode: true, url: this.pending.url, opened }
   }
 
   /** Finish the out-of-band flow with the code Radiopaedia displayed. */

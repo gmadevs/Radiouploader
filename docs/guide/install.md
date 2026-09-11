@@ -125,6 +125,12 @@ Paste the Application ID and secret into the sign-in panel in the app header. To
 stored encrypted through the OS keychain — Keychain on macOS, libsecret on Linux, DPAPI on
 Windows — and never written in the clear.
 
+Signing in opens Radiopaedia's authorisation page in your browser. Where the app cannot open
+one — a minimal Linux running the AppImage may have no `xdg-open` to do it with — it says so
+and shows the address, with a button to copy it: open it in any browser, authorise, and paste
+the code back as usual. When the browser was asked and still shows nothing, the same button
+is there, quieter, above the code field.
+
 The draft-case quota is read at sign-in and shown next to your username. It is what blocks
 importing when the account is full, before you spend time on a study you could not upload.
 
