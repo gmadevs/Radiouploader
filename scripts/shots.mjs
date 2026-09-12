@@ -27,6 +27,9 @@ await import(path.join(root, 'out/main/index.js'))
 
 const problems = []
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+/** Page expressions for the labels of the buttons on screen, and of the lit ones. */
+const buttonLabels = `[...document.querySelectorAll('button')].map((b) => b.textContent.trim())`
+const litButtonLabels = `[...document.querySelectorAll('button.on')].map((b) => b.textContent.trim())`
 /** The bytes of the last PNG written, which the next one must not repeat. */
 let lastShot = null
 
@@ -179,6 +182,11 @@ async function run() {
     return win.webContents.executeJavaScript(source)
   }
 
+  /** Whether a condition holds: a page expression, or a check made here. */
+  function holds(ready) {
+    return typeof ready === 'function' ? ready() : evaluate(ready)
+  }
+
   /** Wait for the app to stop being busy, or give up and say so. */
   async function settle(budget) {
     const deadline = Date.now() + budget
@@ -210,23 +218,31 @@ async function run() {
   }
 
   /** Wait for the page to say something is so, or record what never became so. */
-  async function until(expression, what, budget = 15_000) {
+  async function until(ready, what, budget = 15_000) {
     const deadline = Date.now() + budget
     while (Date.now() < deadline) {
-      if (await evaluate(expression)) return
+      if (await holds(ready)) return
       await sleep(250)
     }
     problems.push(`gave up waiting for ${what}`)
   }
 
-  /** A page expression: the button with this label is the one switched on. */
+  /**
+   * A check: the button with this label is the one switched on.
+   *
+   * The page is asked for the labels and the match is made here, rather than
+   * writing the label into the expression the page runs. A label spliced into
+   * source has to be escaped for a language it is not text in — `JSON.stringify`
+   * leaves U+2028 and U+2029 alone, which are line terminators in JavaScript —
+   * and a label compared in this process is never code at all.
+   */
   function isOn(label) {
-    return `[...document.querySelectorAll('button.on')].some((b) => b.textContent.trim() === ${JSON.stringify(label)})`
+    return async () => (await evaluate(litButtonLabels)).includes(label)
   }
 
-  /** A page expression: a button with this label is on screen. */
+  /** A check: a button with this label is on screen. */
   function hasButton(label) {
-    return `[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === ${JSON.stringify(label)})`
+    return async () => (await evaluate(buttonLabels)).includes(label)
   }
 
   /** Open the reformat dialog on the series whose description contains `name`. */
@@ -351,7 +367,7 @@ async function run() {
     let steady = 0
     while (Date.now() < deadline) {
       await sleep(400)
-      if (ready && !(await evaluate(ready))) {
+      if (ready && !(await holds(ready))) {
         waiting = 'the page to be ready'
         last = null
         steady = 0
