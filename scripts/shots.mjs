@@ -100,7 +100,7 @@ async function run() {
   await settle(4000)
   await shot('02-review', 'the review step', `document.querySelectorAll('.series').length > 0 && !document.querySelector('.progress')`)
 
-  // Trim lives behind a hover, so it is clicked rather than pointed at.
+  // Clicked rather than found by label: every card in the strip has a Trim.
   await evaluate(`document.querySelectorAll('.trim-toggle')[0]?.click()`)
   await sleep(600)
   await shot('03-trim', 'the trim controls', `!!document.querySelector('.trim')`)

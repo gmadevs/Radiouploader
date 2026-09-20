@@ -101,26 +101,6 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
           <canvas ref={canvasRef} className={outsideTrim ? 'dropped' : undefined} />
         )}
         {outsideTrim && <div className="dropped-tag">not uploaded</div>}
-        {!error && (
-          <div className="stack-actions">
-            <button
-              className="small"
-              title="Open for review — blank out burnt-in text and set the contrast"
-              onClick={() => onOpen(stack)}
-            >
-              Open for review
-            </button>
-            {stack.slices.length > 2 && !stack.unsupported && (
-              <button
-                className="small"
-                title="Cut this series along another plane, or flatten slabs of it into MIP, MinIP or mean images"
-                onClick={() => onReformat(stack)}
-              >
-                Reformat
-              </button>
-            )}
-          </div>
-        )}
         {stack.slices.length > 1 && (
           <input
             type="range"
@@ -182,7 +162,7 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
         />
         <label htmlFor={stack.id}>
           <h3>{stack.label}</h3>
-          <div className="muted small">
+          <div className="stack-facts">
             {kept < stack.slices.length ? (
               <>
                 {kept} of {stack.slices.length} images
@@ -197,15 +177,15 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
             {maskCount > 0 && <> · {maskCount} blanked</>}
             {stack.window && <> · contrast set</>}
           </div>
-          {geometry !== '' && <div className="muted small">{geometry}</div>}
-          <div className="muted small">
+          {geometry !== '' && <div className="stack-detail">{geometry}</div>}
+          <div className="stack-detail">
             {formatSize(stack.bytes)} · {perImage(stack.bytes, stack.slices.length)} each
           </div>
           {/* Only when there is something to say. Plain samples are what most
               exports are, and a badge on every card would cost a line to tell
               you nothing; a codec named here is the series that will grow if
               you blank or crop it. */}
-          {stack.compression !== null && <div className="small codec">{stack.compression}</div>}
+          {stack.compression !== null && <div className="stack-detail codec">{stack.compression}</div>}
         </label>
         {stack.slices.length > 2 && !showTrim && !stack.unsupported && (
           <button
@@ -217,6 +197,32 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
           </button>
         )}
       </div>
+
+      {/* The two things this screen asks of everyone, spelled out on the card
+          rather than waiting under the pointer: the check before anonymising
+          names Open for review by name, and a button nobody can see is one
+          nobody is doing. Withheld only when the preview failed, since there
+          is nothing to open. */}
+      {!error && (
+        <div className="stack-actions">
+          <button
+            className="small"
+            title="Open for review — blank out burnt-in text and set the contrast"
+            onClick={() => onOpen(stack)}
+          >
+            Open for review
+          </button>
+          {stack.slices.length > 2 && !stack.unsupported && (
+            <button
+              className="small"
+              title="Cut this series along another plane, or flatten slabs of it into MIP, MinIP or mean images"
+              onClick={() => onReformat(stack)}
+            >
+              Reformat
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Says what the failed preview above does not: this one is not merely
           unviewable here, it cannot go to Radiopaedia at all. */}

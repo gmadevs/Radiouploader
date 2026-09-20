@@ -1,6 +1,7 @@
 # Erase, crop and set contrast
 
-**Open for review** on any stack shows it full size with a scrubber through every image.
+**Open for review**, under any card in the strip, shows that stack full size with a scrubber
+through every image.
 The wheel and the trackpad move through the stack as well, and so do the left and right
 arrow keys — the slider is for jumping across a series, not for reading through one.
 

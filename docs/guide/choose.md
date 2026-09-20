@@ -65,7 +65,21 @@ Under the preview, in the order that decides whether a series is worth uploading
   the series that will grow if you [blank or crop](/guide/review) it.
 
 None of it is written over the image. The top corners of a thumbnail are where patient
-banners sit, and this is the app that must not cover one up.
+banners sit, and this is the app that must not cover one up — which is why **Open for
+review** and **Reformat** are a row of buttons under the card rather than a pair centred
+over the picture.
+
+Both are there whether or not the pointer is on the card. The check before anonymising asks
+you to open anything that could carry text, and a button that appears only under the pointer
+is one that is not there at all for a reader following a screenshot, or for anyone tabbing
+through.
+
+## What a ticked card looks like
+
+A stack that is going up carries an accent border and a ticked box. **The picture is at full
+brightness either way.** An unticked series is the one least likely to have been opened and
+looked at, so it is the last thing that should be dimmed: the banner you need to notice is
+often the reason to leave a series out, and half opacity is what stops it being read at all.
 
 ## Defaults you can leave alone
 
