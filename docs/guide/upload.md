@@ -88,6 +88,11 @@ forty localisers weigh what one reconstruction does, so a bar counting files say
 about how long is left. Under it: how much has gone of how much there is, the speed, and the
 time remaining.
 
+The same figure is drawn as a line across the bottom of the step row, so the window shows
+that something is happening without anybody having to look at the corner it is happening in.
+It carries no words of its own — the footer has those — and a phase with nothing to count
+yet, such as the scan still finding the files, leaves it empty rather than full.
+
 The speed is the average over the whole upload rather than the last second — a rate taken
 from the file in flight swings by an order of magnitude between a 40 kB localiser and a
 12 MB reconstruction, and a time remaining computed from that is one nobody can plan around.

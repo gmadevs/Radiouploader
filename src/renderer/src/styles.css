@@ -89,7 +89,13 @@ textarea { resize: vertical; min-height: 84px; }
   padding: 12px 20px;
   border-bottom: 1px solid var(--border);
   flex: none;
+  position: relative;
 }
+/* Laid over the row's own border rather than given a line of its own: a bar
+   that came and went with the work would otherwise move every screen in the
+   app down three pixels and back again. */
+.topbar { position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--panel-2); }
+.topbar > div { height: 100%; background: var(--accent); transition: width 0.15s; }
 .step {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 12px; border-radius: 999px;

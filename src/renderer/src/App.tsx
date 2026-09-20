@@ -11,7 +11,7 @@ import type {
   UpdateStatus
 } from '@shared/types'
 import { keptCount } from '@shared/selection'
-import { fractionDone } from '@shared/transfer'
+import { fractionOf } from './progressBar'
 import { describeTransfer } from './transferText'
 import { describeError, stated, type ShownError } from './errorText'
 import { AccountBar } from './components/AccountBar'
@@ -511,6 +511,9 @@ export function App(): React.JSX.Element {
    * Read from the same conditions that render them, since a stack id left
    * pointing at nothing puts no dialog on screen.
    */
+  /** How far the running job has got, for the line under the steps and the footer's bar. */
+  const fraction = fractionOf(progress)
+
   const dialogUp =
     confirming || showInfo || (viewing !== null && viewedStack !== null) || (reformatting !== null && reformatStack !== null)
 
@@ -560,6 +563,17 @@ export function App(): React.JSX.Element {
         <button className="small ghost" title="About, and how to report a problem" onClick={() => setShowInfo(true)}>
           Info
         </button>
+
+        {/* A line the width of the window, along the bottom of the step row.
+            The footer's bar is six pixels in a corner, and through a three
+            minute upload nothing else on screen moves at all — which reads as
+            an app that has stopped rather than one that is working. It says
+            what the footer says, so it is not announced a second time. */}
+        {progress && (
+          <div className="topbar" aria-hidden="true">
+            <div style={{ width: `${fraction * 100}%` }} />
+          </div>
+        )}
       </nav>
 
       <main className={step === 'source' || step === 'done' ? 'content centred' : 'content'}>
@@ -788,18 +802,7 @@ export function App(): React.JSX.Element {
               {progress.detail ? ` — ${progress.detail}` : ''}
             </div>
             <div className="progress">
-              {/* An upload's bar is its bytes, not its files: the counter above
-                  restarts at every series, and forty localisers weigh what one
-                  reconstruction does. Everything else has nothing better. */}
-              <div
-                style={{
-                  width: progress.transfer
-                    ? `${fractionDone(progress.transfer) * 100}%`
-                    : progress.total > 0
-                      ? `${(progress.done / progress.total) * 100}%`
-                      : '100%'
-                }}
-              />
+              <div style={{ width: `${fraction * 100}%` }} />
             </div>
             {progress.transfer && (
               <div className="small muted" style={{ marginTop: 4 }}>
