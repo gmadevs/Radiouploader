@@ -4,6 +4,7 @@ import { keptCount, toggleDropped } from '@shared/selection'
 import { CT_WINDOW_PRESETS, matchingPreset, usesHounsfield } from '@shared/windowPresets'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
 import { MIN_MASK_SIDE, moveMask, resizeMask, type MaskHandle } from '../maskEdit'
+import { useFocusTrap } from '../focusTrap'
 import { editsOf, sameEdits } from '../viewerEdits'
 import { useWheelScrub } from '../wheelScrub'
 
@@ -74,6 +75,7 @@ const show = (value: number): string => String(Math.round(value * 10) / 10)
  */
 export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const [stage, setStage] = useState<{ width: number; height: number } | null>(null)
   const [index, setIndex] = useState(() =>
@@ -96,6 +98,7 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
    * component is mounted per stack, so this is read once and stays put.
    */
   const opening = useRef(editsOf(stack))
+  useFocusTrap(dialogRef)
 
   const masks = stack.masks ?? []
   /** What is being kept: the crop under the pointer if there is one, else the stack's. */
@@ -356,7 +359,14 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
 
   return (
     <div className="viewer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="viewer" role="dialog" aria-label={`${heading} — ${stack.label}`}>
+      <div
+        className="viewer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${heading} — ${stack.label}`}
+        ref={dialogRef}
+        tabIndex={-1}
+      >
         <header className="viewer-head">
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2>{stack.label}</h2>

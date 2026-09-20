@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react'
 import type { AppInfo, UpdateStatus } from '@shared/types'
 import { APP_NAME, APP_TAGLINE, ISSUES_URL, RELEASES_URL, supportMailto } from '../about'
+import { useFocusTrap } from '../focusTrap'
 import { UpdateNotice } from './UpdateNotice'
 
 interface Props {
@@ -46,9 +48,29 @@ const STEPS: { title: string; body: string }[] = [
 
 /** Version, a short tutorial, and where to report what went wrong. */
 export function InfoDialog({ info, update, onSetUpdateChecks, onClose }: Props): React.JSX.Element {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(dialogRef)
+
+  // The other three close on Escape, and a dialog that does not is one people
+  // press it at twice before reaching for the mouse.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <div className="viewer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="info" role="dialog" aria-label={`About ${APP_NAME}`}>
+      <div
+        className="info"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`About ${APP_NAME}`}
+        ref={dialogRef}
+        tabIndex={-1}
+      >
         <header className="viewer-head">
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2>{APP_NAME}</h2>

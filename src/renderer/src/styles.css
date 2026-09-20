@@ -63,6 +63,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 /* A field already has a border for the ring to sit on, so it hugs it and reads
    as a thicker edge rather than as a second rectangle around the first. */
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offset: 0; }
+/* Not the dialogs. They take focus as they open so a screen reader announces
+   the window rather than whatever is behind it, but they are not tab stops —
+   and a ring drawn round the whole of one says nothing about where the
+   keyboard is, which is the only thing the ring is for. */
+[tabindex='-1']:focus-visible { outline: none; }
 textarea { resize: vertical; min-height: 84px; }
 /* The discussion and the findings are the two fields a reader actually reads,
    and they are written here rather than pasted in. A four-line box makes two

@@ -3,6 +3,7 @@ import { AXES, boxRange, cross, dot, negate, rotate, square, type Frame, type Ve
 import type { PreviewFrame, Projection, ReformatPlan, Series, Stack, VolumeInfo, WindowLevel } from '@shared/types'
 import { CT_WINDOW_PRESETS, matchingPreset, usesHounsfield } from '@shared/windowPresets'
 import { previewErrorText } from '../dicomPreview'
+import { useFocusTrap } from '../focusTrap'
 import { ReformatPanel } from './ReformatPanel'
 
 interface Props {
@@ -120,6 +121,9 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
       void window.api.closeVolume()
     }
   }, [stack.id])
+
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(dialogRef)
 
   // Four images per change of anything. They are resamples of a volume that is
   // already in memory over there, so this is arithmetic rather than reading.
@@ -265,7 +269,14 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
 
   return (
     <div className="viewer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="viewer" role="dialog" aria-label={`Reformat ${stack.label}`}>
+      <div
+        className="viewer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Reformat ${stack.label}`}
+        ref={dialogRef}
+        tabIndex={-1}
+      >
         <header className="viewer-head">
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2>Reformat</h2>

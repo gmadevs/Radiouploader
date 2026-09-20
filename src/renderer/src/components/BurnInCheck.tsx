@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BurnInFinding, CropRect, MaskRect } from '@shared/types'
 import type { StackEntry } from '../burnIn'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
+import { useFocusTrap } from '../focusTrap'
 import { type OrderGroup, type OrderStudy, uploadOrder } from '../uploadOrder'
 
 interface Props {
@@ -272,6 +273,9 @@ export function BurnInCheck({
   onBack,
   onConfirm
 }: Props): React.JSX.Element {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(dialogRef)
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onBack()
@@ -294,7 +298,14 @@ export function BurnInCheck({
 
   return (
     <div className="viewer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onBack()}>
-      <div className="info check" role="dialog" aria-label="Check for burnt-in text">
+      <div
+        className="info check"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Check for burnt-in text"
+        ref={dialogRef}
+        tabIndex={-1}
+      >
         <header className="viewer-head">
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2>Before anonymising</h2>
