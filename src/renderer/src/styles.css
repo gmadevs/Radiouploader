@@ -123,6 +123,10 @@ h2 { font-size: 16px; margin: 0 0 4px; }
 h3 { font-size: 14px; margin: 0; font-weight: 600; }
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
+/* A paragraph stops being one past about seventy-five characters: the eye
+   loses the start of the next line. The picker's own instruction ran the full
+   width of the window, which on a wide screen is two hundred. */
+.prose { max-width: 72ch; }
 
 .drop {
   display: grid; place-items: center; gap: 16px;

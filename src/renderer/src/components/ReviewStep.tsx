@@ -80,7 +80,7 @@ export function ReviewStep({
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
         <div style={{ flex: 1 }}>
           <h1>Choose what to upload</h1>
-          <p className="muted" style={{ marginTop: 0 }}>
+          <p className="muted prose" style={{ marginTop: 0 }}>
             Series that contain more than one acquisition have been split apart. Check the images before you continue —
             anonymisation cannot remove identifying text burnt into the pixels — open a series to blank it out.
           </p>
