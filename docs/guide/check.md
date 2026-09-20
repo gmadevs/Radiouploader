@@ -7,6 +7,17 @@
 Anonymisation is where a mask stops being an overlay and becomes pixels. After it, going
 back means redoing the run — so this is the last moment when erasing something is free.
 
+## It is a step, and the header says so
+
+The row along the top counts five: **Source**, **Series**, **Check**, **Case details**,
+**Upload**. This screen is one of them. It is a dialog rather than a page of its own, but
+the one gate between a study on your computer and a study on the internet should not be the
+part of the flow the flow leaves out of its own count.
+
+**Series** in that row takes you back here — from this check, and from the case form after
+it — keeping everything you chose. **Source** is not a way back: starting again throws the
+whole import away, which is what the footer's **Back** is for, and it says so.
+
 ## Why it is not a tick box
 
 A dialog that asks *"have you checked?"* becomes a reflex by the third import. It moves

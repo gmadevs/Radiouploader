@@ -20,9 +20,22 @@ import { SourceStep } from './components/SourceStep'
 
 type Step = 'source' | 'review' | 'case' | 'done'
 
-const STEPS: { key: Step; label: string }[] = [
+/**
+ * The steps as the header counts them, which is one more than the state has.
+ *
+ * The check before anonymising is a dialog over the review step rather than a
+ * screen of its own, and so it was not in the row at all: the one gate between
+ * a study on this computer and a study on the internet was the only part of
+ * the flow the flow did not admit to having, and a reader counting four steps
+ * met a fifth screen they had not been told about. It has a place here now,
+ * and `confirming` is what puts the app on it.
+ */
+type StepKey = Step | 'check'
+
+const STEPS: { key: StepKey; label: string }[] = [
   { key: 'source', label: 'Source' },
   { key: 'review', label: 'Series' },
+  { key: 'check', label: 'Check' },
   { key: 'case', label: 'Case details' },
   { key: 'done', label: 'Upload' }
 ]
@@ -458,19 +471,58 @@ export function App(): React.JSX.Element {
     setStep('source')
   }
 
-  const currentIndex = STEPS.findIndex((s) => s.key === step)
+  /**
+   * Where the app is, in the row's own terms.
+   *
+   * Anonymising counts as the check rather than as the series: it is what the
+   * check's button set going, and the row snapping back to Series while the
+   * bar reads "anonymising" says the app has gone backwards.
+   */
+  const here: StepKey = confirming || (busy && step === 'review') ? 'check' : step
+  const currentIndex = STEPS.findIndex((s) => s.key === here)
 
   return (
     <div className="app">
       <div className="titlebar" />
 
-      <nav className="steps">
-        {STEPS.map((s, i) => (
-          <div key={s.key} className={`step ${s.key === step ? 'active' : ''} ${i < currentIndex ? 'done' : ''}`}>
-            <span className="n">{i < currentIndex ? '✓' : i + 1}</span>
-            {s.label}
-          </div>
-        ))}
+      <nav className="steps" aria-label="Upload steps">
+        {STEPS.map((s, i) => {
+          const active = s.key === here
+          const passed = i < currentIndex
+          const className = ['step', active && 'active', passed && 'done'].filter(Boolean).join(' ')
+          const body = (
+            <>
+              <span className="n">{passed ? '✓' : i + 1}</span>
+              {s.label}
+            </>
+          )
+          /*
+           * Only the series step, and only from the two places that already
+           * have a way back to it. Source is not on the list: going there
+           * throws the whole import away, which the footer's Back says in a
+           * word, and a pill in a row of status lights should not be able to
+           * do that to someone who took the row for a set of tabs.
+           */
+          const returnable = s.key === 'review' && (here === 'check' || here === 'case')
+          return returnable ? (
+            <button
+              key={s.key}
+              type="button"
+              className={className}
+              title="Back to the series, keeping everything chosen here"
+              onClick={() => {
+                setConfirming(false)
+                setStep('review')
+              }}
+            >
+              {body}
+            </button>
+          ) : (
+            <div key={s.key} className={className} aria-current={active ? 'step' : undefined}>
+              {body}
+            </div>
+          )
+        })}
         <AccountBar account={account} onChange={setAccount} open={accountOpen} onOpenChange={setAccountOpen} />
         <button className="small ghost" title="About, and how to report a problem" onClick={() => setShowInfo(true)}>
           Info

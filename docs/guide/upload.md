@@ -2,6 +2,9 @@
 
 ![The case form](/shots/07-case.png)
 
+This is step four of five. **Series** in the header takes you back to the picker with
+everything you chose still there, as does **Back** in the footer.
+
 ## Anonymisation warnings
 
 The card at the top lists fields the anonymiser **kept**. They survive the whitelist

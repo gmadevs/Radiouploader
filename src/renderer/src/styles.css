@@ -88,6 +88,10 @@ textarea { resize: vertical; min-height: 84px; }
 .step.active { color: var(--text); background: var(--panel); }
 .step.active .n { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
 .step.done .n { background: var(--ok); color: var(--accent-ink); }
+/* A step you can go back to is a button; the rest are not, and the row has to
+   say which is which. Everything in it looked pressable and none of it was. */
+button.step { background: transparent; border-color: transparent; }
+button.step:hover { color: var(--text); background: var(--panel); border-color: transparent; }
 
 .content { flex: 1; overflow-y: auto; padding: 24px; }
 .content.centred { display: grid; place-items: center; }
@@ -416,7 +420,9 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 .home > .notice.update { width: min(720px, 100%); }
 .home-title p { margin: 0; }
 
-.steps > button { flex: none; margin-left: 10px; }
+/* Info, off the end of the row. Not the steps themselves, which are buttons
+   where they can be gone back to and need no gap of their own. */
+.steps > button:not(.step) { flex: none; margin-left: 10px; }
 
 .info {
   display: flex; flex-direction: column;
