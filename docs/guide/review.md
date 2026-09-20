@@ -64,6 +64,18 @@ first, and only closes the window once nothing is selected.
 original files are never modified — anonymisation writes new ones.
 :::
 
+## Leaving the viewer
+
+Every tool here writes straight to the stack — that is what lets the card behind show the
+blanked image — so there is no save to make and nothing to lose by closing the window.
+**Done**, <kbd>Esc</kbd> and a click outside the window all keep what you did.
+
+**Discard changes** is the other way out, and it appears only once there is something to
+discard. It puts the stack back exactly as it was when the viewer opened: blanked areas,
+crop, window and dropped images, all four together. It is a button and nothing else — no
+keystroke reaches it — because the way out that throws work away should have to be asked
+for by name.
+
 ## Crop
 
 Pick **Crop** and drag out the rectangle to **keep**. Everything outside it comes off every

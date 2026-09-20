@@ -4,6 +4,7 @@ import { keptCount, toggleDropped } from '@shared/selection'
 import { CT_WINDOW_PRESETS, matchingPreset, usesHounsfield } from '@shared/windowPresets'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
 import { MIN_MASK_SIDE, moveMask, resizeMask, type MaskHandle } from '../maskEdit'
+import { editsOf, sameEdits } from '../viewerEdits'
 import { useWheelScrub } from '../wheelScrub'
 
 interface Props {
@@ -87,6 +88,14 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
   const [pendingCrop, setPendingCrop] = useState<CropRect | null>(null)
   /** Which mask is being edited, if any. Cleared when the masks change under it. */
   const [chosen, setChosen] = useState<number | null>(null)
+  /**
+   * The stack as it was when this opened, so there is a way back out of it.
+   *
+   * Every tool here writes straight to the stack, which is what lets the card
+   * behind show the blanked image — so the state to keep is the old one. The
+   * component is mounted per stack, so this is read once and stays put.
+   */
+  const opening = useRef(editsOf(stack))
 
   const masks = stack.masks ?? []
   /** What is being kept: the crop under the pointer if there is one, else the stack's. */
@@ -342,6 +351,9 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
    */
   const lastOne = !droppedHere && keptCount(stack) <= 1
 
+  /** Is there anything to throw away? The way out only appears when there is. */
+  const dirty = !sameEdits(opening.current, editsOf(stack))
+
   return (
     <div className="viewer-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="viewer" role="dialog" aria-label={`${heading} — ${stack.label}`}>
@@ -352,7 +364,7 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
               {heading}
             </div>
           </div>
-          <div className="tools">
+          <div className="tools segmented">
             <button
               className={tool === 'erase' ? 'small on' : 'small'}
               onClick={() => setTool('erase')}
@@ -388,7 +400,26 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
               Contrast
             </button>
           </div>
-          <button onClick={onClose}>Done</button>
+          {/* Apart from the tools, because it is not one. Erase, Crop and
+              Contrast change what a drag does; this ends the session, and the
+              two sat in one row at one size. Escape and a click on the backdrop
+              are Done as well — the way out that throws work away is the one
+              that has to be asked for by name. */}
+          <div className="exits">
+            {dirty && (
+              <button
+                className="ghost"
+                title="Put this series back the way it was when it opened — blanked areas, crop, window and dropped images"
+                onClick={() => {
+                  onChange({ ...opening.current, masks: [...opening.current.masks], dropped: [...opening.current.dropped] })
+                  onClose()
+                }}
+              >
+                Discard changes
+              </button>
+            )}
+            <button onClick={onClose}>Done</button>
+          </div>
         </header>
 
         <div

@@ -285,6 +285,25 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
    footer, and a chosen tool has to look chosen wherever it sits. */
 .tools button.on, .presets button.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600; }
 
+/* One control rather than a row of buttons that happen to be next to each
+   other. Erase, Crop and Contrast are a choice of one, and they were laid out
+   at the same size and the same distance from the button that ends the
+   session — so a thing that changes what a drag does looked like a thing that
+   closes the window. */
+.segmented {
+  display: inline-flex; gap: 3px; flex: none;
+  padding: 3px; border-radius: 10px;
+  background: var(--bg); border: 1px solid var(--border);
+}
+.segmented button { background: transparent; border-color: transparent; }
+.segmented button:hover:not(:disabled) { border-color: var(--border); }
+
+/* The ways out, kept off the end of the row with a rule of their own. */
+.exits {
+  display: flex; align-items: center; gap: 8px; flex: none;
+  padding-left: 14px; border-left: 1px solid var(--border);
+}
+
 .viewer-stage {
   flex: 1; min-height: 0; display: grid; place-items: center;
   background: #000; padding: 12px; position: relative;

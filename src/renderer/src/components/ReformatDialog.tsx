@@ -273,7 +273,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
               {heading} · {stack.label}
             </div>
           </div>
-          <div className="tools">
+          <div className="tools segmented">
             {PANES.map((pane) => (
               <button
                 key={pane}
@@ -285,17 +285,21 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
                 {PANE_NAMES[pane]}
               </button>
             ))}
-            {tilted && (
-              <button
-                className="small ghost"
-                title="Put the three planes back where they started"
-                onClick={() => info && setPlanes(info.frames)}
-              >
-                Straighten
-              </button>
-            )}
           </div>
-          <button onClick={onClose}>Cancel</button>
+          {/* Out of the group beside it: the three panes are which one is being
+              built, and this puts them back where they started. */}
+          {tilted && (
+            <button
+              className="small ghost"
+              title="Put the three planes back where they started"
+              onClick={() => info && setPlanes(info.frames)}
+            >
+              Straighten
+            </button>
+          )}
+          <div className="exits">
+            <button onClick={onClose}>Cancel</button>
+          </div>
         </header>
 
         {error ? (
@@ -407,7 +411,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
           )}
 
           <div className="viewer-actions">
-            <div className="tools">
+            <div className="tools segmented">
               {PROJECTIONS.map((option) => {
                 // A projection through colour would take the red of one voxel
                 // and the green of another and paint a colour that is nowhere
