@@ -481,6 +481,14 @@ export function App(): React.JSX.Element {
   const here: StepKey = confirming || (busy && step === 'review') ? 'check' : step
   const currentIndex = STEPS.findIndex((s) => s.key === here)
 
+  /**
+   * A dialog is up, so the footer behind it is not where the next action is.
+   * Read from the same conditions that render them, since a stack id left
+   * pointing at nothing puts no dialog on screen.
+   */
+  const dialogUp =
+    confirming || showInfo || (viewing !== null && viewedStack !== null) || (reformatting !== null && reformatStack !== null)
+
   return (
     <div className="app">
       <div className="titlebar" />
@@ -681,7 +689,10 @@ export function App(): React.JSX.Element {
         />
       )}
 
-      <footer className="footer">
+      {/* Dimmed behind a dialog: the check before anonymising carries its own
+          accent button three inches above this one, and two of them on screen
+          at once are two answers to the question of what to do next. */}
+      <footer className={dialogUp ? 'footer behind' : 'footer'}>
         {/* Dismissible, and carrying the way out of it where there is one.
             This said "Error invoking remote method 'api:draftCases': Error: …"
             and then stayed there, in a flex row it could squeeze the buttons
@@ -749,12 +760,12 @@ export function App(): React.JSX.Element {
               {studiesToUpload.length > 1 ? `${studiesToUpload.length} studies · ` : ''}
               {selectedStacks.length} series · {selectedImageCount} images selected
             </span>
-            <button onClick={startOver} disabled={busy}>
+            <button onClick={startOver} disabled={busy || dialogUp}>
               Back
             </button>
             <button
               className="primary"
-              disabled={busy || selectedStacks.length === 0}
+              disabled={busy || dialogUp || selectedStacks.length === 0}
               onClick={() => void openCheck()}
             >
               Anonymise and continue
@@ -764,7 +775,7 @@ export function App(): React.JSX.Element {
 
         {step === 'case' && (
           <>
-            <button onClick={() => setStep('review')} disabled={busy}>
+            <button onClick={() => setStep('review')} disabled={busy || dialogUp}>
               Back
             </button>
             <button
@@ -773,6 +784,7 @@ export function App(): React.JSX.Element {
               // them, and this upload cannot change them either way.
               disabled={
                 busy ||
+                dialogUp ||
                 (form.existingCaseId === null
                   ? form.title.trim() === '' || form.systemId === null
                   : drafts?.some((draft) => draft.id === form.existingCaseId) !== true)

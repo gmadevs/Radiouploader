@@ -104,6 +104,12 @@ button.step:hover { color: var(--text); background: var(--panel); border-color: 
   background: var(--panel);
 }
 .footer .spacer { flex: 1; }
+/* Behind a dialog. The accent belongs to whatever is in front, and a primary
+   that cannot be pressed should not go on claiming to be the way forward. */
+.footer.behind button.primary {
+  background: transparent; color: var(--muted);
+  border-color: var(--border); font-weight: 400;
+}
 
 .card {
   background: var(--panel);

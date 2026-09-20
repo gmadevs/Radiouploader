@@ -18,6 +18,10 @@ part of the flow the flow leaves out of its own count.
 it — keeping everything you chose. **Source** is not a way back: starting again throws the
 whole import away, which is what the footer's **Back** is for, and it says so.
 
+While this dialog is up the buttons behind it go quiet. **I have checked — anonymise** is
+the only thing on screen that moves the case forward, and two buttons offering to do that
+are two answers to the same question.
+
 ## Why it is not a tick box
 
 A dialog that asks *"have you checked?"* becomes a reflex by the third import. It moves
