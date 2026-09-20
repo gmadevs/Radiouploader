@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { describeError } from '../errorText'
-import { quotaExhausted, type AccountState } from '../quota'
+import { describeQuota, quotaExhausted, type AccountState } from '../quota'
 
 /** Doorkeeper's out-of-band redirect: the code is shown on screen to copy. */
 const OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
@@ -111,7 +111,18 @@ export function AccountBar({ account, onChange, open, onOpenChange }: Props): Re
     <div className="account">
       {account.authenticated ? (
         <>
-          <span className="muted small">{account.username ?? 'Signed in'}</span>
+          {/* The name is the way in to the account, and the only thing about
+              it that belongs in the header. Sign out sat here at full size
+              next to Info: the two least-used things in the app were the two
+              most prominent, and the one that ends the session was one stray
+              click away from the one that explains it. */}
+          <button
+            className="small ghost account-name"
+            title="Your Radiopaedia account"
+            onClick={() => onOpenChange(!open)}
+          >
+            {account.username ?? 'Signed in'}
+          </button>
           {account.quota && (
             <span className={full ? 'badge full' : 'badge'}>
               {account.quota.allowedDraftCases === null
@@ -119,14 +130,35 @@ export function AccountBar({ account, onChange, open, onOpenChange }: Props): Re
                 : `${account.quota.draftCaseCount}/${account.quota.allowedDraftCases} drafts`}
             </span>
           )}
-          <button className="small ghost" onClick={() => void window.api.signOut().then(load)}>
-            Sign out
-          </button>
         </>
       ) : (
         <button className="small" onClick={() => onOpenChange(!open)}>
           Sign in to Radiopaedia
         </button>
+      )}
+
+      {open && account.authenticated && (
+        <div className="account-panel card rows">
+          <div>
+            <h3>{account.username ?? 'Signed in to Radiopaedia'}</h3>
+            {describeQuota(account.quota) !== null && (
+              <p className="small" style={{ margin: '4px 0 0', color: full ? 'var(--warn)' : 'var(--muted)' }}>
+                {describeQuota(account.quota)}
+              </p>
+            )}
+          </div>
+          <div>
+            <button
+              title="Forget the tokens held in this computer's keychain. The application ID and secret stay."
+              onClick={() => {
+                onOpenChange(false)
+                void window.api.signOut().then(load)
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
       )}
 
       {open && !account.authenticated && (

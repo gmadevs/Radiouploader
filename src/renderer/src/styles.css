@@ -261,6 +261,9 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 .setting input[type='checkbox'] { width: auto; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
 
 .account { margin-left: auto; display: flex; align-items: center; gap: 10px; position: relative; }
+/* Quiet, because it is a label first and a way in second. */
+.account-name { color: var(--muted); border-color: transparent; }
+.account-name:hover { color: var(--text); }
 .account .badge.full { color: var(--danger); border-color: var(--danger); }
 .account-panel {
   position: absolute; top: calc(100% + 10px); right: 0; width: 380px; z-index: 10;

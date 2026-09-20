@@ -58,7 +58,8 @@ by [a workflow](/develop/packaging#the-homebrew-tap) whenever a release is publi
 ::: tip What a zap cannot reach
 `--zap` empties `~/Library/Application Support/Radiouploader` and the preferences, but your
 Radiopaedia tokens are in the **login keychain**, which no cask may touch. Sign out in the
-app first, or delete the *Radiouploader* entry in Keychain Access.
+app first — click your account name in the header, then **Sign out** — or delete the
+*Radiouploader* entry in Keychain Access.
 :::
 
 ## Staying up to date
@@ -142,6 +143,12 @@ importing when the account is full, before you spend time on a study you could n
 
 If the app ever says **Radiopaedia credentials aren't set yet**, the message carries an
 **Enter credentials** button that opens this same panel.
+
+Once you are signed in, your account name in the header is the way back to it: it opens a
+panel with the name, how much of the draft quota is in use, and **Sign out**. Sign out used
+to be a button in the header itself, next to **Info** — the two least-used things in the app
+given the two most prominent places in it, with the one that ends the session a stray click
+from the one that explains it.
 
 **No credentials are compiled into the app.** The Application ID and secret are entered at
 runtime and stored per user, so a build can go to anyone without sharing yours — each
