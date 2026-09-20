@@ -196,6 +196,12 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 .progress > div { height: 100%; background: var(--accent); transition: width 0.15s; }
 
 .notice { border-radius: 8px; padding: 10px 12px; font-size: 14px; border: 1px solid; }
+/* A message with room for what to do about it. Bounded rather than free to
+   grow: this sits in the footer's flex row, and a long one used to push the
+   buttons of the step off the end of it. */
+.notice.banner { display: flex; align-items: flex-start; gap: 10px; flex: 0 1 620px; min-width: 0; }
+.banner-text { flex: 1; min-width: 0; }
+.notice.banner button { flex: none; }
 .notice.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
 .notice.error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .notice.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); }

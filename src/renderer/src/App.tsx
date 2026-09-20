@@ -3,6 +3,7 @@ import type { AppInfo, BurnInFinding, CaseSummary, IngestResult, Progress, Serie
 import { keptCount } from '@shared/selection'
 import { fractionDone } from '@shared/transfer'
 import { describeTransfer } from './transferText'
+import { describeError, stated, type ShownError } from './errorText'
 import { AccountBar } from './components/AccountBar'
 import { quotaExhausted, type AccountState } from './quota'
 import { describeInterval } from '@shared/interval'
@@ -43,7 +44,7 @@ export function App(): React.JSX.Element {
   const [ingest, setIngest] = useState<IngestResult | null>(null)
   const [progress, setProgress] = useState<Progress | null>(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<ShownError | null>(null)
   const [form, setForm] = useState<CaseForm>(EMPTY_FORM)
   const [warnings, setWarnings] = useState<{ tag: string; text: string; level: number; count: number }[]>([])
   const [result, setResult] = useState<{ caseId: string; url: string } | null>(null)
@@ -67,6 +68,12 @@ export function App(): React.JSX.Element {
   const [drafts, setDrafts] = useState<CaseSummary[] | null>(null)
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [showInfo, setShowInfo] = useState(false)
+  /**
+   * Whether the account panel is down. Held here rather than in the bar because
+   * an error is usually about the credentials that panel holds, and a message
+   * that names a fix should be able to open the place the fix lives.
+   */
+  const [accountOpen, setAccountOpen] = useState(false)
   /** What the launch-time check found; null until it answers. */
   const [update, setUpdate] = useState<UpdateStatus | null>(null)
   /**
@@ -324,7 +331,7 @@ export function App(): React.JSX.Element {
       }
     } catch (e) {
       setDrafts([])
-      setError(e instanceof Error ? e.message : String(e))
+      setError(describeError(e))
     }
   }
 
@@ -334,13 +341,13 @@ export function App(): React.JSX.Element {
     try {
       const res = await window.api.ingest(paths)
       if (res.studies.length === 0) {
-        setError(`No readable DICOM files found (scanned ${res.scannedFileCount} files).`)
+        setError(stated('No readable DICOM files found', `${res.scannedFileCount} files were scanned.`))
         return
       }
       setIngest(res)
       setStep('review')
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(describeError(e))
     } finally {
       setWorking(false)
     }
@@ -355,7 +362,12 @@ export function App(): React.JSX.Element {
       const res = await window.api.anonymise()
       setWarnings(res.summary)
       if (res.errors.length > 0) {
-        setError(`${res.errors.length} file(s) could not be anonymised and will not be uploaded.`)
+        setError(
+          stated(
+            `${res.errors.length} file${res.errors.length === 1 ? '' : 's'} could not be anonymised`,
+            'Those files are not uploaded. The rest of the selection went through.'
+          )
+        )
       }
 
       // Seed one form per study, keeping anything already typed. Captions are
@@ -388,7 +400,7 @@ export function App(): React.JSX.Element {
       // list is about to be looked at.
       void readDrafts()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(describeError(e))
     } finally {
       setWorking(false)
     }
@@ -427,7 +439,7 @@ export function App(): React.JSX.Element {
         .then((user) => setAccount({ authenticated: true, username: user.username, quota: user.quota }))
         .catch(() => {})
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(describeError(e))
     } finally {
       setWorking(false)
     }
@@ -459,7 +471,7 @@ export function App(): React.JSX.Element {
             {s.label}
           </div>
         ))}
-        <AccountBar account={account} onChange={setAccount} />
+        <AccountBar account={account} onChange={setAccount} open={accountOpen} onOpenChange={setAccountOpen} />
         <button className="small ghost" title="About, and how to report a problem" onClick={() => setShowInfo(true)}>
           Info
         </button>
@@ -606,6 +618,9 @@ export function App(): React.JSX.Element {
 
       {viewing && viewedStack && (
         <SeriesViewer
+          // Per stack: the viewer remembers what its stack was on the way in,
+          // and a second one arriving in place of the first would inherit it.
+          key={viewedStack.id}
           stack={viewedStack}
           heading={viewing.heading}
           modality={viewing.modality}
@@ -615,7 +630,32 @@ export function App(): React.JSX.Element {
       )}
 
       <footer className="footer">
-        {error && <span className="notice error">{error}</span>}
+        {/* Dismissible, and carrying the way out of it where there is one.
+            This said "Error invoking remote method 'api:draftCases': Error: …"
+            and then stayed there, in a flex row it could squeeze the buttons
+            out of. */}
+        {error && (
+          <div className="notice error banner">
+            <div className="banner-text">
+              <strong>{error.title}</strong>
+              {error.detail !== null && <div className="small">{error.detail}</div>}
+            </div>
+            {error.fix !== null && (
+              <button
+                className="small"
+                onClick={() => {
+                  setAccountOpen(true)
+                  setError(null)
+                }}
+              >
+                {error.fix === 'credentials' ? 'Enter credentials' : 'Sign in'}
+              </button>
+            )}
+            <button className="small ghost" aria-label="Dismiss this message" onClick={() => setError(null)}>
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Wide enough for the line under the bar to stay on one line: it says
             how much has gone, how fast and how long is left, and a figure that

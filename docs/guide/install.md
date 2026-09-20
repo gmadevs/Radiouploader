@@ -140,6 +140,9 @@ importing when the account is full, before you spend time on a study you could n
 
 ## Handing a build to someone else
 
+If the app ever says **Radiopaedia credentials aren't set yet**, the message carries an
+**Enter credentials** button that opens this same panel.
+
 **No credentials are compiled into the app.** The Application ID and secret are entered at
 runtime and stored per user, so a build can go to anyone without sharing yours — each
 person registers their own application and signs in to their own account.

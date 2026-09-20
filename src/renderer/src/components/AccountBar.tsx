@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { describeError } from '../errorText'
 import { quotaExhausted, type AccountState } from '../quota'
 
 /** Doorkeeper's out-of-band redirect: the code is shown on screen to copy. */
@@ -7,6 +8,9 @@ const OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
 interface Props {
   account: AccountState
   onChange: (account: AccountState) => void
+  /** Whether the panel is down. Held by the app, which also opens it from an error. */
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
 /**
@@ -15,8 +19,7 @@ interface Props {
  * The quota is checked before any import so a full account is discovered up
  * front, rather than after importing, previewing and anonymising a whole study.
  */
-export function AccountBar({ account, onChange }: Props): React.JSX.Element {
-  const [open, setOpen] = useState(false)
+export function AccountBar({ account, onChange, open, onOpenChange }: Props): React.JSX.Element {
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
   // Radiopaedia refuses non-https redirect URIs, so the out-of-band URN is the
@@ -51,7 +54,7 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
       })
       .catch((e: unknown) => {
         // Keychain declined, config unreadable — stay signed out and say why.
-        setError(e instanceof Error ? e.message : String(e))
+        setError(describeError(e).title)
         onChange({ authenticated: false, username: null, quota: null })
       })
   }
@@ -75,7 +78,7 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
         }
         return load()
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => setError(describeError(e).title))
       .finally(() => setBusy(false))
   }
 
@@ -96,9 +99,9 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
         onChange({ authenticated: true, username: user.username, quota: user.quota })
         setAwaitingCode(false)
         setCode('')
-        setOpen(false)
+        onOpenChange(false)
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => setError(describeError(e).title))
       .finally(() => setBusy(false))
   }
 
@@ -121,7 +124,7 @@ export function AccountBar({ account, onChange }: Props): React.JSX.Element {
           </button>
         </>
       ) : (
-        <button className="small" onClick={() => setOpen((v) => !v)}>
+        <button className="small" onClick={() => onOpenChange(!open)}>
           Sign in to Radiopaedia
         </button>
       )}
