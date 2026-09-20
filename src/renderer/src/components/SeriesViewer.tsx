@@ -668,6 +668,22 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
               </button>
             )}
           </div>
+
+          {/* The keys, on the screen that has them rather than in a title
+              attribute nobody hovers over. Every one of these was already
+              here, and the only way to find out was to try. */}
+          <div className="keys muted">
+            <span>
+              <kbd>←</kbd> <kbd>→</kbd> step through the images
+            </span>
+            <span>
+              <kbd>Delete</kbd> removes the selected box
+            </span>
+            <span>
+              <kbd>Esc</kbd> lets go of a box, then closes
+            </span>
+            <span>the wheel scrubs</span>
+          </div>
         </div>
       </div>
     </div>

@@ -5,6 +5,10 @@ through every image.
 The wheel and the trackpad move through the stack as well, and so do the left and right
 arrow keys — the slider is for jumping across a series, not for reading through one.
 
+The keys are listed along the bottom of the window: the arrows, <kbd>Delete</kbd> for the box
+you have selected, <kbd>Esc</kbd> to let go of a box and then close. None of them is something
+you should have to find out about by trying.
+
 ![The ultrasound, banner and all](/shots/04-viewer.png)
 
 Three of the four things that can be changed here belong to the **stack** rather than to the

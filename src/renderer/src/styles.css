@@ -446,6 +446,15 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 .viewer-slider input[type='range'] { flex: 1; padding: 0; border: none; background: transparent; accent-color: var(--accent); }
 .viewer-actions { display: flex; align-items: center; gap: 8px; }
 .viewer-actions .spacer { flex: 1; }
+/* What the keyboard does, written down. These were in title attributes and in
+   the guide, which between them reach somebody who already suspects the key
+   exists. */
+.keys { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; }
+kbd {
+  font: inherit; font-size: 11px; line-height: 1;
+  padding: 2px 5px; border-radius: 4px;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+}
 /* The CT windows, as a row that wraps rather than one that scrolls: eight
    buttons fit a wide window and stack on a narrow one, and a preset nobody can
    see is a preset nobody uses. */
