@@ -406,7 +406,7 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 .viewer-row .viewer-slider { flex: 1; min-width: 0; }
 .viewer-row button { flex: none; }
 .viewer-slider { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
-.viewer-slider > span:first-child { width: 52px; flex: none; }
+.viewer-slider > span:first-child { width: 66px; flex: none; }
 .viewer-slider .n { width: 64px; flex: none; text-align: right; font-variant-numeric: tabular-nums; }
 .viewer-slider input[type='range'] { flex: 1; padding: 0; border: none; background: transparent; accent-color: var(--accent); }
 .viewer-actions { display: flex; align-items: center; gap: 8px; }

@@ -341,8 +341,8 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
         )}
 
         <div className="viewer-controls">
-          <div className="viewer-slider">
-            <span>Through</span>
+          <div className="viewer-slider" title="Where the slab sits in the volume; the crosshair moves this too">
+            <span>Position</span>
             <input
               type="range"
               min={0}
@@ -356,7 +356,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
             <span className="n">{step(offsetOf(frame.n))} mm</span>
           </div>
 
-          <div className="viewer-slider">
+          <div className="viewer-slider" title="How thick a slab each image is flattened from">
             <span>Slab</span>
             <input
               type="range"
@@ -371,8 +371,8 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
             <span className="n">{projection === 'slice' ? '—' : `${step(thickness)} mm`}</span>
           </div>
 
-          <div className="viewer-slider">
-            <span>Every</span>
+          <div className="viewer-slider" title="How far apart the images that come out are">
+            <span>Spacing</span>
             <input
               type="range"
               min={info?.finestSpacing ?? 1}

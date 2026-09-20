@@ -32,9 +32,9 @@ instances, written to the session's temp directory and removed with it.
 |---|---|
 | **Axial / Coronal / Sagittal** | which way to cut |
 | **Slice / MIP / MinIP / Mean** | what a slab collapses to |
-| **Through** | where the slab sits — the crosshair moves this too |
+| **Position** | where the slab sits — the crosshair moves this too |
 | **Slab** | how thick it is, in millimetres |
-| **Every** | how far apart the images that come out are |
+| **Spacing** | how far apart the images that come out are |
 
 **MIP** takes the brightest sample through the slab — vessels, contrast, bone. **MinIP**
 takes the darkest — airways, emphysema, fat. **Mean** averages it, which quietens noise at
