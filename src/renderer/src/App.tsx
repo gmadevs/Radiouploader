@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AppInfo, BurnInFinding, CaseSummary, IngestResult, Progress, Series, Stack, UpdateStatus } from '@shared/types'
+import type {
+  AppInfo,
+  BurnInFinding,
+  CaseSummary,
+  IngestResult,
+  Progress,
+  Series,
+  Stack,
+  Study,
+  UpdateStatus
+} from '@shared/types'
 import { keptCount } from '@shared/selection'
 import { fractionDone } from '@shared/transfer'
 import { describeTransfer } from './transferText'
@@ -481,6 +491,21 @@ export function App(): React.JSX.Element {
   const here: StepKey = confirming || (busy && step === 'review') ? 'check' : step
   const currentIndex = STEPS.findIndex((s) => s.key === here)
 
+  /** Image sets of one study that are going up — what the footer calls series. */
+  const seriesIn = (study: Study): number =>
+    study.series.reduce((n, series) => n + series.stacks.filter((stack) => stack.selected).length, 0)
+
+  /**
+   * What the case is called, for the screen that says what went.
+   *
+   * A new case is called whatever was typed on the form; a draft was named on
+   * Radiopaedia, and the list read on the way in is where that name is.
+   */
+  const uploadedTitle =
+    form.existingCaseId === null
+      ? form.title.trim()
+      : (drafts?.find((draft) => draft.id === form.existingCaseId)?.title ?? `Case ${form.existingCaseId}`)
+
   /**
    * A dialog is up, so the footer behind it is not where the next action is.
    * Read from the same conditions that render them, since a stack id left
@@ -608,14 +633,46 @@ export function App(): React.JSX.Element {
         )}
 
         {step === 'done' && result && (
-          <div className="card" style={{ textAlign: 'center', maxWidth: 480 }}>
+          <div className="card done-card">
             <h1>{form.existingCaseId === null ? 'Case uploaded' : 'Images added'}</h1>
-            <p className="muted">
+            <p className="muted prose">
               {form.existingCaseId === null
                 ? 'The case was created as a draft. Open it on Radiopaedia to review the images and publish it.'
                 : 'The studies were added to the draft. Open it on Radiopaedia to review the images and publish it.'}
             </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16 }}>
+
+            {/* What went, named. The screen used to say only that something
+                had, which is no help to somebody who has just sent the fourth
+                case of an afternoon and wants to know this one was the right
+                one. No byte count and no duration: the figures the app could
+                put here at this moment are not ones it can state honestly. */}
+            <div className="done-list">
+              <h2>{uploadedTitle}</h2>
+              <div className="muted small">
+                {studiesToUpload.length > 1 ? `${studiesToUpload.length} studies · ` : ''}
+                {selectedStacks.length} series · {selectedImageCount} images
+              </div>
+              <ul>
+                {studiesToUpload.map((study, index) => (
+                  <li key={study.id}>
+                    <span className="name">{study.studyDescription ?? 'Study'}</span>
+                    <span className="muted small">
+                      {seriesIn(study)} series
+                      {studiesToUpload.length > 1
+                        ? ` · ${describeInterval(study.intervalDays, index === 0)}`
+                        : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <p className="muted small prose">
+              Plane and sequence type have no API parameter, so every case has to be edited on the site anyway. It
+              is left as a draft, which is what adding more images to it later needs.
+            </p>
+
+            <div className="done-actions">
               <a href={`${result.url}/edit`} target="_blank" rel="noreferrer">
                 <button className="primary">Open case for editing</button>
               </a>

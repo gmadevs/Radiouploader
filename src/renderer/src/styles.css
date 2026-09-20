@@ -118,6 +118,23 @@ button.step:hover { color: var(--text); background: var(--panel); border-color: 
   padding: 18px;
 }
 
+/* The last screen. It named no case, counted nothing and sat in the middle of
+   an empty window, so the one question it could have answered — was that the
+   study I meant to send — it left to the site. */
+/* Named for the card, not the step: `done` on its own also matches the
+   completed pills in the header, which a bare .done rule laid out as grids. */
+.done-card { display: grid; gap: 14px; width: min(560px, 100%); }
+.done-card h1, .done-card p { margin: 0; }
+.done-list { display: grid; gap: 4px; padding: 12px 14px; background: var(--bg); border-radius: 8px; }
+.done-list h2 { margin: 0; }
+.done-list ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+/* The name takes what is left; the count keeps its place at the end, since a
+   column of them is what makes two studies comparable at a glance. */
+.done-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.done-list li .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.done-list li .muted { flex: none; }
+.done-actions { display: flex; gap: 10px; margin-top: 2px; }
+
 h1 { font-size: 22px; margin: 0 0 6px; }
 h2 { font-size: 16px; margin: 0 0 4px; }
 h3 { font-size: 14px; margin: 0; font-weight: 600; }

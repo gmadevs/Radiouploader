@@ -102,6 +102,15 @@ in no time otherwise reads as one that has broken.
 
 ![The confirmation](/shots/08-done.png)
 
+The confirmation names what went: the case's title, how many studies, series and images, and
+each study with the series it contributed and the interval it carries. It is the last chance
+to notice that the wrong export was sent, and the screen used to say only that *something*
+had been.
+
+There is no byte count and no duration on it. The last progress event of a run can arrive
+after the run's own reply, so a total read at that moment can be short by one file — and a
+figure that is nearly right is worse here than no figure.
+
 The case is created as a **draft**, so nothing is published until you say so on
 Radiopaedia. The confirmation links straight to the case editor, which is where the plane and
 sequence tags go — the API cannot set those.
