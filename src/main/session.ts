@@ -79,6 +79,11 @@ class Session {
    * leave burnt-in text on the upload.
    */
   applySelection(selection: StackSelection[]): void {
+    // Anonymised files are of the selection they were made from. Kept across a
+    // change, the upload would send a mask drawn since without it, and match
+    // images added since to nothing — so a new selection has to be anonymised
+    // again before anything goes.
+    this.anon = null
     const byId = new Map(selection.map((s) => [s.id, s]))
     for (const study of this.ingest?.studies ?? []) {
       for (const series of study.series) {

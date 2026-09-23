@@ -230,6 +230,13 @@ describe('applySelection — masks, crop and window', () => {
     expect(session.selectedStacks()[0].crop).toBeNull()
   })
 
+  it('forgets the anonymised files, which are of the selection before this one', () => {
+    // Kept, the upload would send files written before this mask was drawn.
+    session.anon = { outputDir: '/tmp/anonymised', files: [], warnings: [], errors: [] }
+    session.applySelection([{ ...full, masks: [{ x: 0, y: 0, width: 0.5, height: 0.5 }] }])
+    expect(session.anon).toBeNull()
+  })
+
   it('forgets edits made to a stack that was then deselected and re-selected', () => {
     session.applySelection([{ ...full, masks: [{ x: 0, y: 0, width: 0.5, height: 0.5 }] }])
     session.applySelection([full])
