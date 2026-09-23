@@ -1,4 +1,7 @@
-node_modules/
+# node_modules is a symlink to node_modules.nosync on the maintainer's machine,
+# which keeps iCloud from syncing it; no trailing slash, so the link matches.
+node_modules
+node_modules.nosync/
 out/
 dist/
 release/
