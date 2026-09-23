@@ -65,6 +65,18 @@ jobs:
 
       - run: npm ci
 
+      # The ffmpeg each installer carries for DICOM video, every architecture
+      # this platform packages; the tests decode through it too. Pinned by hash
+      # in the script, so the cache key is the script and a cached copy is
+      # re-verified before it is used.
+      - name: Cache ffmpeg
+        uses: actions/cache@v6
+        with:
+          path: node_modules/.cache/ffmpeg
+          key: ffmpeg-${{ runner.os }}-${{ hashFiles('scripts/ffmpeg.mjs') }}
+
+      - run: npm run ffmpeg
+
       - name: Typecheck and test
         run: npm test
 

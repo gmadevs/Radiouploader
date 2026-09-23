@@ -2,6 +2,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { Worker } from 'node:worker_threads'
 import type { AnonResult, AnonWarning, Progress, Stack } from '@shared/types'
+import { isVideoSyntax } from '../codecs/video'
+import { imageHeader } from '../preview'
+import { decodedVideo } from '../videoCache'
 import type { AnonJob, AnonMessage } from './anon.worker'
 import type { FrameTask } from './anonymise'
 
@@ -45,10 +48,37 @@ export async function anonymiseStacks(
       total++
     })
   })
-  const sources: AnonJob['sources'] = [...bySource].map(([sourcePath, tasks]) => ({ sourcePath, tasks }))
-
   const result: AnonResult = { outputDir, files: [], warnings: [], errors: [] }
   if (total === 0) return result
+
+  // A video is decoded here, in the main process, before the worker starts: its
+  // frames exist only once the whole stream has been through ffmpeg, and the
+  // decode is the one the viewer already made if the clip was looked at.
+  const sources: AnonJob['sources'] = []
+  for (const [sourcePath, tasks] of bySource) {
+    const header = await imageHeader(sourcePath).catch(() => null)
+    if (header === null || !isVideoSyntax(header.transferSyntax)) {
+      sources.push({ sourcePath, tasks, video: null })
+      continue
+    }
+    onProgress?.({ phase: 'anonymising', done: 0, total, detail: `Decoding ${path.basename(sourcePath)}` })
+    try {
+      const video = await decodedVideo(sourcePath, header)
+      // The header's frame count is a claim about the stream, and a stream can
+      // hold fewer. The frames it does hold still go; the ones it does not are
+      // named rather than taking the whole clip down with them.
+      const held = tasks.filter((task) => task.frame < video.frames)
+      if (held.length < tasks.length) {
+        result.errors.push({
+          path: sourcePath,
+          reason: `The video holds ${video.frames} frames, not the ${header.frames} its header states; the rest are not uploaded`
+        })
+      }
+      if (held.length > 0) sources.push({ sourcePath, tasks: held, video })
+    } catch (err) {
+      result.errors.push({ path: sourcePath, reason: err instanceof Error ? err.message : String(err) })
+    }
+  }
 
   const workerPath = path.join(import.meta.dirname, 'anon.worker.js')
   const worker = new Worker(workerPath, { workerData: { outputDir, sources } satisfies AnonJob })

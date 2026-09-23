@@ -64,8 +64,10 @@ The uploaded file is much larger — the JPEG test pattern in the repository is 
 through untouched instead, so it stays small and lossless. The same machinery splits a compressed cine, which
 cannot have its frames cut out of a bitstream by offset either.
 
-Only a format with no decoder is refused, and video — MPEG-2, MPEG-4, HEVC — is what is
-left.
+Video — MPEG-2, H.264, HEVC — is always rewritten, even a clip of one frame: a video stream
+is not an image Radiopaedia shows. Its frames are decoded whole by ffmpeg in the main process
+before the anonymiser's worker starts, and each is written out like a frame of any other
+run. Only a format with no decoder at all is refused.
 
 ## Layouts that are refused
 

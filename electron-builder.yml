@@ -30,6 +30,12 @@ asarUnpack:
   # answer for.
   - node_modules/@cornerstonejs/**
 mac:
+  # The ffmpeg that decodes DICOM video, for the architecture of this dmg rather
+  # than of the machine building it — one runner builds both. Fetched and
+  # pinned by scripts/ffmpeg.mjs, which the dist scripts run first.
+  extraResources:
+    - from: node_modules/.cache/ffmpeg/darwin-${arch}
+      to: ffmpeg
   # Named outright. With resources/icons present electron-builder built the icns
   # from that Linux set, which stops at 512, and 1.3.4's first draft had a Mac
   # icon with no Retina layer; the install job now checks for it.
@@ -42,6 +48,9 @@ mac:
   hardenedRuntime: true
   gatekeeperAssess: false
 linux:
+  extraResources:
+    - from: node_modules/.cache/ffmpeg/linux-${arch}
+      to: ffmpeg
   # The sizes the hicolor theme declares, cut by npm run icon. Left to itself,
   # electron-builder installed the 1024 icon alone, in a directory the theme
   # does not list, and the menu entry had no icon (#8).
@@ -80,6 +89,9 @@ deb:
     - libasound2t64 | libasound2
     - libgbm1
 win:
+  extraResources:
+    - from: node_modules/.cache/ffmpeg/win32-${arch}
+      to: ffmpeg
   # Named outright for the same reason as the Mac's: the Linux set is not its source.
   icon: resources/icon.png
   target:

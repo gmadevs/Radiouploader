@@ -270,10 +270,10 @@ describe('anonymiseFile — multiframe', () => {
     const message = dcmio.Message.readFile(bytes)
     const dict = message.dict as unknown as Record<string, { vr: string; Value: unknown[] }>
     dict['00280008'] = { vr: 'IS', Value: ['4'] }
-    // MPEG-4: encapsulated like the others, and nothing here reads it.
+    // JPIP: the pixels live on a server, and nothing here fetches them.
     ;(message.meta as Record<string, { vr: string; Value: unknown[] }>)['00020010'] = {
       vr: 'UI',
-      Value: ['1.2.840.10008.1.2.4.102']
+      Value: ['1.2.840.10008.1.2.4.94']
     }
     const outputPath = path.join(outDir, 'mpeg-cine.dcm')
     await fs.writeFile(outputPath, Buffer.from(message.write()))

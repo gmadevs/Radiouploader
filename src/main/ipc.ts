@@ -18,6 +18,7 @@ import type {
   VolumeInfo
 } from '@shared/types'
 import { anonymiseStacks, summariseWarnings } from './anon'
+import { ffmpegVersion } from './codecs/video'
 import { scanForBurnIn } from './burnInScan'
 import { RadiopaediaClient } from './api/client'
 import type { OAuthConfig } from './api/oauth'
@@ -47,11 +48,12 @@ async function requireClient(): Promise<RadiopaediaClient> {
 const OS_NAMES: Record<string, string> = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' }
 
 export function registerIpc(): void {
-  ipcMain.handle('app:info', (): AppInfo => ({
+  ipcMain.handle('app:info', async (): Promise<AppInfo> => ({
     version,
     os: `${OS_NAMES[process.platform] ?? process.platform} ${process.getSystemVersion()}`,
     arch: process.arch,
-    electron: process.versions.electron
+    electron: process.versions.electron,
+    videoDecoder: await ffmpegVersion()
   }))
 
   // Version, and what it would take to move off it. Nothing is downloaded and

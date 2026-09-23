@@ -280,6 +280,8 @@ export interface AppInfo {
   os: string
   arch: string
   electron: string
+  /** What DICOM video is decoded with, as "ffmpeg 6.1.1"; null when this build has none that runs. */
+  videoDecoder: string | null
 }
 
 /**

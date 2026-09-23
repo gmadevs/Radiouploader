@@ -52,7 +52,8 @@ from just its own byte range.
 Compressed pixel data goes through `src/main/codecs/decode.ts`, which loads the standalone
 `@cornerstonejs/codec-*` WASM builds on first use — JPEG, JPEG-LS, JPEG 2000 and HTJ2K —
 with plain JavaScript decoders for lossless JPEG and for RLE, which is PackBits over byte
-planes and wants no codec at all. Only video is left out. A compressed frame
+planes and wants no codec at all. Video — MPEG-2, H.264, HEVC — goes to ffmpeg instead
+(below). A compressed frame
 cannot be addressed arithmetically, so the fragment table is read to find where each one
 starts, and the most recently parsed file is kept so scrubbing a cine does not re-parse it
 per frame.
@@ -67,6 +68,23 @@ unpacked from the asar; only the decode-only builds are shipped.
 What comes back is not always what the header described — a decoder may undo a colour
 transform or unpack to a wider container — so the geometry travels with the samples rather
 than being read from the file again.
+
+
+### Video
+
+A video's frames are not fragments: the pixel data holds one stream, inside a container —
+MPEG-TS or MP4 for H.264 and HEVC, anything from an elementary stream to a program stream for
+MPEG-2 — where most frames are differences from the ones before. So `src/main/codecs/video.ts`
+hands the whole stream to **ffmpeg**, run as a child of the main process, and writes the
+frames to disk as plain RGB; from then on a frame of a video is a byte range, like a frame of
+an uncompressed cine. `src/main/videoCache.ts` makes that happen once per clip per session,
+in the session's working directory, whichever of the preview, the check or the anonymiser
+asks first. ffmpeg is asked for PPM rather than bare samples, because PPM states each
+frame's size: a stream whose pictures are not the size the DICOM header claims is refused by
+name rather than cut into frames at the wrong places.
+
+Not Chromium's own decoders, though Electron has them: they live in a renderer, and a decoded
+clip is hundreds of megabytes of patient pixels that would have to cross the IPC bridge.
 
 ## Where data lives
 

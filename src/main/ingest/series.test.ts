@@ -181,15 +181,24 @@ describe('buildStacks — multiframe objects', () => {
 })
 
 describe('buildStacks — compressed multiframe', () => {
-  /** MPEG-4: encapsulated like the rest, and a video rather than a stack. */
+  /** JPIP: pixel data that lives on a server, which nothing here fetches. */
   const undecodableCine = (): InstanceMeta[] => [
-    inst({ numberOfFrames: 40, transferSyntaxUid: '1.2.840.10008.1.2.4.102' })
+    inst({ numberOfFrames: 40, transferSyntaxUid: '1.2.840.10008.1.2.4.94' })
   ]
 
-  it('names the codec and refuses a run it cannot decode', () => {
+  it('refuses a run it cannot decode', () => {
     const { stacks } = buildStacks('s', undecodableCine())
-    expect(stacks[0].unsupported).toContain('MPEG-4 (H.264)')
+    expect(stacks[0].unsupported).toContain('this app has no decoder for it')
     expect(stacks[0].selected).toBe(false)
+  })
+
+  it('accepts a video, which ffmpeg decodes into its frames', () => {
+    for (const syntax of ['1.2.840.10008.1.2.4.100', '1.2.840.10008.1.2.4.102', '1.2.840.10008.1.2.4.107']) {
+      const { stacks } = buildStacks('s', [inst({ numberOfFrames: 40, transferSyntaxUid: syntax })])
+      expect(stacks[0].unsupported).toBeNull()
+      expect(stacks[0].selected).toBe(true)
+      expect(stacks[0].slices).toHaveLength(40)
+    }
   })
 
   it('accepts an RLE run, which it decodes in plain JavaScript', () => {
@@ -588,7 +597,7 @@ describe('buildStacks — enhanced multiframe', () => {
     const { stacks } = buildStacks('s', [
       inst({
         numberOfFrames: 2,
-        transferSyntaxUid: '1.2.840.10008.1.2.4.102',
+        transferSyntaxUid: '1.2.840.10008.1.2.4.94',
         frames: [frame({ frame: 0, temporalIndex: 1 }), frame({ frame: 1, temporalIndex: 2 })]
       })
     ])

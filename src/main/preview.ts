@@ -12,8 +12,10 @@ import {
   type ImageHeader
 } from '@shared/dicomImage'
 import type { PreviewFrame } from '@shared/types'
-import { decodeEncapsulatedFrame } from './codecs/decode'
+import { decodeEncapsulatedFrame, type DecodedSamples } from './codecs/decode'
 import { encodedFrame } from './codecs/frames'
+import { isVideoSyntax, readVideoFrame } from './codecs/video'
+import { decodedVideo, forgetDecodedVideos } from './videoCache'
 
 /**
  * Frame previews, decoded here rather than in the renderer.
@@ -93,6 +95,17 @@ async function encapsulatedFrame(filePath: string, frame: number, frames: number
   return encodedFrame(openFile.dataSet, frame, frames)
 }
 
+/**
+ * One frame of a compressed file, decoded. A video is decoded whole on first
+ * ask and read from there; anything else a frame at a time.
+ */
+async function decodedFrame(filePath: string, header: ImageHeader, frame: number): Promise<DecodedSamples> {
+  if (isVideoSyntax(header.transferSyntax)) {
+    return readVideoFrame(await decodedVideo(filePath, header), frame)
+  }
+  return decodeEncapsulatedFrame(await encapsulatedFrame(filePath, frame, header.frames), header)
+}
+
 /** Decode one frame of one file, shrunk to fit `maxEdge`. */
 export async function readPreviewFrame(
   filePath: string,
@@ -102,8 +115,7 @@ export async function readPreviewFrame(
   const header = await imageHeader(filePath)
 
   if (header.encapsulated) {
-    const encoded = await encapsulatedFrame(filePath, frame, header.frames)
-    const decoded = await decodeEncapsulatedFrame(encoded, header)
+    const decoded = await decodedFrame(filePath, header, frame)
     // What came out of the codec is what the pixels are now: the file's own
     // bit depth, planar configuration and colour space describe the bitstream,
     // not the samples it unpacks to.
@@ -145,8 +157,7 @@ export async function readStoredSamples(
   const header = await imageHeader(filePath)
 
   if (header.encapsulated) {
-    const encoded = await encapsulatedFrame(filePath, frame, header.frames)
-    const decoded = await decodeEncapsulatedFrame(encoded, header)
+    const decoded = await decodedFrame(filePath, header, frame)
     const asDecoded: ImageHeader = { ...header, ...decoded, encapsulated: false }
     return { header: asDecoded, samples: frameSamples(asDecoded, decoded.bytes) }
   }
@@ -166,4 +177,5 @@ export async function readStoredSamples(
 export function clearPreviewHeaders(): void {
   headers.clear()
   openFile = null
+  forgetDecodedVideos()
 }

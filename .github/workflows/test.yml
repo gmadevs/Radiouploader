@@ -33,6 +33,16 @@ jobs:
 
       - run: npm ci
 
+      # The video tests decode real streams through the ffmpeg the app ships;
+      # this runner's own architecture is all they need.
+      - name: Cache ffmpeg
+        uses: actions/cache@v6
+        with:
+          path: node_modules/.cache/ffmpeg
+          key: ffmpeg-test-${{ hashFiles('scripts/ffmpeg.mjs') }}
+
+      - run: npm run ffmpeg -- linux x64
+
       # Both projects: the main process and the renderer have their own
       # configurations, and `npm test` type-checks neither.
       - run: npm run typecheck

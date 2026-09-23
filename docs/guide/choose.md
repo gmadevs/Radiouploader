@@ -122,7 +122,11 @@ untouched unless something has to change its pixels — a blanked area, a crop, 
 being split — in which case it is decoded and uploaded uncompressed, which makes a larger
 file. See [known limitations](/limitations).
 
-A cine written as **video** — MPEG-2, MPEG-4 or HEVC — is the one case that cannot be uploaded at all,
-because its frames cannot be read to be split. That card says so in place of the tick, and
-the count beside *selected* tells you how many stacks are in that state, so a run cannot go
-missing from the case without having been mentioned.
+A cine written as **video** — MPEG-2, MPEG-4 or HEVC — is decoded into its frames and
+reviewed, erased and uploaded like any other run; the card names the codec. The first look
+at one takes a moment, since a video cannot be read a frame at a time and is decoded whole
+([more](/limitations#a-dicom-video-goes-up-as-its-frames-not-as-a-video)).
+
+A run in a format the app cannot read at all says so in place of the tick, and the count
+beside *selected* tells you how many stacks are in that state, so a run cannot go missing
+from the case without having been mentioned.

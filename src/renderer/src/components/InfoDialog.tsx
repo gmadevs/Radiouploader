@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { AppInfo, UpdateStatus } from '@shared/types'
-import { APP_NAME, APP_TAGLINE, ISSUES_URL, RELEASES_URL, supportMailto } from '../about'
+import { APP_NAME, APP_TAGLINE, ISSUES_URL, RELEASES_URL, buildLine, supportMailto } from '../about'
 import { useFocusTrap } from '../focusTrap'
 import { UpdateNotice } from './UpdateNotice'
 
@@ -143,13 +143,7 @@ export function InfoDialog({ info, update, onSetUpdateChecks, onClose }: Props):
         </div>
 
         <footer className="info-foot muted small">
-          {info ? (
-            <>
-              Version {info.version} · {info.os} · {info.arch} · Electron {info.electron}
-            </>
-          ) : (
-            'Reading version…'
-          )}
+          {info ? `Version ${buildLine(info)}` : 'Reading version…'}
           <span className="spacer" />
           <span>AGPL-3.0-only · not affiliated with Radiopaedia.org</span>
         </footer>

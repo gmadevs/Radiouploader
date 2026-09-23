@@ -1,4 +1,5 @@
 import { parentPort, workerData } from 'node:worker_threads'
+import type { DecodedVideo } from '../codecs/video'
 import { anonymiseFile, type FrameTask } from './anonymise'
 
 export interface AnonJob {
@@ -7,7 +8,7 @@ export interface AnonJob {
    * Grouped by source file so a 250 MB cine run is read and parsed once,
    * however many of its frames are wanted.
    */
-  sources: { sourcePath: string; tasks: FrameTask[] }[]
+  sources: { sourcePath: string; tasks: FrameTask[]; video: DecodedVideo | null }[]
 }
 
 export type AnonMessage =
@@ -24,9 +25,9 @@ async function run(): Promise<void> {
   const total = job.sources.reduce((n, source) => n + source.tasks.length, 0)
   let done = 0
 
-  for (const { sourcePath, tasks } of job.sources) {
+  for (const { sourcePath, tasks, video } of job.sources) {
     try {
-      for (const file of await anonymiseFile(sourcePath, job.outputDir, tasks)) {
+      for (const file of await anonymiseFile(sourcePath, job.outputDir, tasks, video)) {
         port.postMessage({ type: 'file', file } satisfies AnonMessage)
       }
     } catch (err) {

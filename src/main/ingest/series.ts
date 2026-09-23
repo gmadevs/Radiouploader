@@ -2,6 +2,7 @@ import { compressionOf } from '@shared/dicomImage'
 import { cross, describePlane, dot, normalise, type Vec3 } from '@shared/geometry'
 import { nearestAgeOption } from '@shared/radiopaedia'
 import { canDecode } from '../codecs/decode'
+import { isVideoSyntax } from '../codecs/video'
 import type { ImageComponent, Series, SliceRef, Stack, StackKind, Study } from '@shared/types'
 import { ageInYears, type InstanceMeta } from './dicom'
 
@@ -286,7 +287,8 @@ function unsupportedReason(units: Unit[]): string | null {
     ({ instance: m }) =>
       m.numberOfFrames > 1 &&
       compressionOf(m.transferSyntaxUid) !== null &&
-      !canDecode(m.transferSyntaxUid ?? '')
+      !canDecode(m.transferSyntaxUid ?? '') &&
+      !isVideoSyntax(m.transferSyntaxUid)
   )?.instance
   if (blocked === undefined) return null
   const codec = compressionOf(blocked.transferSyntaxUid)

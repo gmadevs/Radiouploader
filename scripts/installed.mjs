@@ -442,6 +442,17 @@ async function launch() {
       steps: [...document.querySelectorAll('.step')].map((e) => e.textContent.trim()),
       bridge: typeof window.api?.ingest
     })`)
+    // The ffmpeg that decodes DICOM video, asked of the app itself: present in
+    // this install, executable, and built for this machine — an Intel binary in
+    // the Apple silicon dmg would run under Rosetta on the runner and not on a
+    // Mac without it, which is why the answer comes from running it there.
+    const decoder = (
+      await cdp.send('Runtime.evaluate', {
+        expression: 'window.api.appInfo().then((info) => info.videoDecoder)',
+        awaitPromise: true,
+        returnByValue: true
+      })
+    ).result.value
 
     const shot = path.resolve(process.env.INSTALLED_SCREENSHOT ?? 'installed.png')
     try {
@@ -456,11 +467,13 @@ async function launch() {
     console.log(`renderer mounted: ${state.root}`)
     console.log(`wizard steps   : ${JSON.stringify(state.steps)}`)
     console.log(`preload bridge : ${state.bridge}`)
+    console.log(`video decoder  : ${decoder ?? 'none'}`)
     if (fs.existsSync(shot)) console.log(`screenshot     : ${shot}`)
 
     if (exited) problems.push(`the app quit while it was being checked (${exited})`)
     if (!state.root) problems.push('the renderer did not mount')
     if (state.bridge !== 'function') problems.push('the preload bridge is missing')
+    if (!decoder) problems.push('the app has no video decoder that runs: ffmpeg is missing from the package, or is not for this machine')
     if (problems.length > 0) throw new Problem(`${problems.join('\n')}\n--- the app's own output ---\n${output}`)
   } finally {
     cdp?.close()

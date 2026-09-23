@@ -19,6 +19,7 @@ import {
 import type { AnonWarning, CropRect, MaskRect, WindowLevel } from '@shared/types'
 import { canDecode, decodeEncapsulatedFrame, type DecodedSamples } from '../codecs/decode'
 import { encodedFrame } from '../codecs/frames'
+import { isVideoSyntax, readVideoFrame, type DecodedVideo } from '../codecs/video'
 
 export interface AnonymisedFile {
   sourcePath: string
@@ -306,11 +307,16 @@ function writeDecodedFrame(
  * not merely hidden by a viewer.
  *
  * The source is read and parsed once however many frames are wanted from it.
+ *
+ * A video arrives already decoded — `video` is where its frames are, which the
+ * main process wrote before starting this — because a video's frames exist
+ * only once the whole stream has been through a decoder. See codecs/video.ts.
  */
 export async function anonymiseFile(
   sourcePath: string,
   outputDir: string,
-  tasks: FrameTask[]
+  tasks: FrameTask[],
+  video: DecodedVideo | null = null
 ): Promise<AnonymisedFile[]> {
   const buf = await fs.readFile(sourcePath)
   const arrayBuffer = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
@@ -350,19 +356,26 @@ export async function anonymiseFile(
    * A compressed file that needs none — a single frame with nothing to blank
    * and nothing to cut away — is passed through untouched, which keeps it small
    * and keeps it lossless.
+   *
+   * A video is always rewritten, even one of a single frame: Radiopaedia shows
+   * a DICOM image, and a video stream in the pixel data is not one.
    */
+  const isVideo = isVideoSyntax(transferSyntax)
+  if (isVideo && video === null) {
+    throw new Error(`${path.basename(sourcePath)} is a video, and was not decoded before anonymising`)
+  }
   const changingPixels =
-    totalFrames > 1 || tasks.some((task) => (task.masks?.length ?? 0) > 0 || cropOf(task) !== null)
+    isVideo || totalFrames > 1 || tasks.some((task) => (task.masks?.length ?? 0) > 0 || cropOf(task) !== null)
   const rewriting = compression !== null && changingPixels
-  if (rewriting && !canDecode(transferSyntax ?? '')) {
+  if (rewriting && !isVideo && !canDecode(transferSyntax ?? '')) {
     throw new Error(
       `Cannot read the pixel data of ${path.basename(sourcePath)}: ${compression} is not a format this app decodes`
     )
   }
   // Frames of an encapsulated object are fragments rather than offsets, and
   // dicom-parser is what knows how to find them.
-  const encapsulated = rewriting ? dicomParser.parseDicom(new Uint8Array(buf)) : null
-  const header = rewriting ? parseHeader(new Uint8Array(buf)) : null
+  const encapsulated = rewriting && !isVideo ? dicomParser.parseDicom(new Uint8Array(buf)) : null
+  const header = rewriting && !isVideo ? parseHeader(new Uint8Array(buf)) : null
 
   const storedGeometry: PixelGeometry = {
     rows,
@@ -417,8 +430,10 @@ export async function anonymiseFile(
     let geometry = storedGeometry
     let photometric = storedPhotometric
 
-    if (rewriting && encapsulated && header) {
-      const decoded = await decodeEncapsulatedFrame(encodedFrame(encapsulated, task.frame, totalFrames), header)
+    if (rewriting && (video || (encapsulated && header))) {
+      const decoded = video
+        ? await readVideoFrame(video, task.frame)
+        : await decodeEncapsulatedFrame(encodedFrame(encapsulated!, task.frame, totalFrames), header!)
       writeDecodedFrame(message, dict, decoded, task.instanceNumber)
       geometry = {
         rows,

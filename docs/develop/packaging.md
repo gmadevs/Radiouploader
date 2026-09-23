@@ -201,6 +201,41 @@ a tap"* — and a scratch one rather than the real clone, which the workflow ove
 `brew style` on a bare `.rb` outside a tap is no substitute: it answers with three offences
 about Sorbet sigils and frozen string literals, none of which apply to a cask.
 
+## The video decoder
+
+```bash
+npm run ffmpeg                 # every architecture this platform packages
+npm run ffmpeg -- linux x64    # one
+```
+
+DICOM video — MPEG-2, H.264, HEVC — is decoded by **ffmpeg**, which no WASM codec here
+replaces and which every installer therefore carries: 45 to 80 MB unpacked, about 25 MB on a
+compressed installer. [Why ffmpeg and not Chromium's decoders](/internals/architecture#video).
+
+The binaries are [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static)'s,
+and `scripts/ffmpeg.mjs` pins them twice: by release, and by the SHA-256 of each unzipped
+binary and of its licence. A download that hashes differently is refused rather than
+shipped — this is an executable the app runs on patient data, and one that changed under a
+fixed release name is not one anybody looked at. They land in `node_modules/.cache/ffmpeg/`,
+which git ignores and nothing syncs, and the dist scripts fetch them before electron-builder
+runs.
+
+**Each installer carries its own architecture's**, not the builder's. One macOS runner builds
+both dmgs and one Linux runner both debs and AppImages, so the script fetches every
+architecture electron-builder packages for the platform, and `electron-builder.yml` takes
+`node_modules/.cache/ffmpeg/<platform>-${arch}` into `resources/ffmpeg` of each. The install
+job then asks the installed app itself — `appInfo().videoDecoder`, which runs the binary — so
+a missing, non-executable or wrong-architecture ffmpeg fails the build rather than the first
+clip someone opens.
+
+The licence file travels beside the binary. ffmpeg is a separate program the app runs, not
+code linked into it; the source is at [ffmpeg.org](https://ffmpeg.org/download.html).
+
+Moving to a newer build is: a new `RELEASE`, new hashes — download, `gunzip`, `shasum -a 256`
+for each of the five — and a run of the tests, which decode real streams in every container
+the standard allows through it. The fixtures they decode are drawn by
+`scripts/videoFixtures.mjs`, never taken from a real clip.
+
 ## The icon
 
 ```bash

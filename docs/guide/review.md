@@ -155,6 +155,6 @@ An image with no box on it and no crop is uploaded exactly as it arrived. A crop
 to the edges counts as no crop: it is dropped rather than spent decoding a file to produce
 the bytes it already had.
 
-Every still-image compression DICOM has is read here, RLE included. Only **video** —
-MPEG-2, MPEG-4, HEVC — is left out: it does not decode, so it cannot be previewed, erased or
-cropped. Export those as still frames before importing.
+Every compression DICOM has is read here, RLE and **video** included — MPEG-2, MPEG-4 and
+HEVC are decoded into their frames, which can be scrubbed, erased and cropped like any cine.
+A banner written across the top of an ultrasound clip is the reason that matters.

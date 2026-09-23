@@ -51,22 +51,32 @@ be anonymised, rather than sent with a mask in the wrong place. Without a mask, 
 frames to lift out they go up as they are. They are rare in the studies people make cases
 from.
 
-## A DICOM video cannot be uploaded
+## A DICOM video goes up as its frames, not as a video
 
-A multiframe object keeps its frames as fragments when it is compressed, so they are decoded
-before they are sent one at a time. Sending the file whole is not an answer: Radiopaedia does
-not expand multiframe objects, and a run of dozens would be published as its first frame.
+A run some machines write as **video** — MPEG-2, MPEG-4 (H.264) or HEVC, as ultrasound and
+angiography often do — is decoded into its frames and uploaded as a stack of them, like any
+other cine. Radiopaedia does not expand a multiframe object, and a video in the pixel data is
+not an image it shows at all; and the frames are what a mask can be painted on, which a clip
+with the patient's name across the top needs.
 
-Every still-image compression in DICOM decodes here — JPEG, lossless JPEG, JPEG-LS,
-JPEG 2000, HTJ2K and RLE. What is left is **video**: MPEG-2, MPEG-4 (H.264) and HEVC
-(H.265), which some machines write an ultrasound or angiography run as. Those are a video
-stream rather than a stack of pictures, and nothing here reads one.
+What that costs:
 
-Such a run is **named in the picker** — the card carries the codec, cannot be ticked, and
-the count of stacks in that state sits beside the selection count — rather than being
-discovered during anonymisation, where the failure is per file and used to take the whole
-series out of the case behind "N file(s) could not be anonymised". Exporting the run as
-still frames from the PACS is the way to publish it.
+- **Size.** The frames go up uncompressed, where the video held differences between them: a
+  few megabytes of clip can be hundreds of megabytes of frames, on the upload and on the disk
+  while the session is open — a 300-frame clip at 1024×768 is about 700 MB decoded.
+- **Time to open.** A video cannot be read a frame at a time, so the first look at one
+  decodes all of it; a few seconds for a long clip, and every frame after that is immediate.
+- **Only the pictures.** An audio track, a second view of a stereo clip and the frame rate
+  are not carried — a stack has none of them.
+- **A frame count is a claim.** When the stream holds fewer frames than its header states,
+  the ones it holds go up and the rest are named as not uploaded.
+
+The decoder is [ffmpeg](/develop/packaging#the-video-decoder), which the app carries; the
+About panel names it, and says "no video decoder" on a build that has none that runs.
+
+Only compressions nobody writes images in any more are still refused — JPIP, whose pixels
+live on a server — and such a run is **named in the picker**: the card carries the codec,
+cannot be ticked, and the count of stacks in that state sits beside the selection count.
 
 ## A reformat is flat
 
