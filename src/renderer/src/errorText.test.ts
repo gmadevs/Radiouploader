@@ -41,6 +41,15 @@ describe('describeError', () => {
     expect(shown.fix).toBeNull()
   })
 
+  it('says a stopped upload left a draft, before calling it a connection problem', () => {
+    const shown = describeError(
+      new Error("Error invoking remote method 'upload:run': Error: Upload stopped partway: fetch failed")
+    )
+    expect(shown.title).toBe('The upload stopped partway')
+    expect(shown.detail).toContain('fetch failed')
+    expect(shown.detail).toContain('carry on in that case')
+  })
+
   it('shows an unrecognised message as it was thrown', () => {
     const shown = describeError(new Error("Error invoking remote method 'api:upload': Error: No studies to upload"))
     expect(shown).toEqual({ title: 'No studies to upload', detail: null, fix: null })

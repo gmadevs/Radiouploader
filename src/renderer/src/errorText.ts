@@ -69,6 +69,20 @@ export function describeError(value: unknown): ShownError {
     }
   }
 
+  // Ahead of the network rule, which a dropped connection mid-upload would
+  // otherwise meet first — and "try again" there does not say the case already
+  // exists, which is what decides whether trying again makes a second one.
+  const stopped = /^Upload stopped partway:\s*(.*)$/s.exec(message)
+  if (stopped) {
+    return {
+      title: 'The upload stopped partway',
+      detail:
+        `${stopped[1]} — what had gone up is on Radiopaedia as a draft. ` +
+        'Press Upload to Radiopaedia again to carry on in that case rather than start another.',
+      fix: null
+    }
+  }
+
   // undici says "fetch failed" and keeps the reason in a cause nobody sees;
   // the codes are what a proxy or a dropped connection leaves in the message.
   if (/fetch failed|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|network/i.test(message)) {

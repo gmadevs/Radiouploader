@@ -46,9 +46,23 @@ function sanitiseWindow(window: WindowLevel | null | undefined): WindowLevel | n
   return { centre, width }
 }
 
+/**
+ * How far an upload got, so that pressing Upload again after a failure carries
+ * on in the case it created rather than creating another beside it — a draft
+ * that holds half a case, and takes a slot of a quota that may have had one.
+ */
+export interface UploadSoFar {
+  caseId: string
+  /** The ingest tree's study id, to the Radiopaedia study made for it. */
+  studies: Map<string, string>
+  /** Stacks posted as a series. One stopped partway is not here, and is sent again. */
+  stacksDone: Set<string>
+}
+
 class Session {
   ingest: IngestResult | null = null
   anon: AnonResult | null = null
+  uploadSoFar: UploadSoFar | null = null
   private workDirPath: string | null = null
 
   async workDir(): Promise<string> {
@@ -81,8 +95,10 @@ class Session {
     // Anonymised files are of the selection they were made from. Kept across a
     // change, the upload would send a mask drawn since without it, and match
     // images added since to nothing — so a new selection has to be anonymised
-    // again before anything goes.
+    // again before anything goes. What an earlier upload got through was of
+    // those files too.
     this.anon = null
+    this.uploadSoFar = null
     const byId = new Map(selection.map((s) => [s.id, s]))
     for (const study of this.ingest?.studies ?? []) {
       for (const series of study.series) {
@@ -113,6 +129,7 @@ class Session {
     await cleanupTempDir(this.workDirPath)
     this.ingest = null
     this.anon = null
+    this.uploadSoFar = null
     this.workDirPath = null
   }
 }

@@ -14,22 +14,20 @@ import type {
   ReformatPlan,
   ReformatRequestMessage,
   StackSelection,
-  Transfer,
   UpdateStatus,
   VolumeInfo
 } from '@shared/types'
 import { anonymiseStacks, summariseWarnings } from './anon'
 import { scanForBurnIn } from './burnInScan'
-import { RadiopaediaClient, type CaseDraft } from './api/client'
+import { RadiopaediaClient } from './api/client'
 import type { OAuthConfig } from './api/oauth'
 import { loadConfig, saveConfig } from './api/store'
-import { uploadStack } from './api/upload'
 import { ingest } from './ingest'
 import { MAX_PREVIEW_EDGE, MAX_VIEWER_EDGE, clearPreviewHeaders, readPreviewFrame } from './preview'
 import { session } from './session'
 import { checkForUpdate, setUpdateChecks, skipVersion } from './update'
 import { closeVolume, commitReformat, openVolume, planCount, previewReformat } from './volume'
-import { planStudies, type StudyDraftInput } from './uploadPlan'
+import { uploadCase, type UploadRequest } from './uploadCase'
 
 let client: RadiopaediaClient | null = null
 
@@ -43,18 +41,6 @@ async function requireClient(): Promise<RadiopaediaClient> {
   client ??= await RadiopaediaClient.fromStoredConfig()
   if (!client) throw new Error('Radiopaedia application credentials are not configured yet')
   return client
-}
-
-export interface UploadRequest {
-  /**
-   * An existing draft to add to. When set the case is not created and the
-   * draft below is not read: the case already has its title, its age and its
-   * system, and the API has no way to change them.
-   */
-  caseId?: string | null
-  caseDraft: CaseDraft
-  /** One entry per DICOM study; each becomes a study on the Radiopaedia case. */
-  studies: StudyDraftInput[]
 }
 
 /** Platform names as people say them, rather than as Node reports them. */
@@ -136,6 +122,7 @@ export function registerIpc(): void {
     if (stacks.length === 0) throw new Error('No stacks selected')
     const result = await anonymiseStacks(stacks, await session.workDir(), broadcast)
     session.anon = result
+    session.uploadSoFar = null
     return { ...result, summary: summariseWarnings(result.warnings) }
   })
 
@@ -180,108 +167,5 @@ export function registerIpc(): void {
   // API, so the whole listing comes down and the drafts are picked out here.
   ipcMain.handle('api:draftCases', async (): Promise<CaseSummary[]> => (await requireClient()).draftCases())
 
-  ipcMain.handle('upload:run', async (_e, request: UploadRequest) => {
-    const c = await requireClient()
-    const anon = session.anon
-    if (!anon) throw new Error('Anonymise the selected series before uploading')
-
-    const planned = planStudies(session.ingest?.studies ?? [], request.studies)
-    if (planned.length === 0) throw new Error('No studies to upload')
-
-    const stacks = session.selectedStacks()
-    // A multiframe instance yields one anonymised file per frame, so the match
-    // back to a slice is on the file *and* the frame, never the path alone.
-    const key = (sourcePath: string, frame: number): string => `${sourcePath}#${frame}`
-    const bySource = new Map(anon.files.map((f) => [key(f.sourcePath, f.frame), f]))
-
-    // Adding to a draft creates no case, so the quota does not apply — and it
-    // is exactly what a full quota leaves you able to do.
-    let caseId = request.caseId ?? null
-
-    if (caseId === null) {
-      // Re-check the quota against the server. The renderer's copy can be stale —
-      // the user may have created drafts elsewhere since this session started —
-      // and a rejected case would otherwise surface as an opaque API error.
-      const { quota } = await c.currentUser()
-      if (quota?.allowedDraftCases !== null && quota !== null && quota.draftCaseCount >= quota.allowedDraftCases) {
-        throw new Error(
-          `Draft quota full: ${quota.draftCaseCount} of ${quota.allowedDraftCases} used. ` +
-            'Publish or delete a draft case on Radiopaedia first. ' +
-            'You can raise your quota at https://radiopaedia.org/supporters'
-        )
-      }
-      caseId = await c.createCase(request.caseDraft)
-    } else {
-      // The case may have been published, sent for review or deleted since the
-      // list was fetched, and only a draft takes new images. Checked here
-      // because this is the last moment before anything is sent.
-      const still = (await c.draftCases()).some((existing) => existing.id === caseId)
-      if (!still) {
-        throw new Error(
-          'That case is no longer a draft on Radiopaedia, so it cannot take new images. ' +
-            'It may have been published, sent for review, or deleted since the list was read.'
-        )
-      }
-    }
-
-    // What each stack sends, worked out before anything goes. The total has to
-    // be known from the first byte or the bar and the time remaining spend the
-    // upload learning how big the job is, which is when they were needed.
-    const filesByStack = new Map(
-      stacks.map((stack) => [
-        stack.id,
-        stack.slices
-          .map((slice) => bySource.get(key(slice.path, slice.frame)))
-          .filter((f): f is NonNullable<typeof f> => f !== undefined)
-      ])
-    )
-
-    // Studies are created oldest first so the case timeline reads in order.
-    let seriesDone = 0
-    const uploading = planned.flatMap((p) => p.stackIds).filter((id) => (filesByStack.get(id)?.length ?? 0) > 0)
-    const seriesTotal = uploading.length
-    const transfer: Transfer = {
-      sent: 0,
-      skipped: 0,
-      total: uploading.reduce((n, id) => n + (filesByStack.get(id) ?? []).reduce((m, f) => m + f.byteLength, 0), 0),
-      elapsedMs: 0
-    }
-    // From here rather than from the handler's first line: the quota check and
-    // the draft listing above are the network answering, not the upload
-    // running, and folding them in would report a speed the transfer never had.
-    const startedAt = Date.now()
-
-    for (const plan of planned) {
-      const studyId = await c.createStudy(caseId, {
-        modality: plan.modality,
-        findings: plan.findings,
-        position: plan.position,
-        caption: plan.caption
-      })
-
-      for (const stackId of plan.stackIds) {
-        const stack = stacks.find((s) => s.id === stackId)
-        const files = filesByStack.get(stackId) ?? []
-        if (!stack || files.length === 0) continue
-
-        seriesDone++
-        await uploadStack(c, caseId, studyId, files, (p) => {
-          if (p.alreadyThere) transfer.skipped += p.bytes
-          else transfer.sent += p.bytes
-          broadcast({
-            phase: 'uploading',
-            done: p.done,
-            total: p.total,
-            detail: `${stack.label} — series ${seriesDone}/${seriesTotal}`,
-            transfer: { ...transfer, elapsedMs: Date.now() - startedAt }
-          })
-        })
-      }
-    }
-
-    // mark_upload_finished is deliberately not called: an unmarked case stays a
-    // draft, which is what adding images to it later needs, and marking one may
-    // do more than unlock editing — see docs/internals/upload.md.
-    return { caseId, url: `https://radiopaedia.org/cases/${caseId}` }
-  })
+  ipcMain.handle('upload:run', async (_e, request: UploadRequest) => uploadCase(await requireClient(), request, broadcast))
 }

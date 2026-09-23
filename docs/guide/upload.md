@@ -105,6 +105,12 @@ Radiopaedia deduplicates by hash, so a file it already holds is never sent. Thos
 count as done and are named separately — *"40 MB already there"* — because a bar that fills
 in no time otherwise reads as one that has broken.
 
+If the upload **stops partway** — the connection drops, the site is down for longer than a
+few retries — what had gone up is already on Radiopaedia as a draft. Pressing **Upload to
+Radiopaedia** again carries on in that same case from the series that stopped, rather than
+starting a second one beside it. Going back to the picker and changing the selection starts
+over.
+
 ![The confirmation](/shots/08-done.png)
 
 The confirmation names what went: the case's title, how many studies, series and images, and
