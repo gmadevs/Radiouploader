@@ -13,6 +13,14 @@ Its output satisfies that validator: `PatientIdentityRemoved` is set to `YES`,
 `SOPInstanceUID` is removed entirely, and the UIDs are rewritten into the required
 `1.2.826.0.1.3680043.10.341.512.…` hashed scheme.
 
+It works on the dataset only. The **file meta header** in front of it — group `0002` — is
+written back as it was read, which left every file carrying its original SOP Instance UID in
+`MediaStorageSOPInstanceUID` (0002,0003): an identifier the hospital's PACS can look up. The
+app replaces that one itself, with the dataset's hashed UID where the anonymiser kept one and
+otherwise a `2.25.…` UID hashed one way from the original, so it is stable between runs. The
+AE titles in the meta header (0002,0016–0018), which name the hospital's machines, are
+dropped.
+
 ## What the app adds
 
 Two things are written into the file **before** `Anonymize` runs, so the bytes that come out
@@ -58,6 +66,16 @@ cannot have its frames cut out of a bitstream by offset either.
 
 Only a format with no decoder is refused, and video — MPEG-2, MPEG-4, HEVC — is what is
 left.
+
+## Layouts that are refused
+
+Masking, cropping and splitting all take a sample to be one byte or two, and a pixel to be
+all of its samples side by side. An image stored any other way — 32-bit samples, a 1-bit
+segmentation, `YBR_FULL_422` or another subsampled colour — would not fail those loops; it
+would have its mask painted somewhere other than where it was drawn. So an image like that
+which needs any of the three is refused and counted among the files that could not be
+anonymised, which keeps it out of the upload. With nothing to paint, cut or split it goes
+through as it is.
 
 ## Warnings
 

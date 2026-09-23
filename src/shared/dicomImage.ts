@@ -211,6 +211,22 @@ export function parseHeader(bytes: Uint8Array): ImageHeader {
   return header
 }
 
+/**
+ * Why the stored samples of an image cannot be painted, cut or split, or null
+ * when they can.
+ *
+ * All three take a sample to be one byte or two and a pixel to be all of its
+ * samples side by side. A 32-bit dose map, a 1-bit segmentation or a 4:2:2
+ * colour image breaks one of those, and the way it breaks is not an error: a
+ * mask lands somewhere other than where it was drawn, and the text it was drawn
+ * over goes up with the case. So they are refused by name instead.
+ */
+export function sampleLayoutProblem(bitsAllocated: number, photometric: string): string | null {
+  if (bitsAllocated !== 8 && bitsAllocated !== 16) return `${bitsAllocated}-bit samples`
+  if (/^YBR_(FULL|PARTIAL)_42[02]$/.test(photometric)) return `${photometric} subsampled colour`
+  return null
+}
+
 /** Bytes one frame occupies. */
 export function frameByteLength(geometry: PixelGeometry): number {
   const bytesPerSample = geometry.bitsAllocated <= 8 ? 1 : 2
@@ -407,11 +423,18 @@ export function fillMasks(
   const bytesPerSample = wide ? 2 : 1
   const planar = samplesPerPixel > 1 && geometry.planarConfiguration === 1
   const plane = rows * columns
+  // Refused rather than skipped: a write that quietly falls off the end, or a
+  // sample size guessed wrong, is a redaction that did not happen.
+  if (bitsAllocated !== 8 && bitsAllocated !== 16) {
+    throw new Error(`Cannot blank ${bitsAllocated}-bit samples`)
+  }
+  if (frameBytes.length < plane * samplesPerPixel * bytesPerSample) {
+    throw new Error('Frame data runs past the end of the pixel data')
+  }
   const view = new DataView(frameBytes.buffer, frameBytes.byteOffset, frameBytes.byteLength)
 
   const write = (index: number, value: number): void => {
     const o = index * bytesPerSample
-    if (o + bytesPerSample > frameBytes.length) return
     if (!wide) frameBytes[o] = value & 0xff
     else if (signed) view.setInt16(o, value, !bigEndian)
     else view.setUint16(o, value, !bigEndian)
@@ -474,6 +497,12 @@ export function cropFrameBytes(frameBytes: Uint8Array, geometry: PixelGeometry, 
   const { columns, samplesPerPixel, bitsAllocated } = geometry
   const bytesPerSample = bitsAllocated <= 8 ? 1 : 2
   const planar = samplesPerPixel > 1 && geometry.planarConfiguration === 1
+  if (bitsAllocated !== 8 && bitsAllocated !== 16) {
+    throw new Error(`Cannot crop ${bitsAllocated}-bit samples`)
+  }
+  if (frameBytes.length < geometry.rows * columns * samplesPerPixel * bytesPerSample) {
+    throw new Error('Frame data runs past the end of the pixel data')
+  }
 
   const out = new Uint8Array(bounds.rows * bounds.columns * samplesPerPixel * bytesPerSample)
   const planes = planar ? samplesPerPixel : 1
@@ -486,7 +515,6 @@ export function cropFrameBytes(frameBytes: Uint8Array, geometry: PixelGeometry, 
   for (let plane = 0; plane < planes; plane++) {
     for (let y = 0; y < bounds.rows; y++) {
       const from = plane * sourcePlane + (bounds.y + y) * sourceStride + bounds.x * perPixel * bytesPerSample
-      if (from + targetStride > frameBytes.length) break
       out.set(frameBytes.subarray(from, from + targetStride), plane * targetPlane + y * targetStride)
     }
   }

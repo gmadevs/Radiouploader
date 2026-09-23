@@ -633,3 +633,86 @@ describe('anonymiseFile — enhanced multiframe', () => {
     expect(tags.string('x00200032')).toBe('2\\0\\3')
   })
 })
+
+describe('anonymiseFile — file meta header', () => {
+  type Dict = Record<string, { vr: string; Value: unknown[] }>
+
+  /** A fixture whose meta header names the station that sent it, as a PACS export does. */
+  async function sent(name: string): Promise<string> {
+    const bytes = new Uint8Array(await fs.readFile(path.join(fixtures, '02_ras_uids.dcm')))
+    const message = dcmio.Message.readFile(bytes.buffer.slice(0) as ArrayBuffer)
+    const meta = message.meta as unknown as Dict
+    meta['00020016'] = { vr: 'AE', Value: ['ST_MARYS_CT2'] }
+    const outputPath = path.join(outDir, name)
+    await fs.writeFile(outputPath, Buffer.from(message.write()))
+    return outputPath
+  }
+
+  async function metaOf(file: string): Promise<Dict> {
+    const bytes = new Uint8Array(await fs.readFile(file))
+    return dcmio.Message.readFile(bytes.buffer.slice(0) as ArrayBuffer).meta as unknown as Dict
+  }
+
+  it('does not carry the original SOP Instance UID in the meta header', async () => {
+    const source = await sent('meta-in.dcm')
+    const original = (await metaOf(source))['00020003'].Value[0]
+    const [result] = await anonymiseFile(source, outDir, whole('meta-out.dcm'))
+    const uid = (await metaOf(result.outputPath))['00020003']?.Value[0]
+
+    expect(uid).not.toBe(original)
+    expect(uid).toMatch(/^2\.25\.\d+$/)
+  })
+
+  it('drops the AE titles that name the hospital’s machines', async () => {
+    const [result] = await anonymiseFile(await sent('ae-in.dcm'), outDir, whole('ae-out.dcm'))
+    expect((await metaOf(result.outputPath))['00020016']).toBeUndefined()
+  })
+})
+
+describe('anonymiseFile — sample layouts it cannot edit', () => {
+  type Dict = Record<string, { vr: string; Value: unknown[] }>
+  const leftHalf = [{ x: 0, y: 0, width: 0.5, height: 1 }]
+
+  /** The 8x8 fixture with its pixel description changed and its bytes not. */
+  async function restated(name: string, tags: Dict): Promise<string> {
+    const bytes = new Uint8Array(await fs.readFile(path.join(fixtures, '01_ras_physician.dcm')))
+    const message = dcmio.Message.readFile(bytes.buffer.slice(0) as ArrayBuffer)
+    Object.assign(message.dict as unknown as Dict, tags)
+    const outputPath = path.join(outDir, name)
+    await fs.writeFile(outputPath, Buffer.from(message.write()))
+    return outputPath
+  }
+
+  it('refuses to blank 32-bit samples rather than painting the mask somewhere else', async () => {
+    // Half as many 32-bit pixels fit in the fixture's bytes, which is the point:
+    // the mask would land at two-byte offsets into four-byte samples.
+    const source = await restated('wide.dcm', {
+      '00280010': { vr: 'US', Value: [4] },
+      '00280100': { vr: 'US', Value: [32] },
+      '00280101': { vr: 'US', Value: [32] },
+      '00280102': { vr: 'US', Value: [31] }
+    })
+    await expect(
+      anonymiseFile(source, outDir, [{ frame: 0, outputName: 'wide-out.dcm', instanceNumber: 1, masks: leftHalf }])
+    ).rejects.toThrow(/32-bit samples/)
+  })
+
+  it('refuses to crop subsampled colour', async () => {
+    const source = await restated('ybr422.dcm', { '00280004': { vr: 'CS', Value: ['YBR_FULL_422'] } })
+    await expect(
+      anonymiseFile(source, outDir, [
+        { frame: 0, outputName: 'ybr422-out.dcm', instanceNumber: 1, crop: { x: 0.5, y: 0, width: 0.5, height: 1 } }
+      ])
+    ).rejects.toThrow(/YBR_FULL_422/)
+  })
+
+  it('still passes such a file through when nothing asks to edit its pixels', async () => {
+    const source = await restated('wide-plain.dcm', {
+      '00280010': { vr: 'US', Value: [4] },
+      '00280100': { vr: 'US', Value: [32] },
+      '00280101': { vr: 'US', Value: [32] },
+      '00280102': { vr: 'US', Value: [31] }
+    })
+    await expect(anonymiseFile(source, outDir, whole('wide-plain-out.dcm'))).resolves.toHaveLength(1)
+  })
+})

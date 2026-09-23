@@ -41,6 +41,16 @@ A compressed image that needs no change is **passed through untouched**, which k
 and keeps it lossless. Windowing counts as no change: it is written to `WindowCenter` /
 `WindowWidth` and never touches the pixels.
 
+## Some images cannot be blanked, cropped or split
+
+A mask, a crop and the splitting of a multiframe run all assume a sample is one byte or two
+and that a pixel's colours sit side by side. Images that break that — 32-bit samples, 1-bit
+segmentations, subsampled colour such as `YBR_FULL_422` — are refused when one of the three
+is asked of them, and they are left out of the upload, counted among the files that could not
+be anonymised, rather than sent with a mask in the wrong place. Without a mask, a crop or
+frames to lift out they go up as they are. They are rare in the studies people make cases
+from.
+
 ## A DICOM video cannot be uploaded
 
 A multiframe object keeps its frames as fragments when it is compressed, so they are decoded

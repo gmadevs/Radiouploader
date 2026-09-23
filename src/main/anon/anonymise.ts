@@ -13,6 +13,7 @@ import {
   frameSamples,
   keepsWholeImage,
   parseHeader,
+  sampleLayoutProblem,
   type PixelGeometry
 } from '@shared/dicomImage'
 import type { AnonWarning, CropRect, MaskRect, WindowLevel } from '@shared/types'
@@ -63,6 +64,9 @@ const FRAME_TAGS = [
   '00281053', // RescaleSlope
   '00281054' // RescaleType
 ]
+
+/** Meta header tags naming the stations that wrote, sent or relayed the original. */
+const META_SOURCE_TAGS = ['00020016', '00020017', '00020018']
 
 const EXPLICIT_VR_BIG_ENDIAN = '1.2.840.10008.1.2.2'
 const EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1'
@@ -205,6 +209,33 @@ function windowOf(dict: Dict): WindowLevel | null {
   return { centre, width }
 }
 
+/**
+ * Bring the file meta header into line with the anonymised dataset.
+ *
+ * `Anonymize` sees only the dataset, and the meta header is written back as it
+ * was read — so every uploaded file used to carry its original SOP Instance UID
+ * in (0002,0003), an identifier the hospital's PACS can look up, sitting next
+ * to the dataset it no longer matched. The meta takes the dataset's hashed UID
+ * where the anonymiser kept one. Where it dropped it, which is what it does for
+ * most images, the meta still needs one — the element is required — so it gets
+ * one derived from the original by a one-way hash: stable, so a re-run writes
+ * the same bytes and Radiopaedia's deduplication still recognises them, and
+ * under the UUID root, which needs no registered prefix.
+ *
+ * The AE titles go outright: they name the hospital's own machines.
+ */
+function anonymiseMeta(meta: Dict, originalUid: string | undefined, anonymised: Dict): void {
+  const hashed = (original: string): string => {
+    const digest = createHash('sha256').update(original).digest('hex').slice(0, 32)
+    return `2.25.${BigInt(`0x${digest}`).toString()}`
+  }
+  const uid = firstValue(anonymised, '00080018') ?? (originalUid === undefined ? undefined : hashed(originalUid))
+
+  if (uid === undefined) delete meta['00020003']
+  else meta['00020003'] = { vr: 'UI', Value: [uid] }
+  for (const tag of META_SOURCE_TAGS) delete meta[tag]
+}
+
 /** Pixel data is stored as written, so masks need the file's byte order. */
 function transferSyntaxOf(message: { meta?: Dict }): string | undefined {
   return message.meta === undefined ? undefined : firstValue(message.meta, '00020010')
@@ -286,6 +317,9 @@ export async function anonymiseFile(
 
   const message = dcmio.Message.readFile(arrayBuffer)
   const dict = message.dict as unknown as Dict
+  // Read once: the meta header is shared by every frame of the file, and the
+  // first one written replaces this.
+  const originalMetaUid = message.meta === undefined ? undefined : firstValue(message.meta, '00020003')
 
   const transferSyntax = transferSyntaxOf(message)
   const compression = compressionOf(transferSyntax)
@@ -416,6 +450,14 @@ export async function anonymiseFile(
       pixelElement.Value = [masks.length > 0 ? allPixels.slice(0) : allPixels]
     }
 
+    // On the samples as they now are — for a decoded file, what the codec gave
+    // back. A layout the loops below misread paints a mask somewhere other than
+    // where it was drawn, so the file is refused and stays out of the upload.
+    if (changingPixels) {
+      const problem = sampleLayoutProblem(geometry.bitsAllocated, photometric)
+      if (problem) throw new Error(`Cannot blank, crop or split ${path.basename(sourcePath)}: it stores ${problem}`)
+    }
+
     if (masks.length > 0) {
       const element = dict['7FE00010']
       const bytes = new Uint8Array(element.Value[0] as ArrayBuffer)
@@ -494,6 +536,7 @@ export async function anonymiseFile(
 
     const anonymised = dcmio.Anonymize(dict as never) as unknown as Dict
     const warnings = collectWarnings(anonymised, sourcePath, task.frame)
+    if (message.meta) anonymiseMeta(message.meta, originalMetaUid, anonymised)
 
     message.dict = anonymised as never
     const out = Buffer.from(message.write())
