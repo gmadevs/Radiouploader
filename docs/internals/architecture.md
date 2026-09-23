@@ -72,7 +72,7 @@ than being read from the file again.
 
 | | |
 |---|---|
-| Originals and anonymised output | a session temp directory, removed on reset and on quit |
+| Originals and anonymised output | a session temp directory, removed on reset and on quit — and, after a crash or a force-quit, at the next launch |
 | OAuth tokens | the OS keychain, via Electron `safeStorage` |
 | Application ID and secret | `config.json` in the app's user-data directory, secrets encrypted |
 | Anything at all | never in the repository, never in a log |

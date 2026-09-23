@@ -33,7 +33,7 @@ features:
     details: Coronal and sagittal reformats, and MIP, MinIP or mean slabs of any thickness, added to the case as their own series — without opening a workstation.
     link: /guide/reformat
   - title: Nothing leaves the machine until you press Upload
-    details: Patient data lives only in the main process, in a temp directory removed on quit. Credentials are entered at runtime and kept in the OS keychain.
+    details: Patient data lives only in the main process, in a temp directory removed on quit, or at the next launch if the app never got to quit. Credentials are entered at runtime and kept in the OS keychain.
     link: /internals/architecture
 ---
 

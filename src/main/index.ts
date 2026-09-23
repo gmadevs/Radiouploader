@@ -3,6 +3,7 @@ import { app, BrowserWindow } from 'electron'
 import { registerIpc } from './ipc'
 import { openOrOffer } from './openLink'
 import { session } from './session'
+import { sweepOrphans } from './tempDirs'
 import { MINIMUM, openingBounds, rememberWindow } from './windowState'
 
 function createWindow(): BrowserWindow {
@@ -55,6 +56,8 @@ void app.whenReady().then(() => {
   app.setAppUserModelId('io.github.gmadevs.radiouploader')
   registerIpc()
   createWindow()
+  // Whatever a crash or a force-quit left of an earlier session's patient data.
+  void sweepOrphans()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

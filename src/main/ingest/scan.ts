@@ -1,9 +1,9 @@
 import { createWriteStream } from 'node:fs'
 import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import yauzl from 'yauzl'
+import { createSessionDir } from '../tempDirs'
 
 /** Files that are never image instances even though they sit next to them. */
 const IGNORED_NAMES = new Set(['DICOMDIR', '.DS_Store', 'Thumbs.db'])
@@ -68,9 +68,9 @@ export async function scanFolder(root: string): Promise<ScanResult> {
   return { candidates, scannedFileCount }
 }
 
-/** Create the session temp directory that holds extracted and anonymised files. */
+/** Create the session temp directory that holds the files extracted from a zip. */
 export async function createTempDir(): Promise<string> {
-  return fs.mkdtemp(path.join(os.tmpdir(), 'radiopaedia-uploader-'))
+  return createSessionDir('import')
 }
 
 /**

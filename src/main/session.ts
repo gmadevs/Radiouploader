@@ -1,16 +1,15 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
-import { app } from 'electron'
 import type { AnonResult, CropRect, IngestResult, MaskRect, Stack, StackSelection, WindowLevel } from '@shared/types'
 import { keptSlices, sanitiseDropped } from '@shared/selection'
 import { cleanupTempDir } from './ingest'
+import { createSessionDir } from './tempDirs'
 
 /**
  * Per-run state held in the main process.
  *
  * Originals and anonymised output both live under a working directory that is
  * removed when the run is reset or the app quits, so identifiable data never
- * outlives the session.
+ * outlives the session — or, when the app did not get to quit, outlives it
+ * only until the next launch (see tempDirs.ts).
  */
 /** Keep masks inside the image and drop any that cover nothing. */
 function sanitiseMasks(masks: MaskRect[] | undefined): MaskRect[] {
@@ -54,7 +53,7 @@ class Session {
 
   async workDir(): Promise<string> {
     if (!this.workDirPath) {
-      this.workDirPath = await fs.mkdtemp(path.join(app.getPath('temp'), 'radiopaedia-work-'))
+      this.workDirPath = await createSessionDir('work')
     }
     return this.workDirPath
   }
