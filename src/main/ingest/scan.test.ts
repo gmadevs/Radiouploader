@@ -121,6 +121,25 @@ describe('extractZip', () => {
     await expect(extractZip(zipPath, dest)).rejects.toThrow(/outside the destination|invalid relative path/)
     await expect(fs.stat(path.join(path.dirname(dest), 'evil'))).rejects.toThrow()
   })
+
+  it('extracts a name that merely starts with two dots', async () => {
+    const dicom = await fs.readFile(path.join(fixtures, '01_ras_physician.dcm'))
+    const zipPath = await makeZip([['..study/IM001.dcm', dicom]])
+
+    const dest = await tempDir()
+    await extractZip(zipPath, dest)
+    expect(await fs.readdir(path.join(dest, '..study'))).toEqual(['IM001.dcm'])
+  })
+
+  it('refuses an archive that unpacks to more than the disk has free, before writing anything', async () => {
+    const zipPath = await makeZip([['study/IM001.dcm', Buffer.alloc(1024)]])
+    const dest = await tempDir()
+
+    await expect(extractZip(zipPath, dest, async () => 100 * 1024 * 1024)).rejects.toThrow(
+      /unpacks to 0\.0 GB and the disk has 0\.1 GB free/
+    )
+    expect(await fs.readdir(dest)).toEqual([])
+  })
 })
 
 describe('readInstance', () => {

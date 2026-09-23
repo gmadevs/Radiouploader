@@ -4,7 +4,9 @@
 
 Drop a folder, a zip, or a handful of files onto the window — or use **Choose folder** /
 **Choose zip**. Zips are expanded into a session temp directory; subfolders are walked, so
-pointing at the root of a burned CD is fine.
+pointing at the root of a burned CD is fine. A zip that would unpack to more than the disk
+has free, with half a gigabyte to spare, is refused before anything is written, and says how
+much it needs — unzip it somewhere with room and choose the folder instead.
 
 Nothing is sent anywhere at this stage. Reading, previewing and anonymising all happen on
 your machine, and the only network call in the whole app is the upload itself.
