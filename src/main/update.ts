@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import { app } from 'electron'
 import type { UpdateStatus } from '@shared/types'
 import { isNewerVersion } from '@shared/version'
-import { loadConfig, saveConfig } from './api/store'
+import { loadConfig, updateConfig } from './api/store'
 
 /**
  * Is there a newer release than the one running?
@@ -133,12 +133,10 @@ export async function checkForUpdate(current: string): Promise<UpdateStatus> {
 
 /** Remember that this version was waved away, so the next launch is quiet. */
 export async function skipVersion(version: string): Promise<void> {
-  const config = await loadConfig()
-  await saveConfig({ ...config, updates: { ...config.updates, skipped: version } })
+  await updateConfig((config) => ({ ...config, updates: { ...config.updates, skipped: version } }))
 }
 
 /** Turn the launch-time check on or off. Off means no request is made at all. */
 export async function setUpdateChecks(enabled: boolean): Promise<void> {
-  const config = await loadConfig()
-  await saveConfig({ ...config, updates: { ...config.updates, enabled } })
+  await updateConfig((config) => ({ ...config, updates: { ...config.updates, enabled } }))
 }

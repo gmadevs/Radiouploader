@@ -21,7 +21,7 @@ import { anonymiseStacks, summariseWarnings } from './anon'
 import { scanForBurnIn } from './burnInScan'
 import { RadiopaediaClient } from './api/client'
 import type { OAuthConfig } from './api/oauth'
-import { loadConfig, saveConfig } from './api/store'
+import { loadConfig, updateConfig } from './api/store'
 import { ingest } from './ingest'
 import { MAX_PREVIEW_EDGE, MAX_VIEWER_EDGE, clearPreviewHeaders, readPreviewFrame } from './preview'
 import { session } from './session'
@@ -127,8 +127,7 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('auth:configure', async (_e, config: OAuthConfig) => {
-    const stored = await loadConfig()
-    await saveConfig({ ...stored, oauth: config })
+    await updateConfig((stored) => ({ ...stored, oauth: config }))
     client = await RadiopaediaClient.fromStoredConfig()
   })
 
@@ -140,7 +139,6 @@ export function registerIpc(): void {
       authenticated: client?.isAuthenticated ?? false,
       redirectUri: stored.oauth?.redirectUri ?? null,
       scope: stored.oauth?.scope ?? null,
-      usesOutOfBandFlow: client?.usesOutOfBandFlow ?? true,
       clientId: stored.oauth?.clientId ?? null
     }
   })

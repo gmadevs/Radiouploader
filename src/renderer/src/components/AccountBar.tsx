@@ -68,15 +68,11 @@ export function AccountBar({ account, onChange, open, onOpenChange }: Props): Re
       .configureAuth({ clientId, clientSecret: clientSecret || undefined, redirectUri, scope })
       .then(() => window.api.beginSignIn())
       .then((res) => {
-        if (res.needsCode) {
-          // Out-of-band: Radiopaedia shows the code, the user brings it back.
-          setAuthUrl(res.url ?? null)
-          setOpened(res.opened !== false)
-          setCopied(false)
-          setAwaitingCode(true)
-          return
-        }
-        return load()
+        // Radiopaedia gives the code, or an address with it in; either comes back here.
+        setAuthUrl(res.url)
+        setOpened(res.opened)
+        setCopied(false)
+        setAwaitingCode(true)
       })
       .catch((e: unknown) => setError(describeError(e).title))
       .finally(() => setBusy(false))

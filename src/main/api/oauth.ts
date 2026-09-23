@@ -1,7 +1,5 @@
 import crypto from 'node:crypto'
-import http from 'node:http'
-import { AddressInfo } from 'node:net'
-import { openExternally, openOrOffer } from '../openLink'
+import { openExternally } from '../openLink'
 
 export const RADIOPAEDIA_ORIGIN = 'https://radiopaedia.org'
 const AUTHORIZE_URL = `${RADIOPAEDIA_ORIGIN}/oauth/authorize`
@@ -27,10 +25,6 @@ export const DEFAULT_SCOPE = ''
  * the authorization page displays the code and the user pastes it into the app.
  */
 export const OOB_REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
-
-export function isOobRedirect(redirectUri: string): boolean {
-  return redirectUri === OOB_REDIRECT_URI
-}
 
 export interface OAuthConfig {
   clientId: string
@@ -66,6 +60,14 @@ function toTokenSet(body: Record<string, unknown>): TokenSet {
   }
 }
 
+/** The token endpoint said no, with the status that says whether it will say yes later. */
+export class OAuthError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message)
+    this.name = 'OAuthError'
+  }
+}
+
 async function postToken(params: Record<string, string>): Promise<TokenSet> {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -75,7 +77,7 @@ async function postToken(params: Record<string, string>): Promise<TokenSet> {
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>
   if (!res.ok) {
     const detail = typeof body.error_description === 'string' ? body.error_description : String(body.error ?? res.status)
-    throw new Error(`OAuth token request failed: ${detail}`)
+    throw new OAuthError(res.status, `OAuth token request failed: ${detail}`)
   }
   return toTokenSet(body)
 }
@@ -135,66 +137,37 @@ export async function openAuthorizationPage(pending: PendingAuthorization): Prom
 }
 
 /**
- * Loopback flow, for an application registered with an https redirect URI.
+ * The code out of whatever was pasted.
  *
- * Kept for completeness — Radiopaedia's form refuses plain http loopback, so
- * most users will go through the out-of-band flow instead.
+ * With the out-of-band URN Radiopaedia shows the code on a page, and that is
+ * what gets pasted. With an https redirect URI it sends the browser there with
+ * the code in the address, and the address is what is at hand — so a URL is
+ * read for its `code`, and for its `state`, which has to be the one this
+ * sign-in sent or the answer belongs to some other request.
+ *
+ * There used to be a loopback listener for that case. It could never have
+ * answered: the browser speaks TLS to an https address, and the listener was
+ * plain http on port 80 whatever the address said.
  */
-export async function authorizeViaLoopback(config: OAuthConfig): Promise<TokenSet> {
-  const redirect = new URL(config.redirectUri)
-  const pending = buildAuthorization(config)
-  const { state } = pending
+export function codeFrom(pasted: string, state: string): string {
+  const trimmed = pasted.trim()
+  let url: URL | null = null
+  try {
+    url = /^https?:\/\//i.test(trimmed) ? new URL(trimmed) : null
+  } catch {
+    url = null
+  }
+  if (url === null) return trimmed
 
-  const code = await new Promise<string>((resolve, reject) => {
-    const server = http.createServer((req, res) => {
-      const url = new URL(req.url ?? '/', `http://127.0.0.1:${(server.address() as AddressInfo).port}`)
-      if (url.pathname !== redirect.pathname) {
-        res.writeHead(404).end()
-        return
-      }
-      const returnedState = url.searchParams.get('state')
-      const returnedCode = url.searchParams.get('code')
-      const error = url.searchParams.get('error')
-
-      const finish = (message: string): void => {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-        res.end(`<!doctype html><meta charset="utf-8"><title>Radiouploader</title>
-          <body style="font:16px/1.5 system-ui;padding:3rem;text-align:center">${message}</body>`)
-        server.close()
-      }
-
-      if (error) {
-        finish('Authorisation was declined. You can close this window.')
-        reject(new Error(`Authorisation declined: ${error}`))
-      } else if (returnedState !== state) {
-        // A mismatched state means the response is not the one we initiated.
-        finish('Authorisation failed. You can close this window.')
-        reject(new Error('OAuth state mismatch — authorisation response rejected'))
-      } else if (!returnedCode) {
-        finish('Authorisation failed. You can close this window.')
-        reject(new Error('Authorisation response contained no code'))
-      } else {
-        finish('Signed in. You can close this window and return to the uploader.')
-        resolve(returnedCode)
-      }
-    })
-
-    server.on('error', reject)
-    server.listen(Number(redirect.port || 80), '127.0.0.1', () => {
-      // No panel waits for a code here to show the address in, so where no
-      // browser opens a dialog offers it; otherwise this listener would sit out
-      // its five minutes with nobody on the way.
-      void openOrOffer(pending.url)
-    })
-
-    // Give the user a bounded window to complete sign-in rather than leaking a listener.
-    setTimeout(() => {
-      server.close()
-      reject(new Error('Timed out waiting for authorisation'))
-    }, 5 * 60_000).unref()
-  })
-
-  return exchangeCode(config, code, pending.codeVerifier)
+  const error = url.searchParams.get('error')
+  if (error) throw new Error(`Authorisation declined: ${error}`)
+  const returnedState = url.searchParams.get('state')
+  if (returnedState !== null && returnedState !== state) {
+    throw new Error('That address answers a different sign-in — start again and paste the new one')
+  }
+  const code = url.searchParams.get('code')
+  if (!code) throw new Error('That address has no authorization code in it')
+  return code
 }
 
 /** Exchange a refresh token for a fresh access token. */

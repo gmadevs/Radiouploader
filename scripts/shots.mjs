@@ -60,7 +60,6 @@ async function run() {
     authenticated: true,
     redirectUri: 'urn:ietf:wg:oauth:2.0:oob',
     scope: null,
-    usesOutOfBandFlow: true,
     clientId: 'sample-application-id'
   }))
   stub('api:currentUser', () => ({

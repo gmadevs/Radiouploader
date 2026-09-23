@@ -117,8 +117,9 @@ uploader — permitted scopes are declared on the application itself. Asking for
 explicitly answers *"The requested scope is invalid, unknown, or malformed"*.
 :::
 
-If you do register an https redirect URI, the app notices and uses a loopback listener
-instead, with no code to copy.
+If you do register an https redirect URI instead, Radiopaedia sends your browser there with
+the code in the address. Paste **the whole address** into the code field and the app reads
+the code out of it, checking that it answers the sign-in you started.
 
 ## Sign in
 

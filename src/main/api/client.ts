@@ -1,9 +1,9 @@
 import type { CaseSummary } from '@shared/types'
 import {
-  authorizeViaLoopback,
   buildAuthorization,
+  codeFrom,
   exchangeCode,
-  isOobRedirect,
+  OAuthError,
   openAuthorizationPage,
   refresh,
   RADIOPAEDIA_ORIGIN,
@@ -11,7 +11,7 @@ import {
   type PendingAuthorization,
   type TokenSet
 } from './oauth'
-import { loadConfig, saveConfig } from './store'
+import { loadConfig, updateConfig } from './store'
 
 const API_BASE = `${RADIOPAEDIA_ORIGIN}/api/v1/`
 
@@ -44,12 +44,10 @@ export interface UserQuota {
 }
 
 export interface SignInStart {
-  /** The out-of-band flow: Radiopaedia shows a code and the user brings it back. */
-  needsCode: boolean
-  /** The authorization page, for opening by hand. Out-of-band only. */
-  url?: string
+  /** The authorization page, for opening by hand. */
+  url: string
   /** Whether the system took the address. True is not proof a window appeared. */
-  opened?: boolean
+  opened: boolean
 }
 
 /** Thrown for non-2xx API responses, carrying the status so callers can react to 429. */
@@ -64,12 +62,10 @@ export class RadiopaediaClient {
   private tokens: TokenSet | null = null
   /** Set between beginSignIn() and completeSignIn() in the out-of-band flow. */
   private pending: PendingAuthorization | null = null
+  /** The refresh in flight, which every request that needs a token waits on. */
+  private refreshing: Promise<void> | null = null
 
   constructor(private config: OAuthConfig) {}
-
-  get usesOutOfBandFlow(): boolean {
-    return isOobRedirect(this.config.redirectUri)
-  }
 
   static async fromStoredConfig(): Promise<RadiopaediaClient | null> {
     const stored = await loadConfig()
@@ -86,31 +82,23 @@ export class RadiopaediaClient {
   /**
    * Open the authorization page.
    *
-   * With an https redirect URI the code returns to a loopback listener and this
-   * completes the sign-in on its own. With the out-of-band URN there is nowhere
-   * for the code to land, so this opens the browser if it can, hands back the
-   * address either way, and the caller follows up with completeSignIn() once
-   * the user has pasted the code.
+   * Opens the browser if it can and hands back the address either way; the
+   * caller follows up with completeSignIn() once the user has pasted the code,
+   * or the address the browser was sent on to.
    */
   async beginSignIn(): Promise<SignInStart> {
-    if (!this.usesOutOfBandFlow) {
-      this.tokens = await authorizeViaLoopback(this.config)
-      await this.persist()
-      return { needsCode: false }
-    }
-
     this.pending = buildAuthorization(this.config)
     const opened = await openAuthorizationPage(this.pending)
-    return { needsCode: true, url: this.pending.url, opened }
+    return { url: this.pending.url, opened }
   }
 
-  /** Finish the out-of-band flow with the code Radiopaedia displayed. */
-  async completeSignIn(code: string): Promise<void> {
+  /** Finish the sign-in with the code Radiopaedia gave, or the address it was in. */
+  async completeSignIn(pasted: string): Promise<void> {
     if (!this.pending) throw new Error('Start the sign-in before submitting a code')
-    const trimmed = code.trim()
-    if (trimmed === '') throw new Error('Paste the authorization code from Radiopaedia')
+    const code = codeFrom(pasted, this.pending.state)
+    if (code === '') throw new Error('Paste the authorization code from Radiopaedia')
 
-    this.tokens = await exchangeCode(this.config, trimmed, this.pending.codeVerifier)
+    this.tokens = await exchangeCode(this.config, code, this.pending.codeVerifier)
     this.pending = null
     await this.persist()
   }
@@ -122,34 +110,82 @@ export class RadiopaediaClient {
   }
 
   private async persist(): Promise<void> {
-    const stored = await loadConfig()
-    await saveConfig({ ...stored, oauth: this.config, tokens: this.tokens ?? undefined })
+    const tokens = this.tokens ?? undefined
+    await updateConfig((stored) => ({ ...stored, oauth: this.config, tokens }))
+  }
+
+  /** Forget the tokens, and say so in the words the renderer offers a sign-in for. */
+  private async expire(): Promise<never> {
+    this.tokens = null
+    await this.persist()
+    throw new Error('Session expired — please sign in again')
+  }
+
+  /**
+   * Swap the refresh token for new tokens, once however many ask.
+   *
+   * Doorkeeper may rotate the refresh token, so two refreshes racing with the
+   * same one end with the second refused — and that refusal used to sign the
+   * user out in the middle of an upload that had four requests in flight.
+   * A refusal (400, 401) is a token that is spent or revoked, which only a new
+   * sign-in fixes; anything else, such as no network, is thrown as it is and
+   * leaves the tokens alone.
+   */
+  private renew(): Promise<void> {
+    this.refreshing ??= (async () => {
+      const refreshToken = this.tokens?.refreshToken
+      if (!refreshToken) return this.expire()
+      try {
+        this.tokens = await refresh(this.config, refreshToken)
+      } catch (error) {
+        if (error instanceof OAuthError && (error.status === 400 || error.status === 401)) return this.expire()
+        throw error
+      }
+      await this.persist()
+    })().finally(() => (this.refreshing = null))
+    return this.refreshing
   }
 
   /** Return a valid access token, refreshing it when it is about to expire. */
   async accessToken(): Promise<string> {
+    if (this.refreshing) await this.refreshing
     if (!this.tokens) throw new Error('Not signed in to Radiopaedia')
-    if (Date.now() < this.tokens.expiresAt) return this.tokens.accessToken
-
-    if (!this.tokens.refreshToken) {
-      this.tokens = null
-      await this.persist()
-      throw new Error('Session expired — please sign in again')
-    }
-    this.tokens = await refresh(this.config, this.tokens.refreshToken)
-    await this.persist()
-    return this.tokens.accessToken
+    if (Date.now() >= this.tokens.expiresAt) await this.renew()
+    return this.tokens!.accessToken
   }
 
-  /** Issue an authenticated request against an absolute or API-relative URL. */
+  /**
+   * Issue an authenticated request against an absolute or API-relative URL.
+   *
+   * The token goes to radiopaedia.org and nowhere else, whatever the URL says.
+   * A 401 is a token the server no longer takes, whatever its expiry claimed —
+   * revoked on the site, or the app's clock wrong — so it is renewed and the
+   * request sent once more; a second 401 means a new sign-in, and says so
+   * rather than surfacing as a bare status. Resending is safe: a request the
+   * server refused as unauthorised is one it did not act on.
+   */
   async request(pathOrUrl: string, init: RequestInit = {}): Promise<Response> {
-    const token = await this.accessToken()
-    const url = pathOrUrl.startsWith('http') ? pathOrUrl : new URL(pathOrUrl, API_BASE).toString()
-    const headers = new Headers(init.headers)
-    headers.set('Authorization', `Bearer ${token}`)
-    if (!headers.has('Accept')) headers.set('Accept', 'application/json')
+    const target = new URL(pathOrUrl, API_BASE)
+    if (target.origin !== RADIOPAEDIA_ORIGIN) {
+      throw new Error(`Refusing to send the Radiopaedia token to ${target.origin}`)
+    }
+    const url = target.toString()
 
-    const res = await fetch(url, { ...init, headers })
+    const send = async (token: string): Promise<Response> => {
+      const headers = new Headers(init.headers)
+      headers.set('Authorization', `Bearer ${token}`)
+      if (!headers.has('Accept')) headers.set('Accept', 'application/json')
+      return fetch(url, { ...init, headers })
+    }
+
+    const token = await this.accessToken()
+    let res = await send(token)
+    if (res.status === 401) {
+      // Another request may already have renewed it.
+      if (this.tokens?.accessToken === token) await this.renew()
+      res = await send(await this.accessToken())
+      if (res.status === 401) await this.expire()
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => '')
       const hint = res.status === 429 ? 'Rate limited by Radiopaedia — retry in a moment' : res.statusText

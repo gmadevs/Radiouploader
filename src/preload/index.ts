@@ -82,13 +82,9 @@ const api = {
     redirectUri: string | null
     clientId: string | null
     scope: string | null
-    usesOutOfBandFlow: boolean
   }> => ipcRenderer.invoke('auth:status'),
-  /**
-   * Opens the authorization page. needsCode marks the out-of-band flow, which
-   * also returns the address and whether the system could open it.
-   */
-  beginSignIn: (): Promise<{ needsCode: boolean; url?: string; opened?: boolean }> =>
+  /** Opens the authorization page, and returns the address and whether the system could open it. */
+  beginSignIn: (): Promise<{ url: string; opened: boolean }> =>
     ipcRenderer.invoke('auth:beginSignIn'),
   completeSignIn: (
     code: string
