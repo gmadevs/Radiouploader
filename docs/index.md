@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: Radiouploader
-  text: Unofficial Radiopaedia draft case preparing and uploading
-  tagline: Reads a study, splits the series that hold more than one acquisition, lets you blank burnt-in text, anonymises with Radiopaedia's own anonymiser, and uploads.
+  text: Prepare DICOM studies and upload them to Radiopaedia as draft cases
+  tagline: Reads a study, splits series that contain more than one acquisition, lets you blank burnt-in text, anonymises the files with Radiopaedia's anonymiser and uploads them.
   image:
     src: /shots/04-viewer.png
     alt: The viewer, with a patient banner burnt into an ultrasound
@@ -20,25 +20,28 @@ hero:
       link: https://github.com/gmadevs/Radiouploader
 
 features:
-  - title: Splits what your PACS exported as one series
-    details: Magnitude and phase, DWI different b-values, echoes, time points — each becomes its own stack you can keep or drop, because the tags that tell them apart are destroyed by anonymisation.
+  - title: Series splitting
+    details: Series that contain several acquisitions (magnitude and phase, several b-values, echoes, time points) are split into separate stacks, which you can upload or leave out. This happens before anonymisation, which removes the tags used to tell them apart.
     link: /internals/splitting
-  - title: The pixels are your job, and it helps
-    details: The anonymiser cleans tags; text burnt into the image survives it. The check before uploading rings what looks like a banner — it finds the obvious ones, and says so rather than calling anything clean.
+  - title: Burnt-in text check
+    details: The anonymiser removes identifying tags, not text burnt into the images. Before anonymising, the app marks areas that look like text banners. It finds large banners and can miss small or faint text, so check every image yourself.
     link: /guide/check
-  - title: Erasing that is really erasing
-    details: A blanked region is painted into the pixel data of every image of a stack before upload, and a crop throws the rest away — Rows, Columns and the patient position all rewritten to match. On a compressed image both mean decoding it first and sending plain samples, because nothing can be painted into a bitstream.
+  - title: Blanking and cropping
+    details: Blanked areas are written into the pixel data of every image in the stack, and cropping removes the rest of the image. The image size and patient position tags are updated to match. Compressed images are decoded first.
     link: /guide/review
-  - title: Cuts the volume another way
-    details: Coronal and sagittal reformats, and MIP, MinIP or mean slabs of any thickness, added to the case as their own series — without opening a workstation.
+  - title: Reformats
+    details: Coronal and sagittal reformats, and MIP, MinIP or mean slabs of any thickness, added to the case as new series.
     link: /guide/reformat
-  - title: Nothing leaves the machine until you press Upload
-    details: Patient data lives only in the main process, in a temp directory removed on quit, or at the next launch if the app never got to quit. Credentials are entered at runtime and kept in the OS keychain.
+  - title: DICOM video
+    details: MPEG-2, H.264 and HEVC video is decoded into frames, which you can review, blank and crop like any other series. The frames are uploaded as JPEG.
+    link: /limitations
+  - title: Local processing
+    details: Images stay on your computer until you upload them. Temporary files are deleted when the app quits, or at the next launch after a crash. Your Radiopaedia credentials are stored in the system keychain.
     link: /internals/architecture
 ---
 
 > **Unofficial.** Not affiliated with or endorsed by Radiopaedia.org.
 
-Every screenshot on this site is taken from the running app by `npm run shots`, on a
-[synthetic study](/develop/screenshots) generated for the purpose — no patient's images
-appear anywhere in this repository.
+Every screenshot on this site is taken from the running app by `npm run shots`, using a
+[synthetic study](/develop/screenshots) generated for the purpose. No patient images appear
+anywhere in this repository.
