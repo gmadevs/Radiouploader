@@ -2,130 +2,94 @@
 
 ![The case form](/shots/07-case.png)
 
-This is step four of five. **Series** in the header takes you back to the picker with
-everything you chose still there, as does **Back** in the footer.
+This is step four of five. To go back to the series with your choices kept, click **Series**
+in the row of steps at the top, or **Back** at the bottom.
 
 ## Anonymisation warnings
 
-The card at the top lists fields the anonymiser **kept**. They survive the whitelist
-because they carry imaging parameters — `SeriesDescription`, `ContentQualification` — but
-they are free text, and a hospital's export can put anything in them. Read them; nothing
-else will.
+The **Anonymisation warnings** card lists fields that the anonymiser kept because they
+describe the images, such as `SeriesDescription` and `ContentQualification`. They are free
+text, so an export can contain anything in them, including names. Read them before uploading.
 
 ## Where the images go
 
-The step opens by asking that, because there are two answers.
+Under **Where these images go**, choose one of:
 
-**A new case** is the usual one: the details below become a new draft, and it counts against
-your draft quota.
+- **A new case**: the details below create a new draft case, which counts towards your draft
+  quota.
+- **An existing draft**: the studies are added to a draft case you already have on
+  Radiopaedia. Only draft cases are listed, because Radiopaedia does not accept new images on
+  a case that has been submitted for review or published. The list is read when this step
+  opens; click **Refresh** to read it again, for example if you published a case on the site
+  in the meantime.
 
-**An existing draft** adds the studies to a case you already have on Radiopaedia. The list
-comes from `GET /api/v1/cases`, which returns your own cases; only the **drafts** are
-offered, because a case that has gone for review or been published is closed to the API and
-refuses new imaging. The list is read when the step opens, and **Refresh** reads it again —
-a case can be published on the site while you are working.
-
-Adding to a draft leaves everything else about it alone. Its title, age, gender, system and
-discussion stay as they are: the API has no way to change them, so edit those on
-Radiopaedia. The studies arrive as new studies on the case.
-
-There is no way to see what the case already holds — the API has no endpoint that lists a
-case's existing studies — so a study you have already uploaded will arrive twice if you
-upload it twice.
+Adding to an existing draft does not change its title, age, gender, system or discussion; the
+API cannot change them, so edit them on Radiopaedia if needed. The studies are added as new
+studies. The app cannot see which studies a case already has, so if you upload the same study
+twice, it appears twice.
 
 ## The case
 
-`Title` and `System` are required, the rest is optional. Three notes on the taxonomy:
+**Title** and **System** are required; the other fields are optional.
 
-- **Age is a list, not a number.** Every year up to 18, then every fifth year to 100, and
-  nothing below a year — the values the site itself offers. A patient younger than that
-  goes up with the age not stated.
-- **Modality is a closed enum.** `DSA (angiography)`, not "Angiography", and there is no
-  PET-CT value.
-- **System ids have gaps.** 5, 10, 13 and 14 are unused, because retired systems keep their
-  numbers.
+- **Age** is chosen from a list: every year up to 18, then every five years up to 100, as on
+  Radiopaedia. There is no value under one year, so for a younger patient the age is left
+  empty.
+- **Modality** uses Radiopaedia's list, for example `DSA (angiography)`. There is no PET-CT
+  value.
+- The **System** and **Diagnostic certainty** lists are copied from Radiopaedia's API
+  reference, because the API does not provide them.
 
-Neither list is served by the API — `/api/v1/systems` and `/api/v1/diagnostic_certainties`
-both 404 — so both are transcribed from the API reference in
-[`src/shared/radiopaedia.ts`](https://github.com/gmadevs/Radiouploader/blob/main/src/shared/radiopaedia.ts).
+**Age and gender are filled in** from the original files when they contain them. The age
+comes from `PatientAge` (0010,1010), or from `PatientBirthDate` (0010,0030) and the study
+date, rounded to the nearest value in the list (the younger one if two are equally close).
+Gender is filled in only for `M` (Male) and `F` (Female). For a case with several studies,
+the values come from the earliest study. They are suggestions, and any value you change stays
+changed.
 
-**Age and sex arrive filled in** when the originals said so. `PatientAge` (0010,1010) is
-preferred, and `PatientBirthDate` (0010,0030) against the study date is the fallback; the
-result is rounded to the nearest value on the list, ties going to the younger one. Sex is
-offered only where Radiopaedia has the word: `M` and `F` become Male and Female, and `O`
-becomes nothing.
-
-Both are read at ingest, because anonymisation removes them — and both are only a
-suggestion. Change either and it stays changed; a case with several studies is filled from
-the earliest, since the age a case presents at is the age at baseline. Under a year the
-field is left empty rather than rounded up: the list has no way to say four months, and
-"1 year" would be a fact invented by arithmetic.
-
-**Plane and sequence type are not settable through the API** either. The series payload
-accepts only `image_format`, `series.root_index` and `stack_upload.uploaded_data`. Tag
-those on the website afterwards.
+Plane and sequence type cannot be set through the API. Add them on Radiopaedia after the
+upload.
 
 ## Studies
 
-One Radiopaedia study per DICOM study, oldest first. The study endpoint has no date
-parameter, and the real dates are blanked by the anonymiser anyway, so the **interval**
-goes in the caption instead — pre-filled as "Baseline", "3 months later", "1.5 years
-later". A study whose date could not be read is captioned "Date unknown" rather than given
-an invented interval.
+Each DICOM study becomes one study in the case, oldest first. The study dates are not
+uploaded: the API has no date field, and the anonymiser removes the dates. Instead, each
+study has a caption with the interval since the first study, such as "Baseline",
+"3 months later" or "1.5 years later". A study with no readable date is captioned
+"Date unknown". You can edit each caption, and each study's **Modality** and **Findings**.
 
-Two studies of the **same day** — a CT and the MR that followed it — are nought days apart
-whichever way round they go, so the date cannot order them and `StudyTime` (0008,0030) does.
-Where an exporter left that out, the earliest acquisition time in the study is used instead;
-where neither says, they keep the order they were read in and can be arranged by hand in
-[Choose what to upload](/guide/choose). Only the first of them is captioned "Baseline"; the
-rest read **"Same day"**, since the same word under both halves of a same-day comparison
-would say nothing about either.
+When two studies are on the same day, the first is captioned "Baseline" and the others
+"Same day". Their order comes from `StudyTime` (0008,0030) or, if that is missing, from the
+earliest acquisition time in each study. If neither is present, you can set the order in
+[Choose what to upload](/guide/choose#changing-the-order-of-series).
 
 ## Upload
 
-While it runs, the bar in the footer measures the upload in **bytes rather than in images**:
-forty localisers weigh what one reconstruction does, so a bar counting files says nothing
-about how long is left. Under it: how much has gone of how much there is, the speed, and the
-time remaining.
+During the upload, the progress bar at the bottom shows the amount of data sent, the total,
+the speed and the estimated time remaining. The progress is measured in bytes, not in files,
+because files vary a lot in size. The same progress is shown as a line under the row of steps.
 
-The same figure is drawn as a line across the bottom of the step row, so the window shows
-that something is happening without anybody having to look at the corner it is happening in.
-It carries no words of its own — the footer has those — and a phase with nothing to count
-yet, such as the scan still finding the files, leaves it empty rather than full.
+The speed is the average over the whole upload, so it does not jump between small and large
+files. The speed and the time remaining appear after the first few seconds, and the time is
+rounded.
 
-The speed is the average over the whole upload rather than the last second — a rate taken
-from the file in flight swings by an order of magnitude between a 40 kB localiser and a
-12 MB reconstruction, and a time remaining computed from that is one nobody can plan around.
-Neither figure appears for the first second or two, while the connection is still being set
-up and any number would be wrong. The estimate is rounded and hedged on purpose: it is an
-average over a network that is not steady, and "3:47 left" would claim a precision it does
-not have.
+Radiopaedia does not store the same file twice. Files it already has are not sent again; they
+count as done and are shown separately, for example *"40 MB already there"*.
 
-Radiopaedia deduplicates by hash, so a file it already holds is never sent. Those bytes
-count as done and are named separately — *"40 MB already there"* — because a bar that fills
-in no time otherwise reads as one that has broken.
-
-If the upload **stops partway** — the connection drops, the site is down for longer than a
-few retries — what had gone up is already on Radiopaedia as a draft. Pressing **Upload to
-Radiopaedia** again carries on in that same case from the series that stopped, rather than
-starting a second one beside it. Going back to the picker and changing the selection starts
-over.
+If the upload stops partway, for example because the connection drops, the files already
+uploaded are on Radiopaedia in a draft case. Click **Upload to Radiopaedia** again to continue
+in the same case from the series where it stopped. If you go back and change the selection,
+the next upload starts from the beginning.
 
 ![The confirmation](/shots/08-done.png)
 
-The confirmation names what went: the case's title, how many studies, series and images, and
-each study with the series it contributed and the interval it carries. It is the last chance
-to notice that the wrong export was sent, and the screen used to say only that *something*
-had been.
+The confirmation screen shows what was uploaded: the case title, the number of studies,
+series and images, and each study with its series and caption. Check it to make sure you
+uploaded the right study.
 
-There is no byte count and no duration on it. The last progress event of a run can arrive
-after the run's own reply, so a total read at that moment can be short by one file — and a
-figure that is nearly right is worse here than no figure.
+The case is a draft, so it is not published until you publish it on Radiopaedia. **Open case
+for editing** opens the case on Radiopaedia, where you can add the plane and sequence type.
+**Upload another** starts again with a new study.
 
-The case is created as a **draft**, so nothing is published until you say so on
-Radiopaedia. The confirmation links straight to the case editor, which is where the plane and
-sequence tags go — the API cannot set those.
-
-Under the hood the upload does not use the zip endpoint — it would merge the stacks back
-together and undo the point of the app. See
-[why upload goes through S3](/internals/upload).
+The app uploads each series separately instead of as one zip file, so that split series stay
+separate on Radiopaedia; see [why upload goes through S3](/internals/upload).
