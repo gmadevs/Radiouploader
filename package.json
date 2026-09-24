@@ -15,6 +15,7 @@
     "dist:win": "npm run build && node scripts/ffmpeg.mjs && electron-builder --win --publish never",
     "smoke": "electron scripts/smoke.mjs",
     "ffmpeg": "node scripts/ffmpeg.mjs",
+    "prose": "node scripts/prose.mjs",
     "shots": "npm run build && electron scripts/shots.mjs",
     "sample": "node scripts/sampleStudy.mjs .sample-study",
     "lab": "node scripts/lab.mjs",
