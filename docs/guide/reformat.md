@@ -1,152 +1,127 @@
 # Reformat, MIP, MinIP and mean
 
-**Reformat** on a stack of three images or more cuts it another way, and flattens slabs of
-it into projections.
+**Reformat**, below the card of a stack with at least three images, creates images in another
+plane, and can combine a slab of the volume into a projection.
 
 ![A coronal MIP of the chest CT](/shots/09-reformat.png)
 
-Three panes are navigators — axial, coronal and sagittal — and the fourth is the image that
-will actually be added. **Drag the middle of the crosshair** in any navigator and the other
-two follow it: the question this view exists to answer is not what the reformat looks like
-but where it is being taken from. The wheel steps through whichever pane it is over.
+The dialog has four panes. Three show the volume in the axial, coronal and sagittal planes and
+are used to navigate; the fourth shows the image that will be added to the case. Drag the
+centre of the crosshair in any navigation pane to move the position, and the other panes
+follow. The mouse wheel moves through the pane under the pointer.
 
-**Drag an arm of the crosshair** and the axes turn. All three planes turn together, because
-they are one set of axes and not three separate views — that is what a crosshair at a
-workstation does, and it is how you line a plane up with something that is not lying square
-in the scanner. The pointer says which of the two it is about to do: a cross moves, a hand
-turns. **Straighten** puts the axes back on the acquisition's own.
+Drag an arm of the crosshair to rotate the other two planes around the plane of that pane;
+use this to align a plane with anatomy that is not straight in the scanner. The pointer shows
+a cross where a drag moves the position and a hand where it rotates. **Straighten** returns
+the planes to their original orientation. After a rotation, the series is named **Oblique**
+in the dialog and in its series description.
 
-Once they are turned, the series is called **Oblique** — in the dialog and in its own
-description — because it is no longer the coronal or the sagittal that a reader means.
+The window is set on the result pane: drag right to widen it and down to raise its centre. All
+four panes use the same window.
 
-The result pane is the one you window: **drag on it**, right to widen and down to raise the
-centre. All four panes share that window, since they are four views of one volume.
+**Add to the case** adds the result to the case as a new series, next to the series it was
+made from. It is anonymised and uploaded like any other series. The images are real DICOM
+files, written to the session's temporary folder and deleted with it.
 
-The result is added to the case as its own series, beside the one it came from. It goes
-through anonymisation and upload like anything else, because that is what it is: real DICOM
-instances, written to the session's temp directory and removed with it.
+## Controls
 
-## The controls
-
-| | |
+| Control | What it sets |
 |---|---|
-| **Axial / Coronal / Sagittal** | which way to cut |
-| **Slice / MIP / MinIP / Mean** | what a slab collapses to |
-| **Position** | where the slab sits — the crosshair moves this too |
-| **Slab** | how thick it is, in millimetres |
-| **Spacing** | how far apart the images that come out are |
+| **Axial / Coronal / Sagittal** | the plane of the result |
+| **Slice / MIP / MinIP / Mean** | how a slab is combined into one image |
+| **Position** | where the slab is; dragging the crosshair changes it too |
+| **Slab** | the slab thickness, in millimetres |
+| **Spacing** | the distance between the images that are created |
 
-**MIP** takes the brightest sample through the slab — vessels, contrast, bone. **MinIP**
-takes the darkest — airways, emphysema, fat. **Mean** averages it, which quietens noise at
-the cost of detail. **Slice** is one plane and ignores the slab.
+**MIP** shows the brightest value through the slab, for vessels, contrast and bone. **MinIP**
+shows the darkest value, for airways, emphysema and fat. **Mean** shows the average, which
+reduces noise and also detail. **Slice** shows a single plane and ignores the slab thickness.
 
-The count beside the button says how many images the plan makes before you commit to it.
-Twenty-five coronals is a series a reader will scroll through; two hundred is a series they
-will scroll past.
+The number next to **Add to the case** shows how many images the current settings will
+create. Choose a number a reader will look through: 25 coronal images are easy to review,
+200 are not.
 
-## The contrast
+## Window
 
-Drag on the result pane — right widens, down raises the centre, the same as everywhere else,
-and the readout beside the buttons says where it has got to, as **W** width **/ L** level.
-Whatever is on screen when you press **Add to the case** is written to the derived images.
+Drag on the result pane to set the window. The current values are shown next to the buttons
+as **W** (width) and **L** (level). The window on screen when you click **Add to the case** is
+written to the new images.
 
-On a CT the row of [named windows](/guide/review#the-ct-presets) is here too, and it earns
-its place twice over: a MIP through a 10 mm slab is read at a wider window than the slices it
-was built from, so the window that suited the source series is rarely the one the reformat
-wants.
+For CT, the [CT window presets](/guide/review#the-ct-presets) are available here too. A MIP of
+a 10 mm slab usually needs a wider window than the source slices.
 
-The window it opens with is the file's own `WindowCenter` / `WindowWidth`, but **only if
-that window shows the data**. Some series carry one that describes something else: a 3D
-FLAIR came through with a window sitting far below its own values, so every voxel of brain
-was above the top of it and the reformat was a white cut-out of a head on black. When the
-stated window covers less than a fifth of what the volume actually spans, the volume's own
-first-to-ninety-ninth percentile is used instead.
+The dialog opens with the window stored in the files (`WindowCenter` and `WindowWidth`), if
+that window covers at least a fifth of the range of values in the volume. Otherwise it uses
+the range from the 1st to the 99th percentile of the volume. This avoids an unusable starting
+window when a file stores a window that does not match its data. If you set a window in
+[Open for review](/guide/review), that window is used.
 
-A window you chose in [Open for review](/guide/review) is a decision rather than a
-suggestion, and is used as it stands.
+The starting window is set once, when the volume is built, so it does not change as you move
+through the volume.
 
-The window is worked out once, when the volume is built, and then stays put: recomputing it
-per image would make every step through the stack a different picture.
+## Colour series
 
-## Colour
+A colour series, such as a DTI direction map, a fused PET or a Doppler image stored as RGB,
+can be reformatted in any plane, and the new images are RGB. MIP, MinIP and Mean are not
+available for colour, because combining the channels of different voxels produces colours
+that are not in the study, and there is no window control for colour images.
 
-A colour series — a DTI directional map, a fused PET or a Doppler acquisition stored as RGB
-— can be **cut on any plane**, and the colours come through it: each channel is interpolated
-along its own axis, and the derived images are written as RGB.
+Two kinds of colour images cannot be reformatted:
 
-It cannot be **projected through**. A maximum through colour would take the red of one voxel,
-the green of another and the blue of a third and paint a colour that is nowhere in the study,
-so **MIP**, **MinIP** and **Mean** are turned off for a colour volume and **Slice** is what
-is left. There is no contrast control either: RGB samples are already the picture, and a
-window over them would be a slider that does nothing.
+- **palette colour**, where each pixel stores an index into a colour table, so values between
+  two pixels have no meaning;
+- colour stored as **YBR** in the file. Colour that is YBR only inside a JPEG is fine, because
+  the decoder returns RGB.
 
-Two kinds of colour are refused rather than reformatted. **Palette colour** stores an index
-into a lookup table instead of a colour, and half way between two indices is not half way
-between two colours — it is whatever the table happens to hold there. And colour stored as
-**YBR** in the file itself is refused by name, since only RGB is carried through. Colour that
-*arrives* as YBR inside a JPEG is fine: the decoder hands back RGB, and what the file said
-about the bitstream is not what the samples are.
+## Planes
 
-## What the planes mean
+The planes are the patient's axial, coronal and sagittal planes, calculated from
+`ImageOrientationPatient`. For example, a brain FLAIR acquired sagittally shows a true axial
+image in the axial pane. If the files do not state their orientation, the app uses the planes
+of the acquisition and shows a note next to the **Add to the case** button.
 
-They are the **patient's**, not the array's. `ImageOrientationPatient` says which way the
-rows and columns of the images point, and the three planes are worked out from it — so a
-brain FLAIR acquired sagittally opens with a real axial in the axial pane, even though the
-plane of its own images is the sagittal one.
+If the gantry was tilted or the patient's position was angled, the planes are correct but the
+anatomy in them is not straight; rotate the crosshair to align them.
 
-That only works when the files say where they were pointing. When they do not, the planes
-fall back to the acquisition's own axes and the dialog says so in the line above the button.
+The reformatted images are built from the last slice of the stack towards the first, so the
+end of the stack is at the top of a coronal or sagittal image. For a study acquired feet
+first, check that the result is not upside down before adding it.
 
-A **tilted gantry or an angled shoulder** is a different matter: the planes are right, but
-the anatomy in them is not square, and that is what turning the crosshair is for.
+## Resolution
 
-Images are built from the last slice down, so the end of the stack ends up at the top of a
-coronal or sagittal image. On a study acquired feet-first that is upside down; look before
-you add.
+The new images have square pixels at the finest in-plane spacing of the volume: 0.7 mm pixels
+for a CT with 0.7 mm pixels, whatever its slice spacing. This is fixed.
 
-## The resolution is not a choice
+Between slices, the app interpolates. A coronal reformat of a study with 5 mm slices has the
+detail of 5 mm slices.
 
-The result is square-pixelled at the finest spacing the volume has in plane — 0.7 mm pixels
-for a 0.7 mm CT, whatever the gap between its slices was. Anything coarser would throw away
-data that is already in memory and anything finer would invent it, so it is not offered.
+A projection (MIP, MinIP or Mean) uses the original image planes inside the slab, not
+interpolated samples, so a thin bright vessel keeps its full brightness. A rotated plane has
+no original image planes to use, so it is sampled at half the finest spacing. A rotated image
+is also larger than a straight one, because it crosses the volume diagonally.
 
-Between the slices it interpolates. A coronal of a 5 mm study is a real reformat of 5 mm
-data and looks like one; it does not become a 0.7 mm acquisition by being resampled.
+## When a stack cannot be reformatted
 
-A projection is taken at the **image planes inside the slab**, not at even steps along it. A
-maximum of interpolated samples is not a maximum of the data — a step straddling the
-brightest voxel returns the average of it and its neighbour, and a vessel comes out half as
-bright as it is.
+The dialog shows the reason when a stack:
 
-A turned plane has no image planes to read, so it is stepped at half the finest spacing
-instead: as close to the same thing as sampling can get. A turned image is also **wider than
-a straight one**, because a tilted direction crosses the volume diagonally and the picture
-has to be big enough to hold what it crosses.
+- has fewer than three images;
+- has gaps between images that vary by more than 10%, for example after an image was dropped;
+- has images of different sizes or in different units;
+- is palette colour, or colour stored as anything other than RGB (see
+  [colour series](#colour-series));
+- has no pixel spacing;
+- would need a volume larger than 512 MB.
 
-## When it refuses
+## What the reformat keeps from the source stack
 
-A volume needs geometry that holds, and the dialog says which part did not:
+Areas you erased on the source stack are erased in the volume before it is built, and the crop
+is applied before it too. So a banner erased on the axial images does not appear in a coronal
+reformat, and the new images carry the position of the cropped area. On colour series, the
+erased area is black in all three channels. The window you chose for the source stack is used.
 
-- **fewer than three images** — there is nothing to cut through
-- **gaps that vary** by more than a tenth — a reformat of them would be stretched where the
-  images are missing
-- **images of different sizes**, or in different units
-- **palette colour**, or colour that is not RGB — see [Colour](#colour)
-- **no pixel spacing**, which leaves the result with no scale
-- **too large** — a volume over 512 MB is refused rather than allocated
+Projections are calculated on the stored values, and the rescale is kept, so a MIP of a CT is
+still in Hounsfield units.
 
-## What it carries over
-
-Areas you blanked on the parent are blanked in the volume **before** it is built, and the
-crop is taken before it too — so a banner erased on the axial images cannot come back
-through a coronal of them, and neither can a margin cut off them. On a colour series the
-blanking is done in all three channels, and black means what the file means by black. The volume is the cropped
-one throughout: it is that much smaller, and the derived images carry the position of the
-corner that was kept rather than the one that was thrown away. The window you chose comes
-with it. Rescale is preserved exactly: projections are taken on the stored
-values, and maximum, minimum and mean all commute with the linear rescale, so a MIP of a CT
-is still in Hounsfield units.
-
-The derived series carries `ImageType` `DERIVED\SECONDARY\MIP` (or `MINIP`, `MEAN`, `MPR`),
-its own series UID, and the geometry of the plane it was cut on — so a reader, or this app
-on a second import, can tell what it is and which way up it goes.
+The new series has `ImageType` `DERIVED\SECONDARY\MIP` (or `MINIP`, `MEAN` or `MPR`), its own
+series UID, and the orientation of the plane it was made in, so viewers, including this app
+when the series is imported again, show it the right way round.
