@@ -1,93 +1,92 @@
 # Anonymisation and masks
 
-The app does not implement its own anonymiser. It links
-[radiopaedia/dicom-anonymiser](https://github.com/radiopaedia/dicom-anonymiser), the
-reference implementation, and runs it in a worker thread.
+The app uses Radiopaedia's reference anonymiser,
+[radiopaedia/dicom-anonymiser](https://github.com/radiopaedia/dicom-anonymiser), and runs it in
+a worker thread.
 
-That is not merely convenient. **Radiopaedia re-runs the same anonymiser on every uploaded
-DICOM and rejects the file if any tag would change**, and API clients found to have
-uploaded patient data are suspended. Using anything else means guessing at a validator you
-cannot see.
+Radiopaedia runs the same anonymiser on every uploaded DICOM file and rejects the file if the
+anonymiser would change any tag. API clients that upload patient data are suspended. Using the
+same anonymiser is the only way to be sure the files pass that check.
 
-Its output satisfies that validator: `PatientIdentityRemoved` is set to `YES`,
-`SOPInstanceUID` is removed entirely, and the UIDs are rewritten into the required
-`1.2.826.0.1.3680043.10.341.512.…` hashed scheme.
+The anonymiser sets `PatientIdentityRemoved` to `YES`, removes `SOPInstanceUID` and replaces
+the other UIDs with hashed values in the `1.2.826.0.1.3680043.10.341.512.…` scheme.
 
-It works on the dataset only. The **file meta header** in front of it — group `0002` — is
-written back as it was read, which left every file carrying its original SOP Instance UID in
-`MediaStorageSOPInstanceUID` (0002,0003): an identifier the hospital's PACS can look up. The
-app replaces that one itself, with the dataset's hashed UID where the anonymiser kept one and
-otherwise a `2.25.…` UID hashed one way from the original, so it is stable between runs. The
-AE titles in the meta header (0002,0016–0018), which name the hospital's machines, are
-dropped.
+The anonymiser changes only the dataset, not the file meta header (group `0002`), so on its own
+it would leave the original SOP Instance UID in `MediaStorageSOPInstanceUID` (0002,0003). That
+UID can be looked up in the hospital's PACS. The app replaces it with the dataset's hashed UID
+if the anonymiser kept one, and otherwise with a `2.25.…` UID calculated by a one-way hash of
+the original, so it is the same on every run. The app also removes the AE titles in the meta
+header (0002,0016 to 0002,0018), which name the hospital's systems.
 
-## What the app adds
+## Changes made before anonymisation
 
-Two things are written into the file **before** `Anonymize` runs, so the bytes that come out
-are final and Radiopaedia's re-run stays a no-op:
+The app writes these changes to the file before `Anonymize` runs, so the files it produces
+are final and running the anonymiser again changes nothing.
 
-**Masks are painted into the pixel data.** A rectangle drawn in the viewer is stored as
-fractions of the image, so it survives the preview downscale and applies at full
-resolution. The fill is worked out per image: black is the dark end of the window in force,
-taken back through the rescale, so a redaction stays black on a CT (where 0 is soft tissue)
-and on MONOCHROME1 (where 0 is white); on YBR colour it is luminance 0 with the chroma
-channels centred.
+**Erased areas are written into the pixel data.** A rectangle drawn in the viewer is stored
+as fractions of the image, so it applies at full resolution, not only to the preview. The
+fill value is calculated for each image so that the area is black: on a CT, the darkest value
+of the current window, converted back through the rescale (0 would be soft tissue); on
+MONOCHROME1, the brightest stored value (0 is white); on YBR colour, luminance 0 with the
+chroma channels at the midpoint.
 
-**The chosen window is written to the tags.** `WindowCenter` / `WindowWidth` (0028,1050 /
-0028,1051), with any `WindowCenterWidthExplanation` or `VOILUTSequence` that would
-contradict it dropped. The pixels are not touched, so the original values reach Radiopaedia
-and stay re-windowable.
+**The chosen window is written to the tags** `WindowCenter` and `WindowWidth` (0028,1050 and
+0028,1051). `WindowCenterWidthExplanation` and `VOILUTSequence` are removed, because they
+would conflict with it. The pixel values do not change, so the window can still be adjusted
+on Radiopaedia.
 
-## A mask on a compressed image
+**An enhanced object's frame gets its own geometry.** Its position, orientation, pixel
+spacing, slice thickness, rescale and window are stored per frame in sequences that the
+anonymiser removes, so the app copies the frame's values to the top level first. See
+[splitting before anonymisation](/internals/splitting).
 
-Painting a mask means writing into stored samples. On a compressed transfer syntax those
-samples are a bitstream, and writing into it would corrupt the image rather than redact it.
+## Erasing or cropping a compressed image
 
-So the file is decoded first. The pixel data is replaced by the samples it decodes to, the
-transfer syntax becomes explicit VR little endian, and the tags that describe the pixels are
-rewritten from what the codec returned — bit depth, planar configuration, and photometric
-interpretation, which is the one that bites: a file declaring `YBR_FULL` hands back RGB, and
-leaving the tag alone publishes an image with red and blue swapped.
+Writing into compressed image data would damage the image instead of erasing part of it. The
+app therefore decodes the file first, replaces the pixel data with the decoded samples,
+changes the transfer syntax to explicit VR little endian, and updates the tags that describe
+the pixels from the decoder output: bit depth, planar configuration and photometric
+interpretation. The photometric interpretation matters most: a file marked `YBR_FULL` decodes
+to RGB, and keeping the old tag would swap red and blue in the uploaded image.
 
-All of that happens **before** `Anonymize` runs, like the mask itself, so the bytes written
-are final and Radiopaedia's re-run of the same anonymiser stays a no-op.
+A [crop](/guide/review#crop) is applied after the erased areas, because both are defined as
+fractions of the original image. An erased area outside the crop is removed with the rest of
+the cropped-off image. The crop updates `Rows`, `Columns` and `ImagePositionPatient`; the new
+position is calculated in patient millimetres, or the tag is removed if the file does not
+contain enough information to calculate it.
 
-A [crop](/guide/review#crop) is written there too, and after the mask rather than before it:
-both are fractions of the image as it arrived, so a mask outside the crop goes the way of
-everything else out there. It rewrites `Rows`, `Columns` and `ImagePositionPatient` — the
-last walked across and down in patient millimetres, or deleted when the file says too little
-to walk it — because a header describing the grid the pixels used to sit on is one that
-lies.
+The decoded file is larger: the JPEG test image in the repository grows from 49 kB to 768 kB.
+A compressed image with no erased area and no crop is uploaded unchanged, so it stays small
+and lossless. Multiframe runs are split into single images with the same decoding.
 
-The uploaded file is much larger — the JPEG test pattern in the repository is 49 kB and
-768 kB decoded. A compressed image with nothing to blank and nothing to cut away is passed
-through untouched instead, so it stays small and lossless. The same machinery splits a compressed cine, which
-cannot have its frames cut out of a bitstream by offset either.
+## Video
 
-Video — MPEG-2, H.264, HEVC — is always rewritten, even a clip of one frame: a video stream
-is not an image Radiopaedia shows. Its frames are decoded whole by ffmpeg in the main process
-before the anonymiser's worker starts, masked and cropped like a frame of any other run, and
-then — last of all the pixel work — compressed again as **JPEG baseline** at quality 95,
-YBR_FULL, with `LossyImageCompression` set, by libjpeg-turbo's WASM encoder
-(`src/main/codecs/encode.ts`). Plain samples made a few megabytes of clip into hundreds;
-the frames were lossy already, so a second, invisible loss is the better trade. Only video
-goes through it: a lossless original is never recompressed. A test re-runs the anonymiser
-on such a file and checks it changes nothing, since that is what Radiopaedia does with every
-upload. Only a format with no decoder at all is refused.
+Video (MPEG-2, H.264, HEVC) is always rewritten, even a clip with a single frame, because
+Radiopaedia does not display a video stream in a DICOM file. ffmpeg decodes the whole video
+in the main process before the anonymiser's worker starts. Each frame is then erased and
+cropped like any other image and, as the last step, compressed as JPEG baseline at quality 95
+(`YBR_FULL`, with `LossyImageCompression` set) by libjpeg-turbo's WASM encoder in
+`src/main/codecs/encode.ts`.
 
-## Layouts that are refused
+Uncompressed frames made a clip of a few megabytes several hundred megabytes. The frames were
+already lossy, and a second compression at quality 95 does not visibly change them. Only
+video frames are compressed this way; a lossless original is never recompressed. A test runs
+the anonymiser again on such a file and checks that it changes nothing.
 
-Masking, cropping and splitting all take a sample to be one byte or two, and a pixel to be
-all of its samples side by side. An image stored any other way — 32-bit samples, a 1-bit
-segmentation, `YBR_FULL_422` or another subsampled colour — would not fail those loops; it
-would have its mask painted somewhere other than where it was drawn. So an image like that
-which needs any of the three is refused and counted among the files that could not be
-anonymised, which keeps it out of the upload. With nothing to paint, cut or split it goes
-through as it is.
+Formats the app cannot decode are refused.
+
+## Images that cannot be changed
+
+Erasing, cropping and splitting assume 8-bit or 16-bit samples, with the colour values of each
+pixel stored together. For other layouts (32-bit samples, 1-bit segmentations, `YBR_FULL_422`
+and other subsampled colour), the code would not fail but would write the erased area in the
+wrong place. The app therefore refuses such an image if it needs any of these changes: the
+file is counted among the files that could not be anonymised and is not uploaded. If it needs
+no change, it is uploaded as it is.
 
 ## Warnings
 
-Some fields survive the whitelist because they carry imaging parameters, but they are free
-text: a hospital's export can put anything in `SeriesDescription`. Those are collected and
-shown on the case form before upload, with a count of how many images carry each. Nothing
-else will read them for you.
+Some fields pass the whitelist because they describe the images, but they are free text, and
+an export can put anything in them, for example in `SeriesDescription`. The app collects
+these fields and shows them on the case form before upload, with the number of images that
+contain each one.
