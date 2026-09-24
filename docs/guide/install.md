@@ -1,164 +1,135 @@
 # Install and sign in
 
-::: danger The app never tells you your images are clean
-It looks for burnt-in text before anonymising and rings what it finds, but it finds the
-obvious banners and misses small print, text over anatomy and anything on the images it did
-not read. Look at every frame yourself, and read [known limitations](/limitations) before
-you point it at a study you care about.
+::: danger Check every image yourself
+Before anonymising, the app marks areas that look like burnt-in text. It finds large
+banners and can miss small print, text over anatomy and text on images it did not examine.
+It never reports a study as free of burnt-in text. Look at every frame before uploading, and
+read [known limitations](/limitations) first.
 :::
 
-Radiouploader runs on macOS, Linux and Windows. The current version of each is linked from
-the [home page](/), and every build of every version is attached to its
-[release](https://github.com/gmadevs/Radiouploader/releases); nothing is signed, so the
-first launch needs one extra step:
+Radiouploader runs on macOS, Linux and Windows. The current installers are linked from the
+[home page](/), and every version is on the
+[releases page](https://github.com/gmadevs/Radiouploader/releases).
+
+The installers are not signed, so the first launch needs one extra step:
 
 | Platform | First launch |
 |---|---|
-| **macOS** | Gatekeeper blocks an unsigned app: `xattr -dr com.apple.quarantine /Applications/Radiouploader.app`, or allow it in System Settings → Privacy & Security (Control-click → Open on macOS 14 and earlier) |
-| **Windows** | SmartScreen warns until the binary builds reputation: More info → Run anyway |
-| **Linux** | `chmod +x` the AppImage, or install the deb. The AppImage also needs FUSE 2, which Ubuntu no longer installs by default: `sudo apt install libfuse2t64` on 24.04, `sudo apt install libfuse2` on 22.04 |
+| macOS | Run `xattr -dr com.apple.quarantine /Applications/Radiouploader.app`, or allow the app in System Settings → Privacy & Security (on macOS 14 and earlier, Control-click the app and choose Open). |
+| Windows | SmartScreen shows a warning: choose More info → Run anyway. |
+| Linux | Make the AppImage executable with `chmod +x`, or install the deb. The AppImage needs FUSE 2, which Ubuntu does not install by default: `sudo apt install libfuse2t64` on 24.04, `sudo apt install libfuse2` on 22.04. |
 
-Signing needs an Apple Developer ID ($99/year) and an Authenticode certificate. Neither is
-in place — see [packaging](/develop/packaging). That is what the extra step is for; it says
-nothing about what the app does once it is open.
+Signing would need an Apple Developer ID and a Windows code-signing certificate, which the
+project does not have. See [packaging](/develop/packaging#signing).
 
-## 🍺 macOS, with Homebrew {#macos-with-homebrew}
+## macOS with Homebrew {#macos-with-homebrew}
 
 ```bash
 brew install --cask gmadevs/radiouploader/radiouploader
 xattr -dr com.apple.quarantine /Applications/Radiouploader.app
 ```
 
-The first line is the install: the tap is added, the disk image for your architecture is
-downloaded, its checksum is checked against the one in the cask, and the app is put in
-`/Applications`. `brew upgrade` picks up later releases, and `brew uninstall --cask
---zap radiouploader` removes the app and what it left in your Library.
+The first command adds the project's tap, downloads the disk image for your Mac's
+architecture, checks it against the checksum in the cask and installs the app in
+`/Applications`.
 
-**The second line is the Gatekeeper step**, and it is not optional. Homebrew marks every
-cask download the way a browser would, and current Homebrew has no `--no-quarantine` to turn
-that off any more — the option was removed. Since this app is not signed, macOS then refuses
-the first launch of the app Homebrew has just installed. `xattr -dr` takes the mark off, and
-works on every version of macOS.
+The second command removes the quarantine flag that Homebrew adds to everything it
+downloads. macOS blocks an unsigned app that has the flag, so without this step the app
+does not open. The cask does not remove the flag itself, because that is a decision for the
+person installing the app.
 
-If you would rather leave Gatekeeper's mark in place, skip that line and let macOS block the
-app once: on macOS 14 and earlier, Control-click the app and choose **Open**; on macOS 15 and
-later, where that override was removed, go to **System Settings → Privacy & Security** and
-choose **Open Anyway** under the message about Radiouploader.
+If you prefer to keep the flag, skip the second command and let macOS block the app once.
+Then, on macOS 14 and earlier, Control-click the app and choose **Open**; on macOS 15 and
+later, go to **System Settings → Privacy & Security** and choose **Open Anyway**.
 
-The cask does not remove the quarantine by itself. Waiving that check on an unsigned binary
-is a decision for the person installing it, and one made in the open beats one made quietly
-by a script.
+To remove the app and its settings, run `brew uninstall --cask --zap radiouploader`.
 
-The cask is not in `homebrew/cask` and cannot be yet: that repository asks a project to be
-notable first — thirty days old at the least, and stars, forks or watchers in numbers this
-one does not have. So it lives in a tap of this project's own,
-[gmadevs/homebrew-radiouploader](https://github.com/gmadevs/homebrew-radiouploader), written
-by [a workflow](/develop/packaging#the-homebrew-tap) whenever a release is published.
+The cask is published in the project's own tap,
+[gmadevs/homebrew-radiouploader](https://github.com/gmadevs/homebrew-radiouploader), and is
+updated automatically when a release is published.
 
-::: tip What a zap cannot reach
-`--zap` empties `~/Library/Application Support/Radiouploader` and the preferences, but your
-Radiopaedia tokens are in the **login keychain**, which no cask may touch. Sign out in the
-app first — click your account name in the header, then **Sign out** — or delete the
-*Radiouploader* entry in Keychain Access.
+::: tip Removing your sign-in
+`--zap` removes `~/Library/Application Support/Radiouploader` and the app's preferences, but
+not your Radiopaedia tokens, which are in the login keychain. Sign out in the app first
+(click your account name in the header, then **Sign out**), or delete the *Radiouploader*
+entry in Keychain Access.
 :::
 
-## Staying up to date
+## Updates
 
-At launch the app asks GitHub for the number of the latest release, and says so on the home
-screen if it is newer than the one running. **Nothing is downloaded and nothing is
-installed**: this app is unsigned on every platform, and an installer it fetched and ran for
-itself would be an unsigned binary arriving over the wire with nobody having looked at it.
+At launch the app checks GitHub for the latest release number. If a newer version exists, the
+home screen shows a notice. The app does not download or install anything itself.
 
-Where Homebrew did the install, the notice carries the command that upgrades it. Two lines,
-like the install: the second one is not optional, because a cask upgrade is a fresh download
-and Homebrew quarantines it exactly as it quarantined the first — an upgraded copy still
-carrying the flag is one macOS refuses to open, having opened the version before it every
-day.
+If you installed with Homebrew, the notice shows the commands to update:
 
 ```bash
 brew upgrade --cask radiouploader
 xattr -dr com.apple.quarantine /Applications/Radiouploader.app
 ```
 
-::: tip Why not one line joined with `&&`
-It was, and it was 103 characters. A command that long wraps in a narrow terminal, whatever
-copies it out of a wrapped rendering takes the wrap with it, and the break lands in the
-middle: `xattr -dr com.apple.quarantine` on its own answers *"Not enough arguments for option
--d"* and the path is left to run as a command of its own. Neither line above reaches 62.
-:::
-
-That command appears only where the **Caskroom really holds this app**. Plenty of people have
-Homebrew and installed by dragging the app out of the disk image; telling them to
-`brew upgrade` would hand them a command that cannot work, so they get the release page
+The second command is needed again, because Homebrew adds the quarantine flag to every
+download. If you installed from the disk image, the notice links to the releases page
 instead.
 
-**Not now** silences that version — a later one is offered again — and the check itself can
-be turned off under **Info → Updates**. It is the one request the app makes on its own:
-a release number comes back, and nothing about you, your account or your studies goes out.
-A check that cannot reach GitHub says nothing rather than reporting a failure about the
-app's own housekeeping, which is also why the dialog never claims you are up to date.
+**Not now** hides the notice until a newer version is released. To turn the check off, open
+**Info** and clear **Look for a newer version at launch**. The check sends no information
+about you, your account or your studies. If GitHub cannot be reached, the app shows nothing.
 
 ## Register an application
 
-The app talks to Radiopaedia as **you**, with credentials you register yourself. Go to
-[radiopaedia.org/oauth/applications/new](https://radiopaedia.org/oauth/applications/new):
+The app connects to Radiopaedia with an OAuth application that you register under your own
+account. Go to
+[radiopaedia.org/oauth/applications/new](https://radiopaedia.org/oauth/applications/new) and
+set:
 
 - **Redirect URI**: `urn:ietf:wg:oauth:2.0:oob`
-- **Scope**: leave it empty
+- **Scope**: leave empty
 
-Radiopaedia's form requires an https redirect URI and rejects a plain `http://127.0.0.1:…`
-loopback, so the usual RFC 8252 native-app pattern cannot be registered at all. The
-out-of-band URN is what their form points at: the app opens the authorization page in your
-browser, Radiopaedia shows you a code, and you paste it back. PKCE is sent either way.
+Radiopaedia requires an https redirect URI or this out-of-band address; it does not accept a
+local `http://127.0.0.1` address. With the out-of-band address, Radiopaedia shows you a code
+after you authorise the app, and you paste the code into the app.
 
-::: warning Do not request a scope
-The API reference never passes a `scope` parameter and neither does Radiopaedia's own
-uploader — permitted scopes are declared on the application itself. Asking for one
-explicitly answers *"The requested scope is invalid, unknown, or malformed"*.
+::: warning Leave the scope empty
+The scopes are set on the application itself. If you enter a scope in the app, Radiopaedia
+answers *"The requested scope is invalid, unknown, or malformed"*.
 :::
 
-If you do register an https redirect URI instead, Radiopaedia sends your browser there with
-the code in the address. Paste **the whole address** into the code field and the app reads
-the code out of it, checking that it answers the sign-in you started.
+If you registered an https redirect URI instead, Radiopaedia sends your browser to that
+address with the code in it. Paste the whole address into the code field, and the app reads
+the code from it.
 
 ## Sign in
 
-Paste the Application ID and secret into the sign-in panel in the app header. Tokens are
-stored encrypted through the OS keychain — Keychain on macOS, libsecret on Linux, DPAPI on
-Windows — and never written in the clear.
+1. Click **Sign in to Radiopaedia** in the header.
+2. Enter the **Application ID** and, if your application has one, the **Client secret**.
+3. Click **Open Radiopaedia to authorise**. Your browser opens Radiopaedia's authorisation
+   page.
+4. Authorise the application, copy the code Radiopaedia shows, paste it into the app and
+   click **Complete sign in**.
 
-Signing in opens Radiopaedia's authorisation page in your browser. Where the app cannot open
-one — a minimal Linux running the AppImage may have no `xdg-open` to do it with — it says so
-and shows the address, with a button to copy it: open it in any browser, authorise, and paste
-the code back as usual. When the browser was asked and still shows nothing, the same button
-is there, quieter, above the code field.
+If the app cannot open a browser (for example on a minimal Linux system without `xdg-open`),
+it shows the address with a **Copy the address** button. Open the address in any browser and
+continue from step 4. The same button is shown if the browser was asked to open but no window
+appeared. Other links the app opens, such as release notes or your case on Radiopaedia,
+behave the same way.
 
-Every other link the app opens — release notes, your case on Radiopaedia after an upload, the
-issue tracker, the support address — does the same in a dialog: what it could not open, and a
-button to copy it.
+Your tokens are stored encrypted in the system keychain: Keychain on macOS, libsecret on
+Linux and DPAPI on Windows.
 
-The draft-case quota is read at sign-in and shown next to your username. It is what blocks
-importing when the account is full, before you spend time on a study you could not upload.
+After you sign in, the header shows your username and how many of your draft cases are in
+use. When the draft quota is full, the app does not let you import a new study for a new case.
 
-## Handing a build to someone else
+If the app shows **Radiopaedia credentials aren't set yet**, click **Enter credentials** to
+open the sign-in panel. To sign out, click your account name in the header, then **Sign out**.
 
-If the app ever says **Radiopaedia credentials aren't set yet**, the message carries an
-**Enter credentials** button that opens this same panel.
+## Using the app on another computer
 
-Once you are signed in, your account name in the header is the way back to it: it opens a
-panel with the name, how much of the draft quota is in use, and **Sign out**. Sign out used
-to be a button in the header itself, next to **Info** — the two least-used things in the app
-given the two most prominent places in it, with the one that ends the session a stray click
-from the one that explains it.
+The Application ID and secret are not built into the app. Each person registers their own
+application and signs in to their own account, so an installer can be given to anyone.
 
-**No credentials are compiled into the app.** The Application ID and secret are entered at
-runtime and stored per user, so a build can go to anyone without sharing yours — each
-person registers their own application and signs in to their own account.
-
-Do not embed your own credentials to save them that step. A client secret shipped inside a
-desktop binary is trivially extractable and stops being a secret
-([RFC 8252 §8.5](https://datatracker.ietf.org/doc/html/rfc8252#section-8.5)); any
-per-application rate limit would then be shared by every user, and one revocation would
-break every install. If the application form offers a *Confidential* checkbox, unticking it
-creates a public client with no secret — client ids are not secret, so that variant could
-ship embedded and rely on PKCE alone, which this app already sends.
+Do not add your own credentials to a build to save others this step. A client secret inside
+a desktop app can be extracted by anyone who has the app
+([RFC 8252 §8.5](https://datatracker.ietf.org/doc/html/rfc8252#section-8.5)), every user
+would share your application's rate limit, and revoking it would stop every copy from
+working. If Radiopaedia's form offers a *Confidential* checkbox, clearing it creates a public
+application without a secret; the app supports that, because it always uses PKCE.
