@@ -1,78 +1,57 @@
 # The check before anonymising
 
-**Anonymise and continue** does not start straight away.
+When you click **Anonymise and continue**, the app first shows the **Before anonymising**
+dialog.
 
 ![The check before anonymising](/shots/06-check.png)
 
-Anonymisation is where a mask stops being an overlay and becomes pixels. After it, going
-back means redoing the run — so this is the last moment when erasing something is free.
+During anonymisation, erased areas are written into the pixels. After that, a change means
+anonymising again, so this dialog is the last chance to erase something without redoing the
+run.
 
-## It is a step, and the header says so
+The dialog is the **Check** step in the row of steps at the top of the window. Click
+**Series** in that row, or **Back to the series** in the dialog, to go back to the series with
+your choices kept. **I have checked — anonymise** starts anonymisation. While the dialog is
+open, the buttons behind it are disabled.
 
-The row along the top counts five: **Source**, **Series**, **Check**, **Case details**,
-**Upload**. This screen is one of them. It is a dialog rather than a page of its own, but
-the one gate between a study on your computer and a study on the internet should not be the
-part of the flow the flow leaves out of its own count.
+## What the dialog shows
 
-**Series** in that row takes you back here — from this check, and from the case form after
-it — keeping everything you chose. **Source** is not a way back: starting again throws the
-whole import away, which is what the footer's **Back** is for, and it says so.
+**Areas that look like burnt-in text.** The app reads two images of every selected series,
+the middle one and the one furthest from it, and marks areas that look like a text overlay:
+very bright or very dark pixels with sharp edges that are the same in both images, while the
+anatomy changes between them. Series with such areas are listed first, with the marked area
+ringed on a thumbnail. Areas you have already erased are not checked. A stack with a single
+image cannot be compared, so it is checked on brightness and edges only, which makes the
+check less reliable there.
 
-While this dialog is up the buttons behind it go quiet. **I have checked — anonymise** is
-the only thing on screen that moves the case forward, and two buttons offering to do that
-are two answers to the same question.
+**Files that declare burnt-in text.** If a file has `BurnedInAnnotation` (0028,0301) set to
+YES, the dialog reports it. A value of NO, or no value, is not reported, because exporters
+often set it without checking.
 
-## Why it is not a tick box
+**Series you have not opened.** The app records which stacks you opened in the viewer. The
+dialog lists the selected ones you have not opened, each with a thumbnail and an
+**Open for review** button. A stack leaves the list once you open it. When every selected
+stack has been opened, the dialog says so, and still asks you to confirm: opening a stack is
+not the same as reading every image in it.
 
-A dialog that asks *"have you checked?"* becomes a reflex by the third import. It moves
-responsibility onto the user without giving them anything they did not already have.
+## Checking the order
 
-So this one **looks, and lists**.
+Next to the burnt-in text check, the dialog shows all selected stacks in the order they will
+be uploaded, numbered as they will appear in the case. Stacks from a split series are grouped
+together.
 
-It reads two images of every selected series — the middle one and the one furthest from it —
-and rings anything that looks like burnt-in text. Those series come first, with the reason
-underneath. The test is what an overlay is: pixels at the ends of the range, hard edges, and
-above all *still* — the anatomy moves between two images of a series and a banner does not.
-An area you have already blanked is not looked at, so it does not come back at you.
+To change the order, drag a card onto the card whose place it should take, or use the arrows
+under each card to move it one place at a time. You can only move a card within its own
+study, because studies are ordered by date. The stacks of a split series move together.
 
-`BurnedInAnnotation` (0028,0301) is reported too when a file declares it. Only a **YES**
-means anything; exporters leave it absent or set it to NO out of habit.
+The order is not shown when there is nothing to arrange, that is, when there is a single
+series or one series per study.
 
-Below that it **lists**: the app records which stacks were opened full size, and the dialog
-names the selected ones that never were, a thumbnail each, every one a click away from the
-viewer. Open one, close it, and it has left the list.
+## What the check does not find
 
-When there is nothing left on the list it says so — and still asks. Opening a stack is not
-the same as having read every image in it.
+The check does not tell you that a series is free of burnt-in text. It finds large banners.
+It does not find small print, text over anatomy, low-contrast text, or text on images it did
+not read, and it does not read the text it finds. If the dialog lists nothing for a series,
+nothing was noticed in the two images it read; there can still be text in the series.
 
-## The order, while the pictures are in front of you
-
-Beside the burnt-in check the dialog shows the whole selection **in the order it will be
-posted in** — one card per image set, the sets out of a split series boxed together, numbered
-as they will appear on the case.
-
-It is asked here because this is where the thumbnails already are. Recognising a series by
-its picture is quicker than by its name, and moving one is a drag: pick a card up and drop it
-on the card whose place it should take. The arrows under each card do the same thing one step
-at a time, which is what a keyboard has.
-
-A drag stays inside its own study — studies are a timeline, ordered by date. And the cards of
-a series that was split into several image sets move together, because they came out of one
-acquisition and the app has no way to say that one of them belongs somewhere else.
-
-The strip is not shown when there is nothing to arrange: a single series, or one in each
-study.
-
-## What it will never tell you
-
-It will never call a selection clean.
-
-The check finds obvious banners. It does not find small print, text over anatomy,
-low-contrast overlays, or anything on the images it did not read — and it is not OCR, so it
-does not know what it has found. **Silence about a series means nothing was noticed in it**,
-which is a much smaller claim than nothing being there, and in an anonymisation tool the
-difference matters: a clean bill stops people looking.
-
-So the dialog reports two things and neither is a verdict. What was **noticed**, ringed on
-the picture. And what went **unopened**, which is a proxy for having looked and no more than
-that. Everything else it leaves to you, and still asks.
+Check every image yourself before you click **I have checked — anonymise**.
