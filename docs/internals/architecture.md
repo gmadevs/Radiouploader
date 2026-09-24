@@ -1,7 +1,7 @@
 # Architecture
 
-An Electron app with three processes' worth of separation and one rule that decides most of
-the design: **patient data lives only in the main process**.
+Radiouploader is an Electron app. Most of its design follows from one rule: patient data is
+handled only in the main process.
 
 ## The pipeline
 
@@ -18,81 +18,88 @@ flowchart LR
   style F fill:#e0a44a22,stroke:#e0a44a
 ```
 
-The order is not negotiable. Radiopaedia's anonymiser applies a whitelist: every element is
-stripped unless explicitly permitted, and all private tags go. The information the app needs
-to group images sensibly exists **only in the originals**, so reading and grouping happen
-first and anonymisation happens last. [The long version](/internals/splitting).
+The steps must run in this order. Radiopaedia's anonymiser keeps only the elements on its
+whitelist and removes all private tags. The information the app needs to group images, such
+as b-values and study dates, is only in the original files, so the app reads and groups them
+first and anonymises last. See [splitting before anonymisation](/internals/splitting).
 
-## The process split
+## The code
 
 ```
 src/main/ingest/    scan folders and zips, read metadata, group into stacks
+src/main/codecs/    decode compressed pixel data and video; encode video frames as JPEG
 src/main/anon/      the anonymiser, in a worker thread
+src/main/volume/    build volumes and reformats
 src/main/api/       OAuth, case and study creation, S3 upload
-src/shared/         types, the DICOM decoder, Radiopaedia's taxonomy
-src/renderer/       the wizard UI
+src/preload/        the IPC bridge between the renderer and the main process
+src/shared/         types, the DICOM reader, geometry, Radiopaedia's lists
+src/renderer/       the user interface
 ```
 
-The renderer has **no Node access**. It reaches the filesystem solely through the IPC
-bridge, which serves only files belonging to the current import — and serves *decoded,
-preview-sized frames* rather than files.
+The renderer runs sandboxed and has no Node access. It reads files only through the IPC
+bridge, which serves only files that belong to the current import, and sends decoded frames
+at preview size, not whole files.
 
-That last part is not an abstraction for its own sake. A cine run is routinely 250 MB, and
-moving one across the bridge costs three copies of it: the read, the `ArrayBuffer` slice and
-the structured clone. Doing it that way is how this used to fail with
-`RangeError: Failed to allocate memory`. Now only the finished pixels of one frame cross.
+Whole files do not cross the bridge because a cine run is often 250 MB, and sending one costs
+three copies: the file read, the `ArrayBuffer` slice and the structured clone. This used to
+fail with `RangeError: Failed to allocate memory`.
 
-## The decoder
+## Decoding
 
-Uncompressed pixel data is read by a small purpose-built reader in
-`src/shared/dicomImage.ts`, split into a header parse and a per-frame decode. Nothing ever
-holds a whole file: the header comes from the first few kilobytes, and each frame is read
-from just its own byte range.
+Uncompressed pixel data is read by `src/shared/dicomImage.ts`, in two parts: the header, from
+the first few kilobytes of the file, and each frame, from its own byte range. No whole file is
+held in memory.
 
-Compressed pixel data goes through `src/main/codecs/decode.ts`, which loads the standalone
-`@cornerstonejs/codec-*` WASM builds on first use — JPEG, JPEG-LS, JPEG 2000 and HTJ2K —
-with plain JavaScript decoders for lossless JPEG and for RLE, which is PackBits over byte
-planes and wants no codec at all. Video — MPEG-2, H.264, HEVC — goes to ffmpeg instead
-(below). A compressed frame
-cannot be addressed arithmetically, so the fragment table is read to find where each one
-starts, and the most recently parsed file is kept so scrubbing a cine does not re-parse it
-per frame.
+Compressed pixel data is decoded by `src/main/codecs/decode.ts`. JPEG, JPEG-LS, JPEG 2000 and
+HTJ2K use the standalone `@cornerstonejs/codec-*` WASM builds, loaded on first use. Lossless
+JPEG and RLE are decoded in JavaScript. A compressed frame cannot be located by calculation,
+so the app reads the fragment table to find where each frame starts, and it keeps the last
+parsed file so that scrolling through a cine does not parse it again for every frame.
 
-It deliberately does **not** use `@cornerstonejs/dicom-image-loader`, which drags in
-`@cornerstonejs/core`, whose viewport and rendering-engine class hierarchy is circular
-enough to throw `Class extends value undefined` once bundled — and none of it is needed,
-since the pixels are painted onto a plain canvas. The codecs are CommonJS Emscripten modules
-that find their own `.wasm` through `__filename`, so they stay external to the bundle and are
-unpacked from the asar; only the decode-only builds are shipped.
+The app does not use `@cornerstonejs/dicom-image-loader`. It depends on `@cornerstonejs/core`,
+whose circular class dependencies throw `Class extends value undefined` once bundled, and the
+app does not need it, because it draws pixels on a plain canvas. The codecs are CommonJS
+Emscripten modules that find their `.wasm` file through `__filename`, so they are kept outside
+the bundle and unpacked from the asar. The decode-only builds are shipped, plus the full
+libjpeg-turbo build, whose encoder compresses video frames.
 
-What comes back is not always what the header described — a decoder may undo a colour
-transform or unpack to a wider container — so the geometry travels with the samples rather
-than being read from the file again.
-
+A decoder can return data in a different form from what the file header describes, for
+example RGB where the header says YCbCr, or 16-bit samples for 12-bit data. The app therefore
+takes the geometry from the decoder output, not from the header.
 
 ### Video
 
-A video's frames are not fragments: the pixel data holds one stream, inside a container —
-MPEG-TS or MP4 for H.264 and HEVC, anything from an elementary stream to a program stream for
-MPEG-2 — where most frames are differences from the ones before. So `src/main/codecs/video.ts`
-hands the whole stream to **ffmpeg**, run as a child of the main process, and writes the
-frames to disk as plain RGB; from then on a frame of a video is a byte range, like a frame of
-an uncompressed cine. `src/main/videoCache.ts` makes that happen once per clip per session,
-in the session's working directory, whichever of the preview, the check or the anonymiser
-asks first. ffmpeg is asked for PPM rather than bare samples, because PPM states each
-frame's size: a stream whose pictures are not the size the DICOM header claims is refused by
-name rather than cut into frames at the wrong places.
+Video (MPEG-2, H.264, HEVC) is stored as one stream in a container, not as one fragment per
+frame: MPEG-TS or MP4 for H.264 and HEVC, and an elementary, program or transport stream for
+MPEG-2. Most frames are stored as differences from earlier frames, so they cannot be decoded
+one at a time.
 
-Not Chromium's own decoders, though Electron has them: they live in a renderer, and a decoded
-clip is hundreds of megabytes of patient pixels that would have to cross the IPC bridge.
+`src/main/codecs/video.ts` passes the whole stream to ffmpeg, which runs as a child process of
+the main process, and writes the frames to disk as RGB. After that, a video frame is a byte
+range, like a frame of an uncompressed cine. `src/main/videoCache.ts` decodes each video once
+per session, in the session's working folder, when the preview, the burnt-in text check or the
+anonymiser first needs it. ffmpeg outputs PPM, which states the size of each frame, so a video
+whose frames do not match the size in the DICOM header is refused with an error.
 
-## Where data lives
+At anonymisation, each frame is erased and cropped as needed and then compressed as JPEG by
+`src/main/codecs/encode.ts`.
 
-| | |
+The app does not use Chromium's video decoders, although Electron includes them, because they
+run in a renderer process, and a decoded clip is hundreds of megabytes of patient images that
+would have to cross the IPC bridge.
+
+## Where data is stored
+
+| Data | Location |
 |---|---|
-| Originals and anonymised output | a session temp directory, removed on reset and on quit — and, after a crash or a force-quit, at the next launch |
-| OAuth tokens | the OS keychain, via Electron `safeStorage` |
-| Application ID and secret | `config.json` in the app's user-data directory, secrets encrypted |
-| Anything at all | never in the repository, never in a log |
+| Original files from a zip, anonymised files, decoded video | a temporary session folder, deleted on reset and on quit, or at the next launch after a crash |
+| OAuth tokens | the system keychain, through Electron `safeStorage` |
+| Application ID and secret | `config.json` in the app's user data folder, with the secret encrypted |
+| Patient data | never in the repository or in logs |
 
-The only outbound request in the whole app is the upload.
+## Network requests
+
+The app connects to Radiopaedia to sign in, to read the account and its draft cases, and to
+upload. The upload sends files directly to Amazon S3 through URLs signed by Radiopaedia. At
+launch, unless you turn it off, the app asks GitHub for the latest release number. It makes
+no other requests.
