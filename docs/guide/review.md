@@ -1,160 +1,133 @@
 # Erase, crop and set contrast
 
-**Open for review**, under any card in the strip, shows that stack full size with a scrubber
-through every image.
-The wheel and the trackpad move through the stack as well, and so do the left and right
-arrow keys — the slider is for jumping across a series, not for reading through one.
+**Open for review**, below any card, opens the stack in a viewer with a slider through all
+its images. You can also move through the images with the mouse wheel, the trackpad, or the
+left and right arrow keys.
 
-The keys are listed along the bottom of the window: the arrows, <kbd>Delete</kbd> for the box
-you have selected, <kbd>Esc</kbd> to let go of a box and then close. None of them is something
-you should have to find out about by trying.
+The keyboard shortcuts are listed at the bottom of the viewer: the arrow keys,
+<kbd>Delete</kbd> to remove the selected box, and <kbd>Esc</kbd> to deselect a box and then
+close the viewer.
 
 ![The ultrasound, banner and all](/shots/04-viewer.png)
 
-Three of the four things that can be changed here belong to the **stack** rather than to the
-image on screen — burnt-in text sits in the same corner of every frame of an ultrasound or a
-reconstruction, the margins are the same margins on all of them, and a window that suits one
-slice suits the rest. The fourth is about the one image you are looking at.
+Erasing, cropping and the window apply to every image in the stack, because burnt-in text,
+margins and a suitable window are usually the same on every image of a series. Dropping an
+image applies only to the image on screen.
 
-## Drop this image
+## Drop an image {#drop-this-image}
 
-**Drop image**, beside the image number, leaves that one image out of the upload and changes
-nothing else about the series. It is for the image a series can be missing: the one that
-moved, the duplicate a reconstruction wrote twice, the slice that caught the table edge.
+**Drop image**, next to the image number, leaves that image out of the upload. Use it for a
+single bad image in a series, such as one with motion, a duplicate, or one that shows the
+table edge.
 
-A dropped image is tagged *dropped* while you are on it, the button becomes **Keep image**,
-and the count beside it says how many have gone. **Keep all** puts every one back. Nothing is
-decided until you anonymise, and the card in the picker says `N of M images` so the loss is
-visible from outside the viewer as well.
+A dropped image is marked *dropped*, the button changes to **Keep image**, and a count shows
+how many images are dropped. **Keep all** restores them all. On the card, the stack shows
+`N of M images`.
 
-This is not [trimming](/guide/choose#trimming). A trim is a range and takes the dead ends of
-a series; a drop takes one image out of the middle and leaves its neighbours where they are.
-Use whichever describes what is actually wrong.
+Dropping is different from [trimming](/guide/choose#trimming): a trim keeps a range of images
+and removes the ends of a stack, while dropping removes single images from anywhere in it.
 
-::: warning A hole is a hole
-The last image of a series cannot be dropped — a series that uploads nothing would simply be
-missing from the case, and the tick box in the picker is the control that says that out loud.
+::: warning Limits of dropping
+You cannot drop the last remaining image of a stack. To leave out a whole stack, clear its
+tick box on the card.
 
-And a stack with an image dropped out of the middle usually **cannot be reformatted**: the
-volume behind [Reformat](/guide/reformat) measures the gap between images and refuses a stack
-whose gaps are uneven, rather than stretching the pictures across the hole. Reformat first,
-then drop, if you want both.
+A stack with an image dropped from the middle usually cannot be
+[reformatted](/guide/reformat), because the gaps between its images are no longer even. If
+you want both, reformat first and then drop the image.
 :::
 
 ## Erase
 
-Drag a rectangle over anything that should not be uploaded: patient banners on ultrasound,
-annotations on reconstructions, scale text.
+Choose **Erase** and drag a rectangle over anything that must not be uploaded, such as a
+patient banner on an ultrasound, annotations on a reconstruction, or scale text.
 
 ![The banner blanked](/shots/05-erase.png)
 
-The rectangle is drawn on **every image of the stack**, and it is painted into the pixel
-data during anonymisation — what is uploaded really is blank, not covered by an overlay.
+The rectangle applies to every image in the stack. During anonymisation it is written into
+the pixel data, so the uploaded images are blank in that area.
 
-What "blank" means is worked out per image: black is the dark end of the window in force,
-taken back through the rescale, so a redaction stays black on a CT (where 0 is soft tissue)
-and on MONOCHROME1 (where 0 is white); on YBR colour it is luminance 0 with the chroma
-channels centred.
+The blank area is black on every image. The app works out the black value for each image: on
+a CT it uses the darkest value of the current window (a value of 0 would show as soft
+tissue), on MONOCHROME1 images the brightest stored value (where 0 is white), and on colour
+images zero brightness.
 
-A box drawn in the wrong place can be put right rather than redrawn. The one you have just
-drawn is already selected — its corners are there to be dragged and <kbd>Delete</kbd> takes
-it away without hunting for it again — and any other can be selected by clicking it: drag it
-to move it, drag a corner to resize it, <kbd>Delete</kbd> to remove that one. It stays inside the image and never shrinks to nothing — a redaction that quietly got
-smaller would uncover what it was put there to hide. <kbd>Esc</kbd> lets go of the box
-first, and only closes the window once nothing is selected.
+The box you have just drawn is selected: drag its corners to resize it, or press
+<kbd>Delete</kbd> to remove it. Click any other box to select it, then drag it to move it,
+drag a corner to resize it, or press <kbd>Delete</kbd> to remove it. A box cannot be moved
+outside the image or resized to nothing. <kbd>Esc</kbd> deselects the box; pressed again, it
+closes the viewer.
 
-::: tip Undo is not destructive
-**Undo box** and **Clear boxes** are always available up to the moment you anonymise. The
-original files are never modified — anonymisation writes new ones.
+::: tip Undo
+**Undo box** and **Clear boxes** work until you anonymise. The original files are never
+changed; anonymisation writes new files.
 :::
 
-## Leaving the viewer
+## Closing the viewer
 
-Every tool here writes straight to the stack — that is what lets the card behind show the
-blanked image — so there is no save to make and nothing to lose by closing the window.
-**Done**, <kbd>Esc</kbd> and a click outside the window all keep what you did.
+Changes are saved to the stack as you make them, and the card shows the result. **Done**,
+<kbd>Esc</kbd> and clicking outside the viewer all keep your changes.
 
-**Discard changes** is the other way out, and it appears only once there is something to
-discard. It puts the stack back exactly as it was when the viewer opened: blanked areas,
-crop, window and dropped images, all four together. It is a button and nothing else — no
-keystroke reaches it — because the way out that throws work away should have to be asked
-for by name.
+**Discard changes** appears once you have changed something. It restores the stack to how it
+was when you opened the viewer: blanked areas, crop, window and dropped images. It has no
+keyboard shortcut.
 
 ## Crop
 
-Pick **Crop** and drag out the rectangle to **keep**. Everything outside it comes off every
-image of the stack.
+Choose **Crop** and drag a rectangle around the part to keep. Everything outside it is removed
+from every image in the stack.
 
 ![The sector kept and the margins cut away](/shots/10-crop.png)
 
-The image stays on screen whole, with what is about to go shaded rather than hidden — a cut
-you cannot see past is one you cannot aim. Drag inside the rectangle to move it, a corner to
-resize it, and **Keep whole image** puts it back.
+The whole image stays visible, with the part to be removed shaded. Drag inside the rectangle
+to move it and drag a corner to resize it. **Keep whole image** removes the crop.
 
-One rectangle serves the whole stack, and not to keep things simple: [Reformat](/guide/reformat)
-builds a box out of the images, and images cut to different sizes do not make one.
+One crop applies to the whole stack, because [Reformat](/guide/reformat) needs all images of a
+stack to be the same size.
 
-::: tip Cropping is not a second way to redact
-A blanked box is already blank pixels rather than an overlay, so nothing survives an erase
-that a crop would have removed. Crop for the reason you would crop a photograph: the black
-margins around an ultrasound sector, the empty air around a reconstruction, the strip a
-banner was sitting in.
-:::
+Use a crop to remove black margins around an ultrasound sector, empty space around a
+reconstruction, or the strip that contained a banner. For burnt-in text, **Erase** is enough:
+erased areas are already blank in the uploaded pixels.
 
-What makes it more than a mask with the pixels thrown away is the geometry, and the app
-moves it for you. `Rows` and `Columns` are rewritten, and so is `ImagePositionPatient` —
-the corner the image starts at, walked across and down in **patient millimetres**. Without
-that a volume built from the cropped images would sit where the discarded corner used to be.
-A file that does not say which way it is pointing has the position **removed** rather than
-left describing a grid its pixels are no longer on; the order the images upload in does not
-depend on it.
-
-The pixels are the same size after a crop as before, so `PixelSpacing` is untouched and a
-measurement made on Radiopaedia still means what it says.
+When the app crops, it updates `Rows`, `Columns` and `ImagePositionPatient`, the position of
+the image's top-left corner in the patient, so a volume built from the cropped images is in
+the right place. If a file does not state its orientation, the app cannot calculate the new
+position and removes `ImagePositionPatient`; the upload order does not depend on it.
+`PixelSpacing` does not change, so measurements on Radiopaedia stay correct.
 
 ## Contrast
 
-Pick **Contrast** and drag on the image: right widens the window, down raises its centre,
-the same directions every DICOM viewer uses. The readout at the bottom right says where it
-has got to, as **W** width **/ L** level.
+Choose **Contrast** and drag on the image: drag right to widen the window and down to raise
+its centre, as in other DICOM viewers. The current values are shown at the bottom right as
+**W** (width) and **L** (level). Contrast is not available for colour images.
 
-### The CT presets
+### CT window presets {#the-ct-presets}
 
-A CT viewer carries a row of named windows under the scrubber — Brain, Subdural, Stroke,
-Temporal bone, Lung, Soft tissue, Liver, Bone — and one click sets the window to it. The
-button stays lit while the picture is the one it names, and goes out as soon as the window
-is dragged off it, so what the row says is always what is on screen.
+For CT, the viewer shows a row of presets below the slider: Brain, Subdural, Stroke, Temporal
+bone, Lung, Soft tissue, Liver and Bone. Click one to set the window. The button stays
+highlighted while the window matches the preset, and the highlight goes off when you drag the
+window to other values.
 
-They are the conventional widths and centres, the ones on a reporting workstation's own
-toolbar, and each is a starting point rather than an answer: a nodule against pleura and an
-early infarct both want something narrower than the preset that gets you to them.
+The presets use conventional widths and centres. Adjust them as needed, for example for a
+nodule next to the pleura or an early infarct.
 
-The row appears on **CT and nothing else**, and that is not an oversight. These numbers are
-Hounsfield units, an absolute scale that only CT states its pixels on; on MR the stored
-values are the scanner's own, so "80 / 40" would name a different picture on every study and
-a fixed list would be a list of wrong answers. Drag there, as before.
+Presets are shown only for CT, because only CT pixel values are in Hounsfield units. On MR
+the values depend on the scanner, so fixed presets would not work. The same presets are
+available in the [reformat dialog](/guide/reformat).
 
-The same row sits in the [reformat dialog](/guide/reformat), where it matters for a second
-reason: a MIP through a slab is read at a wider window than the slices it was built from.
+The window you choose is written to `WindowCenter` and `WindowWidth` (0028,1050 and
+0028,1051). Any `WindowCenterWidthExplanation` or `VOILUTSequence` in the file is removed,
+because it would conflict with the chosen window. The pixel values are not changed, so the
+window can still be adjusted on Radiopaedia.
 
-The chosen window is written to `WindowCenter` / `WindowWidth` (0028,1050 / 0028,1051), and
-any `WindowCenterWidthExplanation` or `VOILUTSequence` that would contradict it is dropped.
-**The pixels themselves are untouched**, so the upload keeps its original values and a
-reader on Radiopaedia can still re-window it.
+## Compressed images
 
-## Erasing or cropping a compressed image
+You can erase and crop compressed images (JPEG, JPEG-LS, JPEG 2000, HTJ2K and lossless JPEG).
+To do so, the app decodes the image and uploads it uncompressed, so the file is larger: the
+test image in the repository grows from 49 kB to 768 kB. Cropping reduces the size, but the
+file is still uncompressed.
 
-Both work, and both change the file that gets uploaded. Nothing can be painted into or cut
-out of a bitstream, so a JPEG, JPEG-LS, JPEG 2000, HTJ2K or lossless-JPEG image with a box
-on it, or a rectangle kept out of it, is decoded and written out as plain uncompressed
-samples. Expect it to be several times the size of the original — the test pattern in the
-repository goes from 49 kB to 768 kB. Cropping claws some of that back, but not the
-compression.
+An image with no erased area and no crop is uploaded unchanged. A crop that covers the whole
+image counts as no crop.
 
-An image with no box on it and no crop is uploaded exactly as it arrived. A crop dragged out
-to the edges counts as no crop: it is dropped rather than spent decoding a file to produce
-the bytes it already had.
-
-Every compression DICOM has is read here, RLE and **video** included — MPEG-2, MPEG-4 and
-HEVC are decoded into their frames, which can be scrubbed, erased and cropped like any cine.
-A banner written across the top of an ultrasound clip is the reason that matters.
+DICOM video (MPEG-2, H.264 and HEVC) is decoded into frames, which you can erase and crop like
+any other images. Each video frame is uploaded as JPEG, after erasing and cropping.
