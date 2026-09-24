@@ -123,10 +123,11 @@ uploaded patient data are suspended. The output satisfies that validator —
 UIDs are rewritten into the required `1.2.826.0.1.3680043.10.341.512.…` hashed scheme.
 
 Every build carries **ffmpeg** to decode DICOM video — a separate program the app runs, not
-code linked into it — from [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static),
-pinned by hash. Its licence file ships beside it, in `ffmpeg/LICENSE` among the installed
-app's resources — LGPL-2.1+ for the macOS builds and GPL-3.0 for the others, as those files
-state — and its source is at [ffmpeg.org](https://ffmpeg.org/download.html).
+code linked into it — pinned by hash: from [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static)
+on macOS and Windows, and from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds)
+(LGPL) on Linux. Its licence file ships beside it, in `ffmpeg/LICENSE` among the installed
+app's resources — LGPL-2.1+ for the macOS and Linux builds and GPL-3.0 for Windows, as those
+files state — and its source is at [ffmpeg.org](https://ffmpeg.org/download.html).
 
 The DICOM fixtures under `src/main/anon/__fixtures__/` come from that same repository. The
 video fixtures under `src/main/codecs/__fixtures__/` are drawn by `scripts/videoFixtures.mjs`. The

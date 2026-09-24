@@ -181,9 +181,11 @@ export async function decodeVideo(
   child.stderr.on('data', (chunk: Buffer) => {
     stderr = (stderr + chunk.toString()).slice(-4000)
   })
-  const exited = new Promise<number>((resolve, reject) => {
+  // A crash has no exit code, only a signal — and says nothing on stderr, so
+  // the signal is the whole of the evidence and goes into the error.
+  const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
     child.on('error', reject)
-    child.on('close', (code) => resolve(code ?? -1))
+    child.on('close', (code, signal) => resolve({ code, signal }))
   })
   // Awaited below on the way out; a throw before then must not leave it unheard.
   exited.catch(() => {})
@@ -219,8 +221,11 @@ export async function decodeVideo(
         frames++
       }
     }
-    const code = await exited
-    if (code !== 0) throw new Error(`The video could not be decoded: ${stderr.trim() || `ffmpeg exited with ${code}`}`)
+    const { code, signal } = await exited
+    if (code !== 0) {
+      const how = signal ? `ffmpeg was stopped by ${signal}` : `ffmpeg exited with ${code}`
+      throw new Error(`The video could not be decoded: ${stderr.trim() || how}`)
+    }
     if (remaining > 0) throw new Error('The video stream ends in the middle of a frame')
     if (frames === 0) throw new Error('The video stream holds no frames')
   } catch (error) {

@@ -209,12 +209,20 @@ npm run ffmpeg -- linux x64    # one
 ```
 
 DICOM video — MPEG-2, H.264, HEVC — is decoded by **ffmpeg**, which no WASM codec here
-replaces and which every installer therefore carries: 45 to 80 MB unpacked, about 25 MB on a
-compressed installer. [Why ffmpeg and not Chromium's decoders](/internals/architecture#video).
+replaces and which every installer therefore carries: 45 to 110 MB unpacked, about 25 MB
+on a compressed macOS or Windows installer and 45 MB on a Linux one. [Why ffmpeg and not Chromium's decoders](/internals/architecture#video).
 
-The binaries are [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static)'s,
-and `scripts/ffmpeg.mjs` pins them twice: by release, and by the SHA-256 of each unzipped
-binary and of its licence. A download that hashes differently is refused rather than
+The macOS and Windows binaries are [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static)'s;
+the Linux ones are [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds)' LGPL builds,
+pinned to a **month-end** autobuild, which BtbN keeps for about two years where the daily
+ones go in a fortnight. Linux used to be ffmpeg-static's too, and its x64 build crashed —
+a segfault in the demuxer, exit 139, nothing on stderr — on any MPEG-TS input on AMD EPYC,
+while the same file decoded on an Intel Xeon. MPEG-TS is the container H.264 is most often
+written in, so that was every such clip on half the Linux machines; the CPU dependence is why
+it took a matrix of runners to see, and why a new build is tried on both before it is pinned.
+
+`scripts/ffmpeg.mjs` pins every one by release and by SHA-256 — of a tar.xz before anything
+is unpacked from it, then of the binary and of its licence. A download that hashes differently is refused rather than
 shipped — this is an executable the app runs on patient data, and one that changed under a
 fixed release name is not one anybody looked at. They land in `node_modules/.cache/ffmpeg/`,
 which git ignores and nothing syncs, and the dist scripts fetch them before electron-builder
@@ -231,8 +239,8 @@ clip someone opens.
 The licence file travels beside the binary. ffmpeg is a separate program the app runs, not
 code linked into it; the source is at [ffmpeg.org](https://ffmpeg.org/download.html).
 
-Moving to a newer build is: a new `RELEASE`, new hashes — download, `gunzip`, `shasum -a 256`
-for each of the five — and a run of the tests, which decode real streams in every container
+Moving to a newer build is: new URLs and new hashes for each of the five, a run of the
+tests on every runner the install job uses — AMD and Intel x64, and arm64 — which decode real streams in every container
 the standard allows through it. The fixtures they decode are drawn by
 `scripts/videoFixtures.mjs`, never taken from a real clip.
 
