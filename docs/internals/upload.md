@@ -1,14 +1,14 @@
 # Why upload goes through S3
 
-`POST /api/v1/cases/:id/studies/:id/images` accepts a zip, and it looks like the obvious
-route. It is the wrong one for this app.
+Radiopaedia's API has an endpoint that accepts a zip file,
+`POST /api/v1/cases/:id/studies/:id/images`, but the app does not use it.
 
-Radiopaedia rebuilds the series from the DICOM identifiers in that zip. Anonymisation
-regenerates UIDs deterministically, so every stack cut out of one original series still
-shares its `SeriesInstanceUID` — the zip route would merge the stacks back together and
-undo the entire point of [splitting them](/internals/splitting).
+With a zip, Radiopaedia rebuilds the series from the DICOM UIDs in the files. Anonymisation
+replaces UIDs with hashed values, and the same original UID always gives the same new UID, so
+all stacks split from one series still share its `SeriesInstanceUID`. Uploaded as a zip, they
+would be merged back into one series, and the [splitting](/internals/splitting) would be lost.
 
-So the app uses the route that states series membership explicitly:
+The app therefore uses the upload route in which it states which files form each series:
 
 ```mermaid
 sequenceDiagram
@@ -21,58 +21,52 @@ sequenceDiagram
   App->>Radiopaedia: POST /image_preparation/:caseId/studies/:studyId/series<br/>(ordered upload ids)
 ```
 
-Steps 1 and 3 live at the **site root**, not under `/api/v1/`.
+The first and last calls are at the root of the site, not under `/api/v1/`.
 
-A presigned URL lasts 15 minutes, and S3 checks that when a PUT starts, not when it ends.
-Four at a time does not keep a big series inside that window — on a slow line the bandwidth
-is the limit, not the concurrency, and a cine decoded out of its JPEG can be a gigabyte — so
-once the URLs are ten minutes old, the files not yet started are signed again. A `403` from
-S3 gets one fresh URL for that file; a second refusal is not about age.
+A presigned URL is valid for 15 minutes, and S3 checks it when a PUT starts. On a slow
+connection a large series can take longer than that, for example a cine that is about 1 GB
+after decoding. The app therefore requests new URLs for the files not yet started once the
+URLs are ten minutes old. If S3 answers a PUT with `403`, the app requests a new URL for that
+file once; a second `403` is treated as an error.
 
 ## When something fails
 
-Asking for URLs and putting bytes at one are safe to repeat, and both are tried up to four
-times, backing off, on a dropped connection, a server error or a rate limit. Anything else —
-a `400`, a refusal — is the request being wrong, and is not sent again.
+Requesting URLs and uploading a file to S3 can safely be repeated. Both are retried up to four
+times, with increasing delays, when the connection drops, the server returns an error, or the
+request is rate-limited. Other errors, such as `400`, are not retried.
 
-Creating the case, creating a study and attaching a series are **not** safe to repeat: a
-request that reached the server and lost its answer would be made twice. So they are never
-retried. Instead the app records each one as it is done, and when an upload stops partway,
-pressing **Upload to Radiopaedia** again carries on in the case it created — the studies it
-made are reused, the series already attached are skipped, and the one that stopped is sent
-again. That costs little: whatever reached S3 the first time comes back as already uploaded.
+Creating the case, creating a study and attaching a series cannot safely be repeated: if a
+request reached the server but the response was lost, repeating it would create a duplicate.
+These calls are never retried. Instead, the app records each one after it succeeds. If an
+upload stops partway, clicking **Upload to Radiopaedia** again continues in the same case: it
+reuses the studies already created, skips the series already attached, and sends the
+interrupted series again. Files that already reached S3 are reported as already uploaded and
+are not sent again.
 
-Without that, a failure left a draft holding half the case, taking a slot of the quota, and
-the second attempt made another. The record is forgotten when the selection changes, when
-the case is no longer a draft, and when the upload finishes.
+Without this, a failed upload left a partial draft case that counted towards the quota, and
+the next attempt created a second case. The record is cleared when the selection changes,
+when the case is no longer a draft, and when the upload finishes.
 
-## Series order is post order
+## Series order
 
-The series endpoint takes `image_format`, `series.root_index` and the list of upload ids.
-There is no position in it, and no endpoint to reorder a case afterwards — so the order the
-series appear in is the order they were posted in, one at a time, and that is the only lever
-there is. It is why the picker lets a series be
-[moved past its neighbour](/guide/choose): the order left there is the order that ships.
+The series endpoint takes `image_format`, `series.root_index` and the ordered list of upload
+ids. It has no position parameter, and the API cannot reorder the series of a case afterwards,
+so series appear in the order they are posted. This is why the picker lets you
+[reorder series](/guide/choose#changing-the-order-of-series) before upload.
 
-`root_index` is not that lever. It is 0-based and picks which frame of the series is shown
-as its thumbnail; the middle one is the useful default, and for a single image it has to
-be 0.
+`root_index` does not affect the order. It is the 0-based index of the frame shown as the
+series thumbnail. The app uses the middle image, or 0 for a single image.
 
-## The step this app does not take
+## Cases are not marked as finished
 
-There is a fourth call in the API — `PUT /api/v1/cases/:id/mark_upload_finished` — and this
-app has never made it. The reference explains it as *"To prevent conflicts between edits via
-API and via the main site, cases cannot be edited on the site until they are marked 'upload
+The API has one more call, `PUT /api/v1/cases/:id/mark_upload_finished`, which the app does
+not make. The API reference describes it as: *"To prevent conflicts between edits via API and
+via the main site, cases cannot be edited on the site until they are marked 'upload
 finished'."*
 
-It is left alone on purpose, for two reasons.
-
-Every case this app uploads **has** to be edited on Radiopaedia afterwards, because plane
-and sequence type have no API parameter at all and are tagged on the site. That editing has
-worked on every case, unmarked, so whatever the flag guards, it is not stopping the one
-thing this app depends on.
-
-And a case that is never marked stays a **draft**, which is what
-[adding images to it later](/guide/upload) requires. Marking it might do more than unlock
-editing — that is not documented clearly enough to risk on a real case — and publishing one
-by accident cannot be undone.
+The app does not call it for two reasons. Every case uploaded with the app has to be edited
+on Radiopaedia afterwards, because plane and sequence type cannot be set through the API,
+and this editing has worked on every case without the call. And a case that is not marked
+stays a draft, which is needed to [add images to it later](/guide/upload#where-the-images-go).
+The documentation does not say clearly whether marking a case does more than allow editing,
+and publishing a case by mistake cannot be undone.
