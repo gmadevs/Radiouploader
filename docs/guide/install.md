@@ -117,7 +117,8 @@ Your tokens are stored encrypted in the system keychain: Keychain on macOS, libs
 Linux and DPAPI on Windows.
 
 After you sign in, the header shows your username and how many of your draft cases are in
-use. When the draft quota is full, the app does not let you import a new study for a new case.
+use. When the draft quota is full, you can still import a study and add it to a draft you
+already have, but you cannot create a new case.
 
 If the app shows **Radiopaedia credentials aren't set yet**, click **Enter credentials** to
 open the sign-in panel. To sign out, click your account name in the header, then **Sign out**.

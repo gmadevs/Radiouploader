@@ -2,31 +2,38 @@
 
 ![The first screen](/shots/01-source.png)
 
-Drop a folder, a zip, or a handful of files onto the window — or use **Choose folder** /
-**Choose zip**. Zips are expanded into a session temp directory; subfolders are walked, so
-pointing at the root of a burned CD is fine. A zip that would unpack to more than the disk
-has free, with half a gigabyte to spare, is refused before anything is written, and says how
-much it needs — unzip it somewhere with room and choose the folder instead.
+Sign in to Radiopaedia first: the app does not import a study until you are signed in (see
+[install and sign in](/guide/install#sign-in)).
 
-Nothing is sent anywhere at this stage. Reading, previewing and anonymising all happen on
-your machine, and the only network call in the whole app is the upload itself.
+Drop a folder, a zip file or a set of DICOM files onto the window, or use **Choose folder**
+or **Choose zip**. The app reads subfolders too, so you can choose the top folder of a CD or
+DVD export.
 
-## What gets rejected
+A zip file is extracted into a temporary folder. If extracting it would leave less than about
+500 MB of free disk space, the app refuses the zip before extracting anything and shows how
+much space it needs. In that case, extract the zip yourself somewhere with more
+space and choose the folder.
 
-Files that are not DICOM are skipped silently — a study folder is full of `DICOMDIR`,
-viewer executables and readme files, and none of them are worth a warning.
+Nothing is sent to Radiopaedia while you import, review and anonymise. The app only connects
+to the internet to sign in, to list your draft cases, to upload, and at launch to check
+GitHub for a newer version (which you can turn off in **Info**).
 
-Objects that *are* DICOM but carry no pixel data are rejected at ingest, so they never
-appear as a series you could pick: presentation states, structured reports, Philips Raw
-Data Storage. Anything else that fails to parse is counted and reported at the top of the
-next screen.
+## Files that are skipped
 
-## What it reads, and why now
+Files that are not DICOM, such as `DICOMDIR`, viewer programs and readme files, are skipped
+without a message.
 
-Ingest reads metadata from the **originals**, before anonymisation, because anonymisation
-destroys most of it — b-values live in private tags, and `StudyDate` is blanked. This is
-the constraint the whole pipeline is arranged around, explained in
+DICOM objects without pixel data, such as presentation states, structured reports and
+Philips raw data, are also skipped, so they never appear as series. Files that cannot be
+read at all are counted, and the count is shown at the top of the next screen.
+
+## What the app reads from the files
+
+The app reads the DICOM tags from the original files, before anonymisation. Anonymisation
+removes most of them: b-values are often in private tags, and `StudyDate` is cleared. The
+app needs them to split series and to order studies; see
 [splitting before anonymisation](/internals/splitting).
 
-One Radiopaedia study is created per DICOM study, ordered oldest first. Only the *interval*
-between them survives to the upload, pre-filled as "Baseline", "3 months later" and so on.
+Each DICOM study becomes one study in the Radiopaedia case, oldest first. The dates are not
+uploaded. Instead, each study gets a caption with the interval from the first one, such as
+"Baseline" or "3 months later", which you can edit before uploading.
