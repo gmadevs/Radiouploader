@@ -61,9 +61,13 @@ with the patient's name across the top needs.
 
 What that costs:
 
-- **Size.** The frames go up uncompressed, where the video held differences between them: a
-  few megabytes of clip can be hundreds of megabytes of frames, on the upload and on the disk
-  while the session is open — a 300-frame clip at 1024×768 is about 700 MB decoded.
+- **Size.** Each frame goes up as its own JPEG, at quality 95, once the mask and the crop are
+  in it — a 300-frame clip at 1024×768 went up as 28 MB, where plain samples would have been
+  700 MB. That is a second lossy compression on a picture the video had already compressed,
+  and it does not show; nothing that was lossless goes through it. While the session is open
+  the decoded clip does sit on disk uncompressed, about 700 MB for that same clip.
+- **Time.** Compressing the frames is most of the anonymising: about 18 seconds for those
+  300 frames.
 - **Time to open.** A video cannot be read a frame at a time, so the first look at one
   decodes all of it; a few seconds for a long clip, and every frame after that is immediate.
 - **Only the pictures.** An audio track, a second view of a stereo clip and the frame rate

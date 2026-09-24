@@ -18,6 +18,7 @@ import {
 } from '@shared/dicomImage'
 import type { AnonWarning, CropRect, MaskRect, WindowLevel } from '@shared/types'
 import { canDecode, decodeEncapsulatedFrame, type DecodedSamples } from '../codecs/decode'
+import { encodeJpegRgb } from '../codecs/encode'
 import { encodedFrame } from '../codecs/frames'
 import { isVideoSyntax, readVideoFrame, type DecodedVideo } from '../codecs/video'
 
@@ -71,6 +72,7 @@ const META_SOURCE_TAGS = ['00020016', '00020017', '00020018']
 
 const EXPLICIT_VR_BIG_ENDIAN = '1.2.840.10008.1.2.2'
 const EXPLICIT_VR_LITTLE_ENDIAN = '1.2.840.10008.1.2.1'
+const JPEG_BASELINE = '1.2.840.10008.1.2.4.50'
 
 /** Warning levels below this are noise for a case uploader. */
 const WARNING_LEVEL_FLOOR = 3
@@ -235,6 +237,32 @@ function anonymiseMeta(meta: Dict, originalUid: string | undefined, anonymised: 
   if (uid === undefined) delete meta['00020003']
   else meta['00020003'] = { vr: 'UI', Value: [uid] }
   for (const tag of META_SOURCE_TAGS) delete meta[tag]
+}
+
+/**
+ * Put a frame of a video back as JPEG baseline, once the mask and the crop are
+ * in its samples — see codecs/encode.ts for why and at what quality. The tags
+ * that describe the pixels say what the JPEG holds: full-resolution YCbCr,
+ * eight bits, and lossy, which the video already was.
+ */
+async function writeJpegFrame(message: { meta?: Dict }, dict: Dict, geometry: PixelGeometry): Promise<void> {
+  const samples = new Uint8Array(dict['7FE00010'].Value[0] as ArrayBuffer)
+  const jpeg = await encodeJpegRgb(samples, geometry.columns, geometry.rows)
+  // A fragment is an even number of bytes; a JPEG ends where its EOI marker
+  // says, so the padding after it is never read.
+  const fragment = new Uint8Array(jpeg.length + (jpeg.length % 2))
+  fragment.set(jpeg)
+
+  if (message.meta) message.meta['00020010'] = { vr: 'UI', Value: [JPEG_BASELINE] }
+  dict['7FE00010'] = { vr: 'OB', Value: [fragment.buffer] }
+  dict['00280002'] = { vr: 'US', Value: [3] }
+  dict['00280004'] = { vr: 'CS', Value: ['YBR_FULL'] }
+  dict['00280006'] = { vr: 'US', Value: [0] }
+  dict['00280100'] = { vr: 'US', Value: [8] }
+  dict['00280101'] = { vr: 'US', Value: [8] }
+  dict['00280102'] = { vr: 'US', Value: [7] }
+  dict['00280103'] = { vr: 'US', Value: [0] }
+  dict['00282110'] = { vr: 'CS', Value: ['01'] }
 }
 
 /** Pixel data is stored as written, so masks need the file's byte order. */
@@ -534,6 +562,9 @@ export async function anonymiseFile(
         else delete dict['00200032']
       }
     }
+
+    // Last of all the pixel work: what is compressed is what was kept.
+    if (isVideo) await writeJpegFrame(message, dict, geometry)
 
     // The window the file itself asks for is left alone unless one was chosen
     // in the viewer — except on an enhanced frame, whose own window is in a

@@ -66,8 +66,14 @@ cannot have its frames cut out of a bitstream by offset either.
 
 Video — MPEG-2, H.264, HEVC — is always rewritten, even a clip of one frame: a video stream
 is not an image Radiopaedia shows. Its frames are decoded whole by ffmpeg in the main process
-before the anonymiser's worker starts, and each is written out like a frame of any other
-run. Only a format with no decoder at all is refused.
+before the anonymiser's worker starts, masked and cropped like a frame of any other run, and
+then — last of all the pixel work — compressed again as **JPEG baseline** at quality 95,
+YBR_FULL, with `LossyImageCompression` set, by libjpeg-turbo's WASM encoder
+(`src/main/codecs/encode.ts`). Plain samples made a few megabytes of clip into hundreds;
+the frames were lossy already, so a second, invisible loss is the better trade. Only video
+goes through it: a lossless original is never recompressed. A test re-runs the anonymiser
+on such a file and checks it changes nothing, since that is what Radiopaedia does with every
+upload. Only a format with no decoder at all is refused.
 
 ## Layouts that are refused
 

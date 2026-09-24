@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url'
 import dicomParser from 'dicom-parser'
 import * as dcmio from 'dicomanon'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { parseHeader } from '@shared/dicomImage'
 import { anonymiseFile } from '../anon/anonymise'
+import { decodeEncapsulatedFrame } from './decode'
 import { decodeVideoFile, ffmpegVersion, isVideoSyntax, readVideoFrame, videoBitstream } from './video'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -165,7 +167,18 @@ describe('decodeVideoFile', () => {
 })
 
 describe('anonymiseFile — video', () => {
-  it('splits a video into single frames, blanked where it was masked, as plain RGB', async () => {
+  /** The frame an output file holds, decoded by the app's own path as a viewer would. */
+  async function pictureOf(file: string): Promise<Uint8Array> {
+    const bytes = new Uint8Array(await fs.readFile(file))
+    const ds = dicomParser.parseDicom(bytes)
+    const element = ds.elements.x7fe00010
+    const encoded = dicomParser.readEncapsulatedPixelDataFromFragments(ds, element, 0, element.fragments!.length)
+    const decoded = await decodeEncapsulatedFrame(encoded, parseHeader(bytes))
+    expect(decoded.photometric).toBe('RGB')
+    return decoded.bytes
+  }
+
+  it('splits a video into single JPEG frames, blanked where it was masked', async () => {
     const source = await videoDicom('video-h264.mpegts', '1.2.840.10008.1.2.4.102')
     const video = await decodeVideoFile(source, path.join(dir, 'anon.rgb'), { rows: HEIGHT, columns: WIDTH })
     // The top eighth, where a machine writes the patient's name.
@@ -180,21 +193,40 @@ describe('anonymiseFile — video', () => {
 
     for (const [frame, result] of results.entries()) {
       const ds = dicomParser.parseDicom(new Uint8Array(await fs.readFile(result.outputPath)))
-      // A picture Radiopaedia can show, rather than a video stream it cannot.
-      expect(ds.string('x00020010')).toBe('1.2.840.10008.1.2.1')
-      expect(ds.string('x00280004')).toBe('RGB')
+      // A picture Radiopaedia can show, rather than a video stream it cannot,
+      // and a small one: a frame is kilobytes, where plain samples were 9 kB
+      // here and two megabytes at an ultrasound's size.
+      expect(ds.string('x00020010')).toBe('1.2.840.10008.1.2.4.50')
+      expect(ds.string('x00280004')).toBe('YBR_FULL')
+      expect(ds.string('x00282110')).toBe('01')
       expect(ds.string('x00280008')).toBe('1')
       expect(ds.uint16('x00280002')).toBe(3)
       expect(ds.string('x00200013')).toBe(String(frame + 1))
-      const element = ds.elements.x7fe00010
-      expect(element.length).toBe(WIDTH * HEIGHT * 3)
-      const bytes = new Uint8Array(ds.byteArray.buffer, ds.byteArray.byteOffset + element.dataOffset, element.length)
-      // The strip is gone; the red below it is not.
-      expect(pixel(bytes, 32, 3)).toEqual([0, 0, 0])
+      expect(result.byteLength).toBeLessThan(WIDTH * HEIGHT * 3)
+
+      // The mask went into the samples before the JPEG did: the strip is black
+      // and stays black through the compression; the red below it is still red.
+      const bytes = await pictureOf(result.outputPath)
+      expect(Math.max(...pixel(bytes, 32, 3))).toBeLessThan(12)
       expect(pixel(bytes, 10, 30)[0]).toBeGreaterThan(180)
+      expect(pixel(bytes, 54, 30)[2]).toBeGreaterThan(180)
     }
     // Twelve different pictures, so S3 keeps twelve.
     expect(new Set(results.map((r) => r.sha256)).size).toBe(FRAMES)
+  })
+
+  it('writes a file Radiopaedia’s re-run of the anonymiser leaves byte for byte alone', async () => {
+    // Radiopaedia anonymises every upload again with the same library and
+    // refuses a file it would change. Encapsulated pixel data is the part of a
+    // file most likely to be written differently the second time.
+    const source = await videoDicom('video-h264.mp4', '1.2.840.10008.1.2.4.102')
+    const video = await decodeVideoFile(source, path.join(dir, 'rerun.rgb'), { rows: HEIGHT, columns: WIDTH })
+    const [result] = await anonymiseFile(source, dir, [{ frame: 3, outputName: 'rerun.dcm', instanceNumber: 1 }], video)
+
+    const written = await fs.readFile(result.outputPath)
+    const message = dcmio.Message.readFile(written.buffer.slice(written.byteOffset, written.byteOffset + written.byteLength) as ArrayBuffer)
+    message.dict = dcmio.Anonymize(message.dict as never) as never
+    expect(Buffer.from(message.write()).equals(written)).toBe(true)
   })
 
   it('reads an HEVC file too, whose syntax the anonymiser does not list as encapsulated', async () => {
@@ -208,8 +240,8 @@ describe('anonymiseFile — video', () => {
     )
     for (const result of results) {
       const ds = dicomParser.parseDicom(new Uint8Array(await fs.readFile(result.outputPath)))
-      expect(ds.string('x00020010')).toBe('1.2.840.10008.1.2.1')
-      expect(ds.elements.x7fe00010.length).toBe(WIDTH * HEIGHT * 3)
+      expect(ds.string('x00020010')).toBe('1.2.840.10008.1.2.4.50')
+      expect(pixel(await pictureOf(result.outputPath), 10, 30)[0]).toBeGreaterThan(180)
     }
   })
 
