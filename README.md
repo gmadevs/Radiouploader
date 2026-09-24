@@ -22,18 +22,22 @@
 
 </div>
 
-A desktop app for preparing and uploading cases to [Radiopaedia.org](https://radiopaedia.org).
+A desktop app for preparing DICOM studies and uploading them to
+[Radiopaedia.org](https://radiopaedia.org) as draft cases.
 
-Point it at a folder, a zip or a handful of DICOM files. It reads the study, splits the
-series that contain more than one acquisition — multiphase, diffusion, SWI — lets you pick
-what to keep, blank out any text burnt into the pixels, crop away the margins and set the
-contrast, anonymises
-everything with Radiopaedia's reference anonymiser, and uploads the result as a draft case.
+The app accepts a folder, a zip file or a set of DICOM files. It:
 
-Before it anonymises it looks through the images for burnt-in banners and rings what it
-finds. It finds the obvious ones, and it never reports a selection as clean.
+- reads the study and splits series that contain more than one acquisition, such as
+  multiphase, diffusion or SWI;
+- lets you choose which series to upload, blank out burnt-in text, crop the images and set
+  the window;
+- marks areas that look like burnt-in text before anonymising (it finds large banners and
+  can miss small or faint text, so check every image yourself);
+- anonymises the files with Radiopaedia's reference anonymiser and uploads them as a draft
+  case.
 
-Runs on macOS, Linux and Windows.
+It also reads DICOM video (MPEG-2, H.264 and HEVC) and can add coronal, sagittal and MIP
+reformats to a case. It runs on macOS, Linux and Windows.
 
 > Unofficial. Not affiliated with or endorsed by Radiopaedia.org.
 
@@ -41,8 +45,8 @@ Runs on macOS, Linux and Windows.
 
 <!-- downloads: npm run links -->
 
-Version **1.5.1**. Nothing is signed, so the first launch needs one extra step per
-platform: [how to open it](https://gmadevs.github.io/Radiouploader/guide/install).
+Version **1.5.1**. The installers are not signed, so the first launch needs one extra step
+on each platform: [how to open it](https://gmadevs.github.io/Radiouploader/guide/install).
 
 | | Also built |
 |---|---|
@@ -50,24 +54,23 @@ platform: [how to open it](https://gmadevs.github.io/Radiouploader/guide/install
 | [![Linux](https://img.shields.io/badge/Linux-AppImage%20x64-FCC624?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.1/Radiouploader-1.5.1.AppImage) | AppImage arm64: [.AppImage](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.1/Radiouploader-1.5.1-arm64.AppImage) · Debian amd64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.1/radiouploader_1.5.1_amd64.deb) · Debian arm64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.1/radiouploader_1.5.1_arm64.deb) |
 | [![Windows](https://img.shields.io/badge/Windows-x64%20installer-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.1/Radiouploader.Setup.1.5.1.exe) |  |
 
-🍺 On macOS, with Homebrew — the second line because the app is not signed and
-Homebrew quarantines what it downloads:
+On macOS you can also install it with Homebrew. The second command removes the quarantine
+flag Homebrew adds to downloads, which macOS would otherwise use to block the unsigned app:
 
 ```bash
 brew install --cask gmadevs/radiouploader/radiouploader
 xattr -dr com.apple.quarantine /Applications/Radiouploader.app
 ```
 
-and to move an install already there onto this version — the app says so itself at
-launch, and the second line is there because a cask upgrade re-quarantines what it
-downloads:
+To update a Homebrew install (the app tells you at launch when a new version is out), run
+the second command again, because Homebrew adds the flag to every download:
 
 ```bash
 brew upgrade --cask radiouploader
 xattr -dr com.apple.quarantine /Applications/Radiouploader.app
 ```
 
-Older versions, and the notes that come with each, are on the [releases page](https://github.com/gmadevs/Radiouploader/releases).
+Older versions and their release notes are on the [releases page](https://github.com/gmadevs/Radiouploader/releases).
 
 <!-- /downloads -->
 
@@ -81,8 +84,8 @@ Older versions, and the notes that come with each, are on the [releases page](ht
 |---|---|
 | [Install and sign in](https://gmadevs.github.io/Radiouploader/guide/install) | registering an OAuth application, first launch on each platform |
 | [Using it](https://gmadevs.github.io/Radiouploader/guide/import) | the whole wizard, screen by screen |
-| [How it works](https://gmadevs.github.io/Radiouploader/internals/architecture) | the pipeline, the process split, why the order is what it is |
-| [Known limitations](https://gmadevs.github.io/Radiouploader/limitations) | what it does not do yet, and why |
+| [How it works](https://gmadevs.github.io/Radiouploader/internals/architecture) | how the app is structured, and the order it processes images in |
+| [Known limitations](https://gmadevs.github.io/Radiouploader/limitations) | what the app does not do |
 
 ## Development
 
@@ -96,40 +99,41 @@ npm run docs:dev   # the documentation site, locally
 npm run lab        # a throwaway Windows or Ubuntu desktop on EC2, to try an installer on
 ```
 
-Before a release is drafted, every installer it will offer is installed the way a user would
-install it — on macOS, Windows, Ubuntu and bare Debian and Ubuntu images — and the app is
-opened from where the install left it, then removed:
+Before a release is drafted, CI installs each installer on macOS, Windows, Ubuntu and clean
+Debian and Ubuntu images, opens the installed app and removes it again. See
 [installing what was built](https://gmadevs.github.io/Radiouploader/develop/packaging#installing-what-was-built).
 
 More in [build and run](https://gmadevs.github.io/Radiouploader/develop/build).
 
 ## Security
 
-Found a way this app could leak patient data, or a hole in how it keeps credentials? Report
-it privately — [SECURITY.md](SECURITY.md) says how, and what not to attach to a report.
+If you find a way the app could leak patient data or expose credentials, report it
+privately as described in [SECURITY.md](SECURITY.md), which also lists what not to attach
+to a report.
 
 ## Licence
 
 AGPL-3.0-only.
 
-This app links [radiopaedia/dicom-anonymiser](https://github.com/radiopaedia/dicom-anonymiser),
-which is AGPL-3.0-only, so the combined work is too. If you distribute a build, publish the
-source.
+The app includes [radiopaedia/dicom-anonymiser](https://github.com/radiopaedia/dicom-anonymiser),
+which is licensed AGPL-3.0-only, so the app is too. If you distribute a build, you must also
+publish its source.
 
-Using their reference anonymiser is not just convenient: Radiopaedia re-runs it on every
-uploaded DICOM and rejects the file if any tag would change, and API clients found to have
-uploaded patient data are suspended. The output satisfies that validator —
-`PatientIdentityRemoved` is set to `YES`, `SOPInstanceUID` is removed entirely, and the
-UIDs are rewritten into the required `1.2.826.0.1.3680043.10.341.512.…` hashed scheme.
+The app uses Radiopaedia's reference anonymiser because Radiopaedia runs the same anonymiser
+on every uploaded DICOM file and rejects files it would change. API clients that upload
+patient data are suspended. The anonymiser sets `PatientIdentityRemoved` to `YES`, removes
+`SOPInstanceUID` and replaces the other UIDs with hashed values in the
+`1.2.826.0.1.3680043.10.341.512.…` scheme.
 
-Every build carries **ffmpeg** to decode DICOM video — a separate program the app runs, not
-code linked into it — pinned by hash: from [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static)
-on macOS and Windows, and from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds)
-(LGPL) on Linux. Its licence file ships beside it, in `ffmpeg/LICENSE` among the installed
-app's resources — LGPL-2.1+ for the macOS and Linux builds and GPL-3.0 for Windows, as those
-files state — and its source is at [ffmpeg.org](https://ffmpeg.org/download.html).
+Every build includes ffmpeg, which the app runs as a separate program to decode DICOM video.
+The binaries are pinned by hash. They come from
+[eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static) on macOS and Windows
+and from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) (LGPL) on Linux. The
+licence file is installed next to the binary, in `ffmpeg/LICENSE` among the app's resources:
+LGPL-2.1+ for the macOS and Linux builds and GPL-3.0 for Windows. The ffmpeg source is at
+[ffmpeg.org](https://ffmpeg.org/download.html).
 
-The DICOM fixtures under `src/main/anon/__fixtures__/` come from that same repository. The
-video fixtures under `src/main/codecs/__fixtures__/` are drawn by `scripts/videoFixtures.mjs`. The
-sample study the screenshots are taken on is generated, not real — see
-[screenshots](https://gmadevs.github.io/Radiouploader/develop/screenshots).
+The DICOM fixtures in `src/main/anon/__fixtures__/` come from the
+radiopaedia/dicom-anonymiser repository. The video fixtures in `src/main/codecs/__fixtures__/`
+are generated by `scripts/videoFixtures.mjs`, and the sample study used for the screenshots
+is generated too; see [screenshots](https://gmadevs.github.io/Radiouploader/develop/screenshots).
