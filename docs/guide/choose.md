@@ -2,131 +2,105 @@
 
 ![The review step](/shots/02-review.png)
 
-Every study is listed oldest first as a **strip that scrolls sideways**, each series a group
-within it, each **stack** a card with a scrubbable preview. A stack is a group of images
-that belong together as one thing to upload — usually the whole series, but a series that
-holds more than one acquisition is split into several.
+Each study is shown as a horizontal row, oldest study first. Within a study, each series has
+a heading, and each **stack** is a card with a preview. A stack is a set of images that is
+uploaded as one series. Usually a stack is a whole series; a series that contains more than
+one acquisition is split into several stacks.
 
-The strip is sideways because a study of thirty series is a row to run along rather than a
-page to scroll down, and because it keeps the series next to each other, which is where they
-can be compared. Groups keep their own heading, so **All**, **None** and **Keep one phase**
-stay with the series they act on.
+In the example above, the CT is one stack of 12 images. The diffusion series was split by
+b-value into `b=0` and `b=1000`, and its heading shows the badge **Split by b-value**.
 
-The example above shows both cases: the CT is one stack of 12 images, while the diffusion
-series arrived as one series and was split by b-value into `b=0` and `b=1000`, badged
-**Split by b-value**.
+The rows scroll sideways, so series stay next to each other and are easier to compare. The
+series heading stays with its cards, together with its **All**, **None** and (for split
+phases) **Keep one phase** buttons.
 
-Scrolling with the wheel or the trackpad over a card looks through its images. The page
-stays where it is while the pointer is over one, so a card can be scrubbed without the strip
-sliding out from under it.
+To look through a stack's images, scroll with the mouse wheel or trackpad over its card. The
+row does not move while the pointer is over a card.
 
-## Putting the series in order
+## Changing the order of series
 
-The arrows in a series heading move it past its neighbour, left or right along the strip.
-Series arrive in the order the scanner numbered them, which is the order they were acquired
-in and not always the order they are worth reading in — the localiser first and the sequence
-that shows the finding last.
+Use the arrows in a series heading to move it left or right. Series arrive in the order the
+scanner numbered them, which is the order they were acquired. You may want a different order
+for the case, for example the localiser first and the sequence that shows the finding last.
 
-**This is not decoration.** Radiopaedia's series endpoint has no position of its own, so the
-order the app posts them in is the order the case ends up with. What you leave the strip in
-is what a reader scrolls through.
+The order matters: Radiopaedia has no way to reorder series after upload, so the case keeps
+the order in which the app uploads them, which is the order shown here.
 
-Studies are ordered by date, oldest first, because the case is a timeline and the
-[interval between them](/guide/upload) is what carries the meaning. **Studies of the same
-day get arrows too** — and only between each other. Two exams of one morning are nought days
-apart whichever order they go in, so nothing but the clock says which came first: the app
-reads `StudyTime`, falls back to the earliest acquisition time, and where neither is there
-leaves the choice to you. Across days there are no arrows, because that order is not a
-preference.
+Studies are ordered by date, oldest first, and the interval between them becomes the
+[study caption](/guide/upload). Studies from different days cannot be moved. Studies from the
+same day have arrows too, and can be moved only among themselves. To order them, the app uses
+`StudyTime`, or the earliest acquisition time if there is no study time. If neither is
+present, the studies stay in the order they were read, and you can move them. When two studies
+share a date, their headings also show the time.
 
-When two studies share a date the heading shows the time as well, so what the app decided is
-visible rather than implied.
+You can also change the order by dragging the thumbnails in
+[the check before anonymising](/guide/check).
 
-The order can also be changed — by dragging, against the thumbnails — at
-[the check before anonymising](/guide/check), which is the last screen before the images are
-rewritten.
+## What a card shows
 
-## What a card says
+Below the preview, a card shows:
 
-Under the preview, in the order that decides whether a series is worth uploading:
+- **The number of images**, and how many are left after trimming.
+- **The plane, extent and spacing**, for example `Axial · 55 / 5 mm`: the plane in the
+  patient's axes, the distance the stack covers, and the distance between images. The spacing
+  is the median gap, so a stack with a missing slice still shows a spacing that occurs
+  between its images. A cine shows none of these, because all its frames are in the same
+  place.
+- **The size** of the stack and of one image. When a stack takes only some frames of a file
+  (a phase of an enhanced object, or one b-value), it is counted as that share of the file.
+- **The compression**, shown only for compressed images. A compressed image that you
+  [blank or crop](/guide/review) is uploaded uncompressed and becomes larger.
 
-- **How many images**, and how many are left after a trim.
-- **The plane and the reach** — `Axial · 55 / 5 mm`: the plane it was cut on named in the
-  patient's own axes, then how far the stack runs and how far apart its images are. The
-  spacing is the middle gap rather than the average one, so a stack with a slice missing
-  reports a spacing that a pair of its images actually has. A cine has none of this: its
-  frames are all in one place.
-- **What it weighs**, and what one image of it weighs. A stack that took only some of the
-  frames of a file — a phase out of an enhanced object, a b-value out of a run — is charged
-  that share of it, so the parts of a split file add up to the file rather than to a copy of
-  it each.
-- **The compression**, and only when there is one. Most exports are plain samples, and a
-  badge saying so on every card would cost a line to tell you nothing. A codec named here is
-  the series that will grow if you [blank or crop](/guide/review) it.
+Nothing is drawn over the preview, because patient banners are often in the top corners of
+an image. The **Open for review** and **Reformat** buttons are below the card and always
+visible.
 
-None of it is written over the image. The top corners of a thumbnail are where patient
-banners sit, and this is the app that must not cover one up — which is why **Open for
-review** and **Reformat** are a row of buttons under the card rather than a pair centred
-over the picture.
+## Selected and unselected stacks
 
-Both are there whether or not the pointer is on the card. The check before anonymising asks
-you to open anything that could carry text, and a button that appears only under the pointer
-is one that is not there at all for a reader following a screenshot, or for anyone tabbing
-through.
+A selected stack has a coloured border and a ticked box. Unselected stacks are shown at full
+brightness too, so that you can still see any text in them.
 
-## What a ticked card looks like
+## Default selection
 
-A stack that is going up carries an accent border and a ticked box. **The picture is at full
-brightness either way.** An unticked series is the one least likely to have been opened and
-looked at, so it is the last thing that should be dimmed: the banner you need to notice is
-often the reason to leave a series out, and half opacity is what stops it being read at all.
+When a series is split, some stacks are selected by default:
 
-## Defaults you can leave alone
+- phase, real and imaginary maps are **not** selected when a magnitude image is present;
+- in a diffusion series, the highest b-value and the ADC map are selected;
+- every time point of a dynamic series is selected.
 
-The common case is meant to need no clicking:
+To keep only one phase of a multiphase series, click **Keep one phase** in its heading. This
+selects the first phase and clears the others.
 
-- phase, real and imaginary maps are **off**
-- the highest b-value and the ADC map are **on**
-- **every** time point of a dynamic series stays on
-
-Dropping phases is a deliberate act rather than a silent default, which is why a multiphase
-series gets a **Keep one phase** button instead of arriving pre-trimmed.
-
-With a large export the fastest route is the opposite: **Deselect all**, then tick back the
-few series that matter.
+With a large export, it is often quicker to click **Deselect all** and then select the few
+series you need.
 
 ## Trimming
 
 ![The trim controls](/shots/03-trim.png)
 
-**Trim** chooses the first and last image to keep, so the localiser slices before the
-anatomy and the tail after it can go without deselecting the stack. Moving either handle
-jumps the preview to that image, and anything outside the range is dimmed and tagged *not
-uploaded*.
+**Trim** sets the first and last image to upload, so you can leave out, for example,
+localiser slices at the start and the end of a stack without leaving out the whole stack.
+Moving either handle shows that image in the preview. Images outside the range are dimmed and
+marked *not uploaded*. They are not processed or uploaded.
 
-Trimmed images are never decoded, written out or uploaded — trimming is not a display
-setting.
+To leave out a single image in the middle of a stack, open the stack and use **Drop image**
+in the viewer (see [review](/guide/review#drop-this-image)). The card shows both as
+`N of M images`, with the range and the number of dropped images.
 
-A single image in the middle of a stack is a different problem, and has
-[its own control in the viewer](/guide/review#drop-this-image). The card counts both the
-same way: `N of M images`, with the range and the number dropped beside it.
+## Formats
 
-## What the preview will and will not show
+The preview reads uncompressed DICOM and every still-image compression in DICOM: JPEG,
+lossless JPEG, JPEG-LS, JPEG 2000, HTJ2K and RLE. It also reads DICOM video (MPEG-2, H.264
+and HEVC). If an image cannot be read, the card shows the reason instead of the image.
 
-The preview decodes every still-image compression DICOM has — JPEG, lossless JPEG, JPEG-LS,
-JPEG 2000, HTJ2K and RLE — as well as uncompressed DICOM. Anything it cannot read shows the
-reason in place of the image rather than being mis-rendered.
+You can review, window, blank and crop a compressed image like any other. It is uploaded
+unchanged unless its pixels have to change: a blanked area, a crop, or a multiframe run
+being split into single images. In that case it is decoded first and uploaded uncompressed,
+so the file is larger. See [known limitations](/limitations).
 
-A compressed image can be reviewed, windowed, erased and cropped like any other. It is sent
-untouched unless something has to change its pixels — a blanked area, a crop, or a cine run
-being split — in which case it is decoded and uploaded uncompressed, which makes a larger
-file. See [known limitations](/limitations).
+A video is decoded into its frames, which you can review, blank and crop like any other run,
+and each frame is uploaded as JPEG. The first time you open a video takes a few seconds,
+because the whole video is decoded at once.
 
-A cine written as **video** — MPEG-2, MPEG-4 or HEVC — is decoded into its frames and
-reviewed, erased and uploaded like any other run; the card names the codec. The first look
-at one takes a moment, since a video cannot be read a frame at a time and is decoded whole
-([more](/limitations#a-dicom-video-goes-up-as-its-frames-not-as-a-video)).
-
-A run in a format the app cannot read at all says so in place of the tick, and the count
-beside *selected* tells you how many stacks are in that state, so a run cannot go missing
-from the case without having been mentioned.
+If a stack is in a format the app cannot read at all, the card says so instead of showing a
+tick box, and the number of such stacks is shown next to the number of selected stacks.
