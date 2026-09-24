@@ -229,7 +229,10 @@ export async function decodeVideo(
     if (remaining > 0) throw new Error('The video stream ends in the middle of a frame')
     if (frames === 0) throw new Error('The video stream holds no frames')
   } catch (error) {
+    // Waited out, not only signalled: Windows will not delete a file a process
+    // still has open, and the stream beside this is deleted next.
     child.kill()
+    await exited.catch(() => {})
     throw error
   } finally {
     sink.end()
@@ -255,7 +258,10 @@ export async function decodeVideoFile(
     const frames = await decodeVideo(streamPath, rawPath, expected)
     return { path: rawPath, frames, ...expected }
   } finally {
-    await fs.rm(streamPath, { force: true })
+    // Never at the cost of the error that brought us here: a clean-up that
+    // failed would otherwise be the only thing reported. The working directory
+    // goes with the session anyway.
+    await fs.rm(streamPath, { force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {})
   }
 }
 
