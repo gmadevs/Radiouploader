@@ -81,8 +81,8 @@ export function ReviewStep({
         <div style={{ flex: 1 }}>
           <h1>Choose what to upload</h1>
           <p className="muted prose" style={{ marginTop: 0 }}>
-            Series that contain more than one acquisition have been split apart. Check the images before you continue —
-            anonymisation cannot remove identifying text burnt into the pixels — open a series to blank it out.
+            Series that contain more than one acquisition have been split into separate stacks. Anonymisation does not
+            remove text burnt into the pixels, so open each series to check its images and blank out any such text.
           </p>
         </div>
         <div style={{ flex: 'none', textAlign: 'right', display: 'grid', gap: 6, justifyItems: 'end' }}>

@@ -207,7 +207,7 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
         <div className="stack-actions">
           <button
             className="small"
-            title="Open for review — blank out burnt-in text and set the contrast"
+            title="Open to check the images, blank out burnt-in text, crop and set the contrast"
             onClick={() => onOpen(stack)}
           >
             Open for review
@@ -215,7 +215,7 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
           {stack.slices.length > 2 && !stack.unsupported && (
             <button
               className="small"
-              title="Cut this series along another plane, or flatten slabs of it into MIP, MinIP or mean images"
+              title="Make images of this series in another plane, or MIP, MinIP or mean images of thick slabs"
               onClick={() => onReformat(stack)}
             >
               Reformat

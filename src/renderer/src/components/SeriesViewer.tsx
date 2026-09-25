@@ -354,6 +354,13 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
    */
   const lastOne = !droppedHere && keptCount(stack) <= 1
 
+  // A video goes up as JPEG frames whether it is changed or not, so only the
+  // other compressed formats grow when they are blanked or cropped.
+  const largerOnceChanged =
+    frame?.compressed && !/^(MPEG|HEVC)/.test(stack.compression ?? '')
+      ? ' A compressed image is uploaded decoded once it is changed, so the file is larger.'
+      : ''
+
   /** Is there anything to throw away? The way out only appears when there is. */
   const dirty = !sameEdits(opening.current, editsOf(stack))
 
@@ -363,7 +370,7 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
         className="viewer"
         role="dialog"
         aria-modal="true"
-        aria-label={`${heading} — ${stack.label}`}
+        aria-label={`${heading}: ${stack.label}`}
         ref={dialogRef}
         tabIndex={-1}
       >
@@ -378,22 +385,14 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
             <button
               className={tool === 'erase' ? 'small on' : 'small'}
               onClick={() => setTool('erase')}
-              title={
-                frame?.compressed
-                  ? 'Drag over burnt-in text to blank it out on every image of this series. A compressed image cannot be written into, so blanking one uploads it decoded — a larger file.'
-                  : 'Drag over burnt-in text to blank it out on every image of this series'
-              }
+              title={`Drag over burnt-in text to blank it on every image of this series.${largerOnceChanged}`}
             >
               Erase
             </button>
             <button
               className={tool === 'crop' ? 'small on' : 'small'}
               onClick={() => setTool('crop')}
-              title={
-                frame?.compressed
-                  ? 'Drag a rectangle to keep; everything outside it comes off every image of this series. A compressed image cannot be cut into, so cropping one uploads it decoded — a larger file.'
-                  : 'Drag a rectangle to keep; everything outside it comes off every image of this series'
-              }
+              title={`Drag a rectangle over the part to keep. Everything outside it is removed from every image of this series.${largerOnceChanged}`}
             >
               Crop
             </button>
@@ -404,7 +403,7 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
               title={
                 greyscale
                   ? 'Drag to set the window: sideways for width, up and down for centre'
-                  : 'Colour images carry no window to adjust'
+                  : 'Colour images have no window to adjust'
               }
             >
               Contrast
@@ -419,7 +418,7 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
             {dirty && (
               <button
                 className="ghost"
-                title="Put this series back the way it was when it opened — blanked areas, crop, window and dropped images"
+                title="Undo every change made since this series was opened: blanked areas, crop, window and dropped images"
                 onClick={() => {
                   onChange({ ...opening.current, masks: [...opening.current.masks], dropped: [...opening.current.dropped] })
                   onClose()
@@ -445,7 +444,7 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
               {error}
               <br />
               <span className="muted small">
-                None of erasing, cropping or contrast can be applied to an image that cannot be decoded.
+                Erase, Crop and Contrast do not work on an image that cannot be decoded.
               </span>
             </div>
           ) : (
@@ -581,10 +580,10 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
               disabled={lastOne}
               title={
                 lastOne
-                  ? 'This is the only image left in the series. Untick the series in the picker to leave it out altogether.'
+                  ? 'This is the only image left. To leave the whole series out, untick it in the list of series.'
                   : droppedHere
                     ? 'Put this image back into the upload'
-                    : 'Leave this one image out of the upload. The rest of the series is unaffected, and it can be put back.'
+                    : 'Leave this image out of the upload. The other images of the series are still uploaded, and you can put it back.'
               }
               onClick={() => onChange({ dropped: toggleDropped(dropped, index) })}
             >
@@ -611,7 +610,7 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
                 <button
                   key={option.name}
                   className={preset?.name === option.name ? 'small on' : 'small ghost'}
-                  title={`${option.hint} — width ${option.window.width}, centre ${option.window.centre} HU`}
+                  title={`${option.hint}: width ${option.window.width}, centre ${option.window.centre} HU`}
                   onClick={() => onChange({ window: option.window })}
                 >
                   {option.name}
@@ -630,11 +629,11 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
             <span className="muted small">
               {tool === 'crop'
                 ? crop
-                  ? `Keeping ${percent(crop.width)} × ${percent(crop.height)} of every image — drag inside to move it, a corner to resize`
-                  : 'Drag the rectangle to keep; everything outside it comes off every image'
+                  ? `Keeping ${percent(crop.width)} × ${percent(crop.height)} of every image. Drag inside to move it, or a corner to resize.`
+                  : 'Drag a rectangle over the part to keep. Everything outside it is removed from every image.'
                 : masks.length === 0
-                  ? 'Drag over any burnt-in text to blank it on every image'
-                  : `${masks.length} area${masks.length === 1 ? '' : 's'} blanked on every image — drag a box to move it, a corner to resize`}
+                  ? 'Drag over burnt-in text to blank it on every image'
+                  : `${masks.length} area${masks.length === 1 ? '' : 's'} blanked on every image. Drag a box to move it, or a corner to resize.`}
             </span>
             <div className="spacer" />
             {/* Beside the button that undoes it, rather than on a row of its own. */}
@@ -680,9 +679,9 @@ export function SeriesViewer({ stack, heading, modality, onChange, onClose }: Pr
               <kbd>Delete</kbd> removes the selected box
             </span>
             <span>
-              <kbd>Esc</kbd> lets go of a box, then closes
+              <kbd>Esc</kbd> deselects a box, or closes the viewer
             </span>
-            <span>the wheel scrubs</span>
+            <span>the mouse wheel moves through the images</span>
           </div>
         </div>
       </div>
