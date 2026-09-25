@@ -47,6 +47,10 @@ interface Props {
   newCaseBlocked: string | null
   /** Ask for the drafts again — one may have been published on the site since. */
   onRefreshDrafts: () => void
+  /** An upload of these images that stopped partway, and the draft it was going into. */
+  interrupted: { caseId: string; savedAt: string } | null
+  /** Forget the stopped upload and make a new case instead. */
+  onStartNew: () => void
 }
 
 /** The day a draft was last touched, which is how you tell two alike apart. */
@@ -63,7 +67,9 @@ export function CaseStep({
   warnings,
   drafts,
   newCaseBlocked,
-  onRefreshDrafts
+  onRefreshDrafts,
+  interrupted,
+  onStartNew
 }: Props): React.JSX.Element {
   const set = <K extends keyof CaseForm>(key: K, value: CaseForm[K]): void => onChange({ ...form, [key]: value })
   const joining = form.existingCaseId !== null
@@ -112,6 +118,16 @@ export function CaseStep({
             Refresh
           </button>
         </div>
+
+        {interrupted !== null && form.existingCaseId === interrupted.caseId && (
+          <div className="notice warn">
+            An upload of these images to this draft stopped partway on {when(interrupted.savedAt)}. Uploading continues
+            in it: series that were already uploaded are not sent again.{' '}
+            <button className="small" onClick={onStartNew}>
+              Start a new case instead
+            </button>
+          </div>
+        )}
 
         {newCaseBlocked !== null && (
           <p className="small" style={{ margin: 0, color: 'var(--warn)' }}>

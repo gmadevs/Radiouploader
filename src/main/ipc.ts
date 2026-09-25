@@ -28,7 +28,8 @@ import { MAX_PREVIEW_EDGE, MAX_VIEWER_EDGE, clearPreviewHeaders, readPreviewFram
 import { session } from './session'
 import { checkForUpdate, setUpdateChecks, skipVersion } from './update'
 import { closeVolume, commitReformat, openVolume, planCount, previewReformat } from './volume'
-import { uploadCase, type UploadRequest } from './uploadCase'
+import { clearInterruptedUpload } from './interruptedUpload'
+import { interruptedForSelection, uploadCase, type UploadRequest } from './uploadCase'
 
 let client: RadiopaediaClient | null = null
 
@@ -124,7 +125,6 @@ export function registerIpc(): void {
     if (stacks.length === 0) throw new Error('No stacks selected')
     const result = await anonymiseStacks(stacks, await session.workDir(), broadcast)
     session.anon = result
-    session.uploadSoFar = null
     return { ...result, summary: summariseWarnings(result.warnings) }
   })
 
@@ -168,4 +168,9 @@ export function registerIpc(): void {
   ipcMain.handle('api:draftCases', async (): Promise<CaseSummary[]> => (await requireClient()).draftCases())
 
   ipcMain.handle('upload:run', async (_e, request: UploadRequest) => uploadCase(await requireClient(), request, broadcast))
+
+  // An upload that stopped and that the current selection would carry on, so the
+  // case step can say so and select its draft; and the way to start afresh.
+  ipcMain.handle('upload:interrupted', async () => interruptedForSelection())
+  ipcMain.handle('upload:discardInterrupted', async () => clearInterruptedUpload())
 }

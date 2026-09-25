@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { app, safeStorage } from 'electron'
+import type { InterruptedUpload } from '../interruptedUpload'
 import type { OAuthConfig, TokenSet } from './oauth'
 
 export interface StoredConfig {
@@ -13,6 +14,8 @@ export interface StoredConfig {
    * cannot check the app against.
    */
   updates?: { enabled?: boolean; skipped?: string }
+  /** An upload that stopped partway, to carry on after a restart. No patient identifiers. */
+  interruptedUpload?: InterruptedUpload
 }
 
 function configPath(): string {
@@ -32,7 +35,8 @@ async function saveConfig(config: StoredConfig): Promise<void> {
   const canEncrypt = safeStorage.isEncryptionAvailable()
   const payload: Record<string, unknown> = {
     oauth: config.oauth ? { ...config.oauth, clientSecret: undefined } : undefined,
-    updates: config.updates
+    updates: config.updates,
+    interruptedUpload: config.interruptedUpload
   }
 
   if (canEncrypt) {
@@ -86,7 +90,8 @@ export async function loadConfig(): Promise<StoredConfig> {
   if (parsed === null || typeof parsed !== 'object') return {}
   const config: StoredConfig = {
     oauth: parsed.oauth as OAuthConfig | undefined,
-    updates: parsed.updates as StoredConfig['updates']
+    updates: parsed.updates as StoredConfig['updates'],
+    interruptedUpload: parsed.interruptedUpload as InterruptedUpload | undefined
   }
 
   if (typeof parsed.secrets === 'string' && safeStorage.isEncryptionAvailable()) {

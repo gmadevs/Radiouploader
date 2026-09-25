@@ -89,6 +89,8 @@ export function App(): React.JSX.Element {
   const [findings, setFindings] = useState<BurnInFinding[] | null>(null)
   /** The account's draft cases, or null until they have been read. */
   const [drafts, setDrafts] = useState<CaseSummary[] | null>(null)
+  /** An upload of this selection that stopped partway, in this session or before a restart. */
+  const [interrupted, setInterrupted] = useState<{ caseId: string; savedAt: string } | null>(null)
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [showInfo, setShowInfo] = useState(false)
   /**
@@ -418,6 +420,7 @@ export function App(): React.JSX.Element {
         )
       }))
       setStep('case')
+      await checkInterrupted()
       // The drafts are read on the way in rather than at sign-in: one may have
       // been published on the site in the meantime, and this is the moment the
       // list is about to be looked at.
@@ -427,6 +430,23 @@ export function App(): React.JSX.Element {
     } finally {
       setWorking(false)
     }
+  }
+
+  /**
+   * Whether an upload of this selection stopped partway, and if so point the
+   * form at its draft: carrying on means adding to that case, and the case step
+   * says so rather than letting "A new case" quietly continue an old one.
+   */
+  const checkInterrupted = async (): Promise<void> => {
+    const found = await window.api.interruptedUpload().catch(() => null)
+    setInterrupted(found)
+    if (found) setForm((current) => ({ ...current, existingCaseId: found.caseId }))
+  }
+
+  const startNewCase = (): void => {
+    void window.api.discardInterruptedUpload()
+    setInterrupted(null)
+    setForm((current) => ({ ...current, existingCaseId: null }))
   }
 
   const upload = async (): Promise<void> => {
@@ -455,6 +475,7 @@ export function App(): React.JSX.Element {
         }))
       })
       setResult(res)
+      setInterrupted(null)
       setStep('done')
       // The upload consumed a draft slot; reflect that in the header.
       void window.api
@@ -463,6 +484,9 @@ export function App(): React.JSX.Element {
         .catch(() => {})
     } catch (e) {
       setError(describeError(e))
+      // A case may have been made before the stop: select it, and list it.
+      void checkInterrupted()
+      void readDrafts()
     } finally {
       setWorking(false)
     }
@@ -475,6 +499,7 @@ export function App(): React.JSX.Element {
     setConfirming(false)
     setIngest(null)
     setResult(null)
+    setInterrupted(null)
     setWarnings([])
     setForm(EMPTY_FORM)
     setError(null)
@@ -643,6 +668,8 @@ export function App(): React.JSX.Element {
           drafts={drafts}
           newCaseBlocked={newCaseBlocked}
           onRefreshDrafts={() => void readDrafts()}
+          interrupted={interrupted}
+          onStartNew={startNewCase}
         />
         )}
 

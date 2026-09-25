@@ -1,12 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IngestResult, Stack, Study } from '@shared/types'
+import type { StoredConfig } from './api/store'
 
 vi.mock('electron', () => ({ app: { getPath: () => '/tmp' }, safeStorage: {}, shell: {}, dialog: {} }))
 const uploadStack = vi.fn()
 vi.mock('./api/upload', () => ({ uploadStack }))
+// The config file, in memory: what survives a restart is what is in here.
+let stored: StoredConfig = {}
+vi.mock('./api/store', () => ({
+  loadConfig: async () => stored,
+  updateConfig: async (change: (config: StoredConfig) => StoredConfig) => {
+    stored = change(stored)
+  }
+}))
 
 const { session } = await import('./session')
-const { uploadCase, STOPPED_PARTWAY } = await import('./uploadCase')
+const { uploadCase, interruptedForSelection, STOPPED_PARTWAY } = await import('./uploadCase')
 
 function stack(id: string): Stack {
   return {
@@ -61,8 +70,12 @@ function study(id: string, stackIds: string[]): Study {
   } as Study
 }
 
-/** Two studies, the first with two stacks, all anonymised. */
-function prepare(): void {
+/**
+ * Two studies, the first with two stacks, all anonymised. `hashes` stands for
+ * the anonymised content: the same hash is the same bytes, as the anonymiser is
+ * deterministic, and a changed one is a stack edited since.
+ */
+function prepare(hashes: Record<string, string> = {}): void {
   const studies = [study('s1', ['a', 'b']), study('s2', ['c'])]
   session.ingest = { sourceKind: 'folder', sourcePath: '/tmp', tempDir: null, scannedFileCount: 3, failures: [], studies } as IngestResult
   session.anon = {
@@ -71,13 +84,12 @@ function prepare(): void {
       sourcePath: `/tmp/${id}.dcm`,
       frame: 0,
       outputPath: `/tmp/anonymised/${id}.dcm`,
-      sha256: id,
+      sha256: hashes[id] ?? id,
       byteLength: 10
     })),
     warnings: [],
     errors: []
   }
-  session.uploadSoFar = null
 }
 
 const request = (caseId: string | null = null) => ({
@@ -110,59 +122,98 @@ function fakeClient(drafts: string[] = ['case-1']) {
 /** The stacks uploadStack was asked for, by the file each one sent. */
 const sentStacks = (): string[] => uploadStack.mock.calls.map((call) => call[3][0].sha256)
 
+/** A first attempt that sends stack a and stops on b. */
+async function stopAfterFirstStack(c: ReturnType<typeof fakeClient>): Promise<void> {
+  uploadStack.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new TypeError('fetch failed'))
+  await uploadCase(c as never, request(), () => {}).catch(() => {})
+  uploadStack.mockReset()
+}
+
 beforeEach(() => {
   uploadStack.mockReset()
+  stored = {}
   prepare()
 })
 
 describe('uploadCase', () => {
-  it('says it stopped partway, and remembers what was done before it stopped', async () => {
+  it('says it stopped partway, and records what was done without any patient identifier', async () => {
     const c = fakeClient()
     uploadStack.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new TypeError('fetch failed'))
 
     await expect(uploadCase(c as never, request(), () => {})).rejects.toThrow(`${STOPPED_PARTWAY}: fetch failed`)
-    expect(session.uploadSoFar?.caseId).toBe('case-1')
-    expect([...session.uploadSoFar!.stacksDone]).toEqual(['a'])
-    expect([...session.uploadSoFar!.studies]).toEqual([['s1', 'rp-study-1']])
+    const record = stored.interruptedUpload!
+    expect(record.caseId).toBe('case-1')
+    expect(record.stacksDone).toHaveLength(1)
+    expect(record.planned).toHaveLength(3)
+    expect(Object.values(record.studies)).toEqual(['rp-study-1'])
+    // Study keys are one-way hashes, never the StudyInstanceUID itself.
+    expect(JSON.stringify(record)).not.toContain('"s1"')
   })
 
-  it('carries on in the same case, from the series that stopped', async () => {
+  it('carries on in the same case after a restart, from the series that stopped', async () => {
     const c = fakeClient()
-    uploadStack.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new TypeError('fetch failed'))
-    await uploadCase(c as never, request(), () => {}).catch(() => {})
-    uploadStack.mockReset()
+    await stopAfterFirstStack(c)
 
-    const result = await uploadCase(c as never, request(), () => {})
+    // A restart: the session is gone, the same study is imported and anonymised
+    // again, and the config file is what remains.
+    prepare()
+    expect(await interruptedForSelection()).toEqual({ caseId: 'case-1', savedAt: expect.any(String) })
 
+    const result = await uploadCase(c as never, request('case-1'), () => {})
     expect(result.caseId).toBe('case-1')
     expect(c.createCase).toHaveBeenCalledTimes(1)
     // The first study was made before the stop; only the second is new.
     expect(c.createStudy).toHaveBeenCalledTimes(2)
     expect(sentStacks()).toEqual(['b', 'c'])
     expect(uploadStack.mock.calls[0][2]).toBe('rp-study-1')
-    expect(session.uploadSoFar).toBeNull()
+    expect(stored.interruptedUpload).toBeUndefined()
   })
 
-  it('does not carry on when the request names a different draft', async () => {
+  it('does not carry on when a series already uploaded has changed since', async () => {
+    // Stack a went up, then a mask was drawn on it: what is on Radiopaedia is
+    // the unmasked version, so a has to go up again, into a new series.
+    const c = fakeClient()
+    await stopAfterFirstStack(c)
+    prepare({ a: 'a-with-mask' })
+
+    expect(await interruptedForSelection()).toBeNull()
+    await uploadCase(c as never, request('case-1'), () => {})
+    expect(sentStacks()).toEqual(['a-with-mask', 'b', 'c'])
+  })
+
+  it('does not put an unrelated study into the old case', async () => {
+    const c = fakeClient()
+    await stopAfterFirstStack(c)
+    prepare({ a: 'x', b: 'y', c: 'z' })
+
+    expect(await interruptedForSelection()).toBeNull()
+  })
+
+  it('makes a new case when a new case is asked for, whatever stopped before', async () => {
+    const c = fakeClient()
+    await stopAfterFirstStack(c)
+
+    await uploadCase(c as never, request(null), () => {})
+    expect(c.createCase).toHaveBeenCalledTimes(2)
+    expect(sentStacks()).toEqual(['a', 'b', 'c'])
+  })
+
+  it('does not carry on into a different draft', async () => {
     const c = fakeClient(['case-1', 'case-9'])
-    uploadStack.mockRejectedValueOnce(new Error('S3 upload failed'))
-    await uploadCase(c as never, request(), () => {}).catch(() => {})
-    uploadStack.mockReset()
+    await stopAfterFirstStack(c)
 
     const result = await uploadCase(c as never, request('case-9'), () => {})
-
     expect(result.caseId).toBe('case-9')
     expect(sentStacks()).toEqual(['a', 'b', 'c'])
   })
 
-  it('starts over when the case it would carry on is no longer a draft', async () => {
+  it('forgets the stopped upload when its case is no longer a draft', async () => {
     const c = fakeClient()
-    uploadStack.mockRejectedValueOnce(new Error('S3 upload failed'))
-    await uploadCase(c as never, request(), () => {}).catch(() => {})
+    await stopAfterFirstStack(c)
     c.draftCases.mockResolvedValue([])
 
-    await expect(uploadCase(c as never, request(), () => {})).rejects.toThrow(/no longer a draft/)
-    expect(session.uploadSoFar).toBeNull()
+    await expect(uploadCase(c as never, request('case-1'), () => {})).rejects.toThrow(/no longer a draft/)
+    expect(stored.interruptedUpload).toBeUndefined()
   })
 
   it('does not call a failure to create the case a stop partway, since nothing was made', async () => {
@@ -170,15 +221,6 @@ describe('uploadCase', () => {
     c.createCase.mockRejectedValueOnce(new Error('422 Unprocessable Entity'))
 
     await expect(uploadCase(c as never, request(), () => {})).rejects.toThrow(/^422/)
-    expect(session.uploadSoFar).toBeNull()
-  })
-
-  it('forgets how far it got once the selection changes', async () => {
-    const c = fakeClient()
-    uploadStack.mockRejectedValueOnce(new Error('S3 upload failed'))
-    await uploadCase(c as never, request(), () => {}).catch(() => {})
-
-    session.applySelection([])
-    expect(session.uploadSoFar).toBeNull()
+    expect(stored.interruptedUpload).toBeUndefined()
   })
 })

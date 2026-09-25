@@ -43,9 +43,19 @@ reuses the studies already created, skips the series already attached, and sends
 interrupted series again. Files that already reached S3 are reported as already uploaded and
 are not sent again.
 
-Without this, a failed upload left a partial draft case that counted towards the quota, and
-the next attempt created a second case. The record is cleared when the selection changes,
-when the case is no longer a draft, and when the upload finishes.
+The record is kept in `config.json` in the app's user data folder, so an upload can also be
+continued after the app has been closed. It contains the case id, a one-way hash of each
+study's `StudyInstanceUID` (never the UID itself), and for each stack a hash of its
+anonymised files, both for the stacks already attached and for all the stacks the upload
+planned to send. Because the anonymiser is deterministic, importing and anonymising the same
+study with the same choices produces the same hashes.
+
+A later upload continues the recorded one only if it goes into the recorded draft (the case
+step selects it), contains at least one of the planned stacks, and contains every stack
+already attached, unchanged. A stack changed since, for example with an extra erased area,
+has a different hash, so it is not treated as already uploaded. The record is cleared when
+the upload finishes, when its case is no longer a draft, or when you choose
+**Start a new case instead**. See `src/main/interruptedUpload.ts`.
 
 ## Series order
 

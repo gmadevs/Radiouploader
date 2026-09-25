@@ -97,6 +97,9 @@ const api = {
   }> => ipcRenderer.invoke('api:currentUser'),
 
   upload: (request: unknown): Promise<{ caseId: string; url: string }> => ipcRenderer.invoke('upload:run', request),
+  /** An upload of the current selection that stopped partway, if there is one. */
+  interruptedUpload: (): Promise<{ caseId: string; savedAt: string } | null> => ipcRenderer.invoke('upload:interrupted'),
+  discardInterruptedUpload: (): Promise<void> => ipcRenderer.invoke('upload:discardInterrupted'),
 
   onProgress: (handler: (p: Progress) => void): (() => void) => {
     const listener = (_e: unknown, p: Progress): void => handler(p)

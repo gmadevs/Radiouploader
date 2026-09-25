@@ -77,9 +77,15 @@ Radiopaedia does not store the same file twice. Files it already has are not sen
 count as done and are shown separately, for example *"40 MB already there"*.
 
 If the upload stops partway, for example because the connection drops, the files already
-uploaded are on Radiopaedia in a draft case. Click **Upload to Radiopaedia** again to continue
-in the same case from the series where it stopped. If you go back and change the selection,
-the next upload starts from the beginning.
+uploaded are on Radiopaedia in a draft case, and the app selects that draft. Click
+**Upload to Radiopaedia** again to continue in the same case from the series where it stopped.
+
+This also works after you close the app: import the same study again, make the same choices
+and anonymise it. The case step then shows that an upload of these images stopped partway,
+with its draft selected, and series already uploaded are not sent again. If you changed a
+series that was already uploaded, for example by erasing another area, the app does not
+continue in the old case, because the version on Radiopaedia is the old one. To make a new
+case instead, click **Start a new case instead**.
 
 ![The confirmation](/shots/08-done.png)
 
