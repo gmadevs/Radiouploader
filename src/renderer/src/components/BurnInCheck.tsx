@@ -114,12 +114,12 @@ function drawOutline(canvas: HTMLCanvasElement, outline: MaskRect[] | undefined)
 
 /** What was noticed about one stack, in as few words as it can be put. */
 function findingText(finding: BurnInFinding): string {
-  if (finding.declared && finding.regions.length === 0) return 'The file says it carries burnt-in annotation'
+  if (finding.declared && finding.regions.length === 0) return 'Marked in the file as having burnt-in text'
   const places = finding.regions.length === 1 ? 'one place' : `${finding.regions.length} places`
-  const weaker = finding.compared < 2 ? ', from a single image' : ''
+  const weaker = finding.compared < 2 ? ' (one image only)' : ''
   return finding.declared
-    ? `The file says it carries annotation, and something looks like text in ${places}`
-    : `Looks like text in ${places}${weaker}`
+    ? `Marked in the file as having burnt-in text. Possible text in ${places}`
+    : `Possible text in ${places}${weaker}`
 }
 
 /**
@@ -163,8 +163,8 @@ function OrderCheck({
   return (
     <div className="order-check">
       <p className="small" style={{ margin: 0 }}>
-        <strong>Check the order as well.</strong> The series are posted in this order, and it is the order they appear
-        in on the case. Drag one to move it, or use the arrows.
+        Check the order of the series. They are uploaded in this order and appear in this order in the case. Drag a
+        series to move it, or use the arrows.
       </p>
       {studies.map((study) => (
         <div className="order-study" key={study.studyId}>
@@ -219,7 +219,7 @@ function OrderCheck({
                 <div className="order-foot">
                   {group.entries.length > 1 && (
                     <span className="muted order-note">
-                      {group.entries.length} image sets out of this series, moving together
+                      {group.entries.length} stacks from this series, moved together
                     </span>
                   )}
                   <span className="reorder">
@@ -318,13 +318,13 @@ export function BurnInCheck({
         <div className={`info-body check-body${reorderable ? ' split' : ''}`}>
           <div className="check-main">
             <div className="notice warn">
-              <strong>Anonymisation does not touch the pixels.</strong> Names, dates and hospital banners burnt into the
-              images upload exactly as they are. Only what you blank with <strong>Open for review</strong> is removed.
+              <strong>Anonymisation does not change the pixels.</strong> Names, dates and hospital banners burnt into the
+              images are uploaded unchanged. Only the areas you blank with <strong>Open for review</strong> are removed.
             </div>
 
             {findings === null && (
               <p className="muted small" style={{ margin: 0 }}>
-                Looking through the images for text…
+                Checking two images of each series for text…
               </p>
             )}
 
@@ -332,14 +332,15 @@ export function BurnInCheck({
               <>
                 <p className="small" style={{ margin: 0, color: 'var(--warn)' }}>
                   {flagged.length === 1 ? 'Something was noticed in one series' : `Something was noticed in ${flagged.length} series`}
-                  . Open it and blank anything identifying — the ring is where to look, not the whole of what is there.
+                  . Open it and blank anything identifying. The ring marks where to look, and there can be more text
+                  elsewhere in the image.
                 </p>
                 <div className="check-grid">
                   {flagged.map((entry) => (
                     <button
                       key={entry.stack.id}
                       className="check-item flagged"
-                      title="Open for review — blank out burnt-in text and set the contrast"
+                      title="Open to check the images, blank out burnt-in text, crop and set the contrast"
                       onClick={() => onOpen(entry)}
                     >
                       <Thumb entry={entry} outline={noticed.get(entry.stack.id)?.regions} />
@@ -357,16 +358,16 @@ export function BurnInCheck({
               <>
                 <p className="muted small" style={{ margin: 0 }}>
                   {stillUnseen.length === 1
-                    ? 'One selected series has not been opened full size yet:'
-                    : `${stillUnseen.length} selected series have not been opened full size yet:`}{' '}
-                  open anything that could carry text — ultrasound, screen captures, reconstructions.
+                    ? 'One selected series has not been opened full size yet.'
+                    : `${stillUnseen.length} selected series have not been opened full size yet.`}{' '}
+                  Open any series that could contain text, such as ultrasound, screen captures and reconstructions.
                 </p>
                 <div className="check-grid">
                   {stillUnseen.map((entry) => (
                     <button
                       key={entry.stack.id}
                       className="check-item"
-                      title="Open for review — blank out burnt-in text and set the contrast"
+                      title="Open to check the images, blank out burnt-in text, crop and set the contrast"
                       onClick={() => onOpen(entry)}
                     >
                       <Thumb entry={entry} />
@@ -382,16 +383,17 @@ export function BurnInCheck({
             ) : (
               unseen.length === 0 && (
                 <p className="muted small" style={{ margin: 0 }}>
-                  Every selected series has been opened full size. That is not the same as having read every image in
-                  them — go back if any of these carry text you have not looked for.
+                  Every selected series has been opened full size. Opening a series does not mean every image in it has
+                  been checked. Go back if any of them could contain text you have not looked for.
                 </p>
               )
             )}
 
             {findings !== null && (
               <p className="muted small" style={{ margin: 0 }}>
-                Nothing was noticed in the rest. That check reads two images per series and finds obvious banners; it
-                does not find small print, text over anatomy, or anything on the images it did not look at.
+                {flagged.length > 0 ? 'Nothing was noticed in the other series.' : 'Nothing was noticed.'} The check
+                reads two images of each series and finds large banners. It does not find small print, text over anatomy,
+                or text on the images it did not read.
               </p>
             )}
           </div>
