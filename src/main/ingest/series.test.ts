@@ -577,20 +577,53 @@ describe('buildStacks — enhanced multiframe', () => {
     ])
   })
 
-  it('keeps the frames of different StackIDs from interleaving', () => {
-    // Three orthogonal localisers in one object are three volumes. Ordering
-    // their frames against each other by position makes one that is no volume.
-    const { stacks } = buildStacks(
+  it('splits the volumes of one object into a stack per StackID', () => {
+    // Three orthogonal localisers in one object are three volumes. Kept as one
+    // stack, their frames were ordered against each other by position, which
+    // makes one that is no volume.
+    const { stacks, splitReason } = buildStacks(
       's',
       enhanced([
         frame({ frame: 0, stackId: '1', sliceLocation: 0 }),
         frame({ frame: 1, stackId: '2', sliceLocation: 2 }),
         frame({ frame: 2, stackId: '1', sliceLocation: 10 }),
-        frame({ frame: 3, stackId: '2', sliceLocation: 12 })
+        frame({ frame: 3, stackId: '2', sliceLocation: 12 }),
+        frame({ frame: 4, stackId: '10', sliceLocation: 1 })
       ])
     )
-    expect(stacks).toHaveLength(1)
-    expect(stacks[0].slices.map((slice) => slice.frame)).toEqual([0, 2, 1, 3])
+    expect(splitReason).toBe('stack')
+    expect(stacks.map((stack) => stack.label)).toEqual(['Stack 1', 'Stack 2', 'Stack 10'])
+    expect(stacks.map((stack) => stack.slices.map((slice) => slice.frame))).toEqual([[0, 2], [1, 3], [4]])
+    expect(stacks.every((stack) => stack.selected)).toBe(true)
+  })
+
+  it('splits by StackID and by phase together', () => {
+    const { stacks, splitReason } = buildStacks(
+      's',
+      enhanced([
+        frame({ frame: 0, stackId: '1', temporalIndex: 1, sliceLocation: 0 }),
+        frame({ frame: 1, stackId: '1', temporalIndex: 2, sliceLocation: 0 }),
+        frame({ frame: 2, stackId: '2', temporalIndex: 1, sliceLocation: 0 }),
+        frame({ frame: 3, stackId: '2', temporalIndex: 2, sliceLocation: 0 })
+      ])
+    )
+    // The phase is the finding, so it names the split; the stack says which volume.
+    expect(splitReason).toBe('phase')
+    expect(stacks.map((stack) => stack.label)).toEqual([
+      'Phase 1 · Stack 1',
+      'Phase 1 · Stack 2',
+      'Phase 2 · Stack 1',
+      'Phase 2 · Stack 2'
+    ])
+  })
+
+  it('leaves a single StackID as one stack', () => {
+    const { stacks, splitReason } = buildStacks(
+      's',
+      enhanced([frame({ frame: 0, stackId: '1', sliceLocation: 0 }), frame({ frame: 1, stackId: '1', sliceLocation: 5 })])
+    )
+    expect(splitReason).toBeNull()
+    expect(stacks.map((stack) => stack.label)).toEqual(['All images'])
   })
 
   it('still refuses an enhanced run in a format it cannot decode', () => {

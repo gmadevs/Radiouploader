@@ -58,9 +58,11 @@ The app reads both at import and applies the table above to each frame:
 A dynamic enhanced series therefore appears as one stack per phase, as it would from a
 classic export, and each phase can be selected separately.
 
-The app also reads `StackID` (0020,9056). One enhanced object can contain several volumes,
-typically three orthogonal localisers, and frames of different stacks are kept separate when
-a stack is ordered.
+The app also reads `StackID` (0020,9056), in `FrameContentSequence`. One enhanced object can
+contain several volumes, typically three orthogonal localisers. Each `StackID` becomes a
+separate stack, labelled **Stack 1**, **Stack 2** and so on, and the series heading shows
+**Split by stack**. When the stacks also differ in time point, b-value or echo, the labels
+combine both, for example **Phase 1 · Stack 2**.
 
 To upload one frame of an enhanced object as its own image, the app also copies the frame's
 description to the top level. `ImagePositionPatient`, `ImageOrientationPatient`,

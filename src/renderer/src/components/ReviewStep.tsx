@@ -52,7 +52,8 @@ const SPLIT_LABELS: Record<string, string> = {
   component: 'Split by image type',
   diffusion: 'Split by b-value',
   echo: 'Split by echo',
-  phase: 'Split by phase'
+  phase: 'Split by phase',
+  stack: 'Split by stack'
 }
 
 export function ReviewStep({

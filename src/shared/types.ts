@@ -9,6 +9,7 @@ export type StackKind =
   | 'echo' // multi-echo acquisition
   | 'diffusion' // DWI, one stack per b-value
   | 'component' // SWI/phase-contrast: magnitude, phase, SWI, mIP...
+  | 'stack' // enhanced object holding several volumes, one stack per StackID
 
 /** The magnitude/phase/derived flavour of an image, read from ImageType. */
 export type ImageComponent = 'magnitude' | 'phase' | 'real' | 'imaginary' | 'swi' | 'mip' | 'adc' | 'derived' | 'unknown'

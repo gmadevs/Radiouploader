@@ -66,7 +66,8 @@ When a series is split, some stacks are selected by default:
 
 - phase, real and imaginary maps are **not** selected when a magnitude image is present;
 - in a diffusion series, the highest b-value and the ADC map are selected;
-- every time point of a dynamic series is selected.
+- every time point of a dynamic series is selected;
+- every stack of an enhanced object split by `StackID` is selected.
 
 To keep only one phase of a multiphase series, click **Keep one phase** in its heading. This
 selects the first phase and clears the others.

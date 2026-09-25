@@ -38,6 +38,12 @@ interface Dimensions {
   bValue: number | null
   echoNumber: number | null
   temporalIndex: number | null
+  /**
+   * One enhanced object can hold several volumes, typically three orthogonal
+   * localisers. Each is a stack of its own: kept together they were one card of
+   * three planes that nobody could scroll, reformat or name.
+   */
+  stackId: string | null
 }
 
 /**
@@ -109,12 +115,13 @@ function dimensionsOf(unit: Unit): Dimensions {
     component: unit.component,
     bValue: unit.bValue,
     echoNumber: unit.echoNumber,
-    temporalIndex: unit.temporalIndex
+    temporalIndex: unit.temporalIndex,
+    stackId: unit.stackId
   }
 }
 
 function dimensionKey(d: Dimensions): string {
-  return [d.component, d.bValue ?? '-', d.echoNumber ?? '-', d.temporalIndex ?? '-'].join('|')
+  return [d.component, d.bValue ?? '-', d.echoNumber ?? '-', d.temporalIndex ?? '-', d.stackId ?? '-'].join('|')
 }
 
 /** The direction an image looks, or null when it does not say. */
@@ -303,6 +310,7 @@ function buildLabel(d: Dimensions, phaseIndex: number | null, echoTime: number |
     parts.push(echoTime !== null ? `Echo ${d.echoNumber} (TE ${echoTime} ms)` : `Echo ${d.echoNumber}`)
   }
   if (multi.has('phase') && phaseIndex !== null) parts.push(`Phase ${phaseIndex}`)
+  if (multi.has('stack') && d.stackId !== null) parts.push(`Stack ${d.stackId}`)
   return parts.length > 0 ? parts.join(' · ') : 'All images'
 }
 
@@ -336,8 +344,11 @@ export function buildStacks(seriesId: string, instances: InstanceMeta[]): { stac
   if (distinct((u) => u.bValue) > 1) varying.add('diffusion')
   if (distinct((u) => u.echoNumber) > 1) varying.add('echo')
   if (distinct((u) => u.temporalIndex) > 1) varying.add('phase')
+  if (distinct((u) => u.stackId) > 1) varying.add('stack')
 
   const stacks: Stack[] = []
+  // The Stack type has no StackID of its own, so the label pass below reads it here.
+  const stackIds = new Map<Stack, string | null>()
   for (const [, group] of groups) {
     const dims = dimensionsOf(group[0])
     const shared = sharePlane(group)
@@ -350,11 +361,14 @@ export function buildStacks(seriesId: string, instances: InstanceMeta[]): { stac
     if (repeated) {
       varying.add('phase')
       repeated.forEach((phaseUnits, i) => {
-        stacks.push(makeStack(seriesId, stacks.length, dims, i + 1, phaseUnits, varying, shared))
+        const stack = makeStack(seriesId, stacks.length, dims, i + 1, phaseUnits, varying, shared)
+        stackIds.set(stack, dims.stackId)
+        stacks.push(stack)
       })
     } else {
-      const phaseIndex = dims.temporalIndex
-      stacks.push(makeStack(seriesId, stacks.length, dims, phaseIndex, group, varying, shared))
+      const stack = makeStack(seriesId, stacks.length, dims, dims.temporalIndex, group, varying, shared)
+      stackIds.set(stack, dims.stackId)
+      stacks.push(stack)
     }
   }
 
@@ -365,7 +379,8 @@ export function buildStacks(seriesId: string, instances: InstanceMeta[]): { stac
       component: stack.component,
       bValue: stack.bValue,
       echoNumber: stack.echoNumber,
-      temporalIndex: stack.phaseIndex
+      temporalIndex: stack.phaseIndex,
+      stackId: stackIds.get(stack) ?? null
     }
     stack.label = buildLabel(dims, stack.phaseIndex, null, varying)
     stack.kind = primaryKind(varying)
@@ -384,6 +399,7 @@ function primaryKind(varying: Set<StackKind>): StackKind {
   if (varying.has('diffusion')) return 'diffusion'
   if (varying.has('echo')) return 'echo'
   if (varying.has('phase')) return 'phase'
+  if (varying.has('stack')) return 'stack'
   return 'single'
 }
 
