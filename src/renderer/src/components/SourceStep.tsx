@@ -66,7 +66,7 @@ export function SourceStep({
         <div>
           <h2>Add a study</h2>
           <p className="muted" style={{ margin: 0 }}>
-            Drop a folder or a zip of DICOM files here. Nothing leaves this computer until you upload.
+            Drop a folder or a zip of DICOM files here. Your images stay on this computer until you upload them.
           </p>
         </div>
         {blocked && <div className="notice error">{blocked.reason}</div>}

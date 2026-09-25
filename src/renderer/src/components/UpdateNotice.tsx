@@ -54,7 +54,7 @@ export function UpdateNotice({ update, onDismiss }: Props): React.JSX.Element | 
             </a>
           )}
           {onDismiss && (
-            <button className="small ghost" title="Stop offering this version" onClick={onDismiss}>
+            <button className="small ghost" title="Hide this notice until a newer version is released" onClick={onDismiss}>
               Not now
             </button>
           )}
@@ -66,7 +66,7 @@ export function UpdateNotice({ update, onDismiss }: Props): React.JSX.Element | 
           the box — which is the thing that broke it the first time somebody
           copied it off a screen. */}
       {update.command && (
-        <div className="command" title="Homebrew installed this copy, so this is what upgrades it">
+        <div className="command" title="Homebrew installed this copy, so these commands update it">
           <code>{update.command}</code>
         </div>
       )}

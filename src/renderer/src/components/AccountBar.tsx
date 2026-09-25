@@ -145,7 +145,7 @@ export function AccountBar({ account, onChange, open, onOpenChange }: Props): Re
           </div>
           <div>
             <button
-              title="Forget the tokens held in this computer's keychain. The application ID and secret stay."
+              title="Remove the sign-in tokens from this computer's keychain. The Application ID and secret are kept."
               onClick={() => {
                 onOpenChange(false)
                 void window.api.signOut().then(load)
@@ -162,16 +162,16 @@ export function AccountBar({ account, onChange, open, onOpenChange }: Props): Re
           {!awaitingCode ? (
             <>
               <p className="muted small" style={{ margin: 0 }}>
-                Create your own application on Radiopaedia with scope <code>cases</code> — these credentials stay on
-                this computer and are never bundled with the app. Its Redirect URI must be an https address or the
-                out-of-band URN below; a plain <code>http://127.0.0.1</code> address is rejected by their form.
+                Register an application on Radiopaedia to get an Application ID. Set its Redirect URI to the address
+                below (Radiopaedia does not accept a local <code>http://127.0.0.1</code> address) and leave its scope
+                empty. These details are stored only on this computer.
               </p>
               <label className="field">
                 Application ID
                 <input value={clientId} onChange={(e) => setClientId(e.target.value)} />
               </label>
               <label className="field">
-                Client secret — leave empty for a public application
+                Client secret (leave empty for a public application)
                 <input type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} />
               </label>
               <label className="field">
@@ -179,9 +179,8 @@ export function AccountBar({ account, onChange, open, onOpenChange }: Props): Re
                 <input value={redirectUri} onChange={(e) => setRedirectUri(e.target.value)} />
               </label>
               <label className="field">
-                Scope — leave empty. Radiopaedia declares the permitted scopes on the application itself, and
-                requesting one here is rejected.
-                <input value={scope} onChange={(e) => setScope(e.target.value)} placeholder="cases" />
+                Scope (leave empty: Radiopaedia rejects a scope entered here)
+                <input value={scope} onChange={(e) => setScope(e.target.value)} />
               </label>
               {error && <div className="notice error">{error}</div>}
               <div>
@@ -201,8 +200,8 @@ export function AccountBar({ account, onChange, open, onOpenChange }: Props): Re
                 </p>
               ) : (
                 <div className="notice warn">
-                  This computer did not open a browser. Copy the address below, open it in a browser yourself,
-                  authorise the application there, then paste the code Radiopaedia shows you.
+                  The app could not open a browser. Copy the address below, open it in a browser, authorise the
+                  application, then paste the code Radiopaedia shows you.
                 </div>
               )}
               {authUrl && !opened && (
@@ -218,7 +217,7 @@ export function AccountBar({ account, onChange, open, onOpenChange }: Props): Re
                 </div>
               )}
               <label className="field">
-                Authorization code
+                Authorisation code
                 <input
                   value={code}
                   autoFocus

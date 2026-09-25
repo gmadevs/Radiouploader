@@ -15,34 +15,33 @@ interface Props {
 /** What each step of the wizard is for, in the order they happen. */
 const STEPS: { title: string; body: string }[] = [
   {
-    title: 'Sign in first',
-    body:
-      'Radiopaedia limits how many draft cases an account may hold, so the app checks the quota before you import anything rather than after the work is done.'
+    title: 'Sign in',
+    body: 'Sign in to Radiopaedia before importing a study. The header shows how many of your draft cases are in use.'
   },
   {
-    title: 'Drop a study in',
+    title: 'Add a study',
     body:
-      'A folder, a zip, or a handful of files. Everything is read on this computer; nothing is sent anywhere until you press Upload.'
+      'Drop a folder, a zip file or a set of DICOM files. The app reads them on this computer, and your images are not sent anywhere until you upload them.'
   },
   {
     title: 'Choose what to upload',
     body:
-      'Series that hold more than one acquisition — phases, b-values, echoes, magnitude and phase maps — are split apart so each can be picked separately. Trim drops the dead slices at either end.'
+      'Series that contain several acquisitions (phases, b-values, echoes, magnitude and phase images) are split into separate stacks, which you can select separately. Trim removes images at either end of a stack.'
   },
   {
     title: 'Open for review',
     body:
-      'Opens a series full size. Erase drags a black box over burnt-in text — a patient banner, an annotation — and it is painted into the pixels of every image in that series before upload. Contrast sets the window the images are read at, and a CT gets the usual named windows — brain, lung, bone — as buttons. Anonymisation cleans the tags; the pixels are your job.'
+      'Opens a stack in the viewer. Erase blanks burnt-in text, such as a patient banner, on every image of the stack, and the blank area is written into the pixels before upload. Crop removes margins. Contrast sets the window; for CT there are presets such as Brain, Lung and Bone. The anonymiser removes identifying tags, not text in the images, so check the images yourself.'
   },
   {
-    title: 'One last look',
+    title: 'Check before anonymising',
     body:
-      'Anonymise and continue stops to list the selected series you never opened full size, each one a click away from the viewer. Nothing looks for burnt-in text on your behalf, so the list is what went unchecked, not what is dirty.'
+      'Anonymise and continue first shows a check: areas that look like burnt-in text, and the selected stacks you have not opened in the viewer. It finds large banners and can miss small or faint text, so it never reports a stack as free of text.'
   },
   {
-    title: 'Case details, then upload',
+    title: 'Case details and upload',
     body:
-      'One study per DICOM study, oldest first, with the interval between them preserved in the caption. The case arrives on Radiopaedia as a draft, so nothing is published until you say so there.'
+      'Each DICOM study becomes a study in the case, oldest first, with the interval between them in its caption. The case is uploaded as a draft and is not published until you publish it on Radiopaedia.'
   }
 ]
 
@@ -90,8 +89,8 @@ export function InfoDialog({ info, update, onSetUpdateChecks, onClose }: Props):
           </ol>
 
           <div className="notice warn">
-            <strong>Check the images before you upload.</strong> The anonymiser works on DICOM tags. Text burnt into
-            the pixels is invisible to it — blank it yourself with Open for review.
+            <strong>Check the images before you upload.</strong> The anonymiser removes identifying DICOM tags. It does
+            not remove text burnt into the images; erase that in Open for review.
           </div>
 
           <h3 style={{ marginTop: 4 }}>Updates</h3>
@@ -103,8 +102,8 @@ export function InfoDialog({ info, update, onSetUpdateChecks, onClose }: Props):
                   answers exactly as one that found nothing, and this app does
                   not dress a silence up as a result. */}
               {update?.enabled === false
-                ? 'The check at launch is off, so this build has not been compared with anything.'
-                : 'Nothing newer was found when the app started.'}{' '}
+                ? 'The update check at launch is off.'
+                : 'No newer version was found when the app started.'}{' '}
               <a href={RELEASES_URL} target="_blank" rel="noreferrer">
                 Releases on GitHub
               </a>
@@ -119,16 +118,16 @@ export function InfoDialog({ info, update, onSetUpdateChecks, onClose }: Props):
             <span>
               Look for a newer version at launch
               <span className="muted small" style={{ display: 'block' }}>
-                Asks GitHub for the number of the latest release. Nothing about you, your account or your studies is
-                sent, and nothing is downloaded — the upgrade is yours to run.
+                Asks GitHub for the latest release number. No information about you, your account or your studies is
+                sent, and nothing is downloaded or installed.
               </span>
             </span>
           </label>
 
-          <h3 style={{ marginTop: 4 }}>Something went wrong?</h3>
+          <h3 style={{ marginTop: 4 }}>Reporting a problem</h3>
           <p className="muted small" style={{ margin: 0 }}>
-            Report it with the version below and, if you can, what the study was: modality, how it was exported, and
-            whether the images previewed.
+            Include the version shown below and, if you can, the modality, how the study was exported and whether the
+            images appeared in the preview. Never attach patient images.
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {/* target=_blank so both go through the window-open handler, which
