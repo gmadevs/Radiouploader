@@ -301,6 +301,32 @@ export function App(): React.JSX.Element {
     })
   }
 
+  /**
+   * Turn a dynamic series between a stack per phase and a stack per slice.
+   *
+   * The main process holds the tree that is uploaded, so it does the turning
+   * and this copy is replaced with its answer. The edits made so far are pushed
+   * first, or a mask drawn a moment ago would not be there to carry across.
+   */
+  const arrangeSeries = async (series: Series, arrangement: 'phase' | 'slice'): Promise<void> => {
+    if (series.arrangement === arrangement) return
+    try {
+      await pushSelection()
+      const updated = await window.api.arrangeSeries(series.id, arrangement)
+      setIngest((current) =>
+        current && {
+          ...current,
+          studies: current.studies.map((study) => ({
+            ...study,
+            series: study.series.map((s) => (s.id === updated.id ? updated : s))
+          }))
+        }
+      )
+    } catch (e) {
+      setError(describeError(e))
+    }
+  }
+
   /** Opening a stack is what the burnt-in check counts as having looked at it. */
   const openViewer = (stackId: string, heading: string, modality: string | null): void => {
     setViewing({ stackId, heading, modality })
@@ -651,6 +677,7 @@ export function App(): React.JSX.Element {
                 modality: series.modality
               })
             }}
+            onArrange={(series, arrangement) => void arrangeSeries(series, arrangement)}
             onKeepOnePhase={(series) => {
               // Keep the earliest phase and drop the rest; the user can re-tick any.
               const first = series.stacks.find((s) => s.selected)?.id ?? series.stacks[0]?.id

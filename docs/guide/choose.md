@@ -72,6 +72,26 @@ When a series is split, some stacks are selected by default:
 To keep only one phase of a multiphase series, click **Keep one phase** in its heading. This
 selects the first phase and clears the others.
 
+## Dynamic series by phase or by slice
+
+A dynamic series, such as a pituitary dynamic, is split into one stack per time point: 18
+phases of 5 slices give 18 stacks of 5 images. Scrolling one of them moves through the slices
+at one moment.
+
+To follow the enhancement instead, click **By slice** in the series heading. The series then
+has one stack per slice position, each holding that slice at every time point in order: 5
+stacks of 18 images. Scrolling one of them shows the contrast arriving. **Keep one slice**
+selects the first slice and clears the others, for a case that shows only the slice through
+the lesion. **By phase** goes back.
+
+When each time point holds a single image, as in a 4D angiogram exported as one MIP per
+phase, **By slice** gives one stack with all the phases in order.
+
+The buttons appear only when every phase has the same slices at the same positions. Areas you
+have erased are kept when you switch, and are applied to every stack of the series, since a
+banner is in the same place on all of them. A crop or a window is kept only if every stack of
+the series had the same one. Trims and dropped images are reset.
+
 With a large export, it is often quicker to click **Deselect all** and then select the few
 series you need.
 

@@ -4,6 +4,7 @@ import { nearestAgeOption } from '@shared/radiopaedia'
 import { canDecode } from '../codecs/decode'
 import { isVideoSyntax } from '../codecs/video'
 import type { ImageComponent, Series, SliceRef, Stack, StackKind, Study } from '@shared/types'
+import { bySlice } from './arrange'
 import { ageInYears, type InstanceMeta } from './dicom'
 
 const COMPONENT_LABELS: Record<ImageComponent, string> = {
@@ -623,7 +624,8 @@ export function buildStudies(instances: InstanceMeta[]): Study[] {
         modality: seriesInstances[0].modality,
         splitReason,
         stacks,
-        instanceCount: seriesInstances.length
+        instanceCount: seriesInstances.length,
+        ...(splitReason === 'phase' && bySlice(id, stacks) !== null ? { arrangement: 'phase' as const } : {})
       })
     }
     series.sort((a, b) => (a.seriesNumber ?? 0) - (b.seriesNumber ?? 0))

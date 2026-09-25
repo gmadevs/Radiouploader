@@ -39,6 +39,8 @@ const api = {
   ingest: (paths: string[]): Promise<IngestResult> => ipcRenderer.invoke('ingest:run', paths),
   resetIngest: (): Promise<void> => ipcRenderer.invoke('ingest:reset'),
   setSelection: (selection: StackSelection[]): Promise<void> => ipcRenderer.invoke('selection:set', selection),
+  arrangeSeries: (seriesId: string, arrangement: 'phase' | 'slice'): Promise<Series> =>
+    ipcRenderer.invoke('series:arrange', seriesId, arrangement),
   /**
    * One decoded frame, no larger than `maxEdge`. Whole files never cross this
    * bridge — the card asks for a thumbnail, the viewer for something it can

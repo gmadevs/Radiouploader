@@ -316,6 +316,12 @@ export interface Series {
   splitReason: StackKind | null
   stacks: Stack[]
   instanceCount: number
+  /**
+   * How a dynamic series is laid out: a stack per time point, or a stack per
+   * slice position played in time. Absent when the series cannot be turned,
+   * which is every series that is not split by phase with matching slices.
+   */
+  arrangement?: 'phase' | 'slice'
 }
 
 export interface Study {

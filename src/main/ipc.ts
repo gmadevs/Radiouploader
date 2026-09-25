@@ -13,6 +13,7 @@ import type {
   Progress,
   ReformatPlan,
   ReformatRequestMessage,
+  Series,
   StackSelection,
   UpdateStatus,
   VolumeInfo
@@ -90,6 +91,9 @@ export function registerIpc(): void {
   ipcMain.handle('selection:set', (_e, selection: StackSelection[]) => {
     session.applySelection(selection)
   })
+  ipcMain.handle('series:arrange', (_e, seriesId: string, arrangement: 'phase' | 'slice'): Series =>
+    session.arrange(seriesId, arrangement === 'slice' ? 'slice' : 'phase')
+  )
 
   // Reformatting. The volume itself never leaves the main process; the renderer
   // asks for frames of it exactly as it asks for frames of a file.

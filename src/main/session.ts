@@ -1,6 +1,7 @@
-import type { AnonResult, CropRect, IngestResult, MaskRect, Stack, StackSelection, WindowLevel } from '@shared/types'
+import type { AnonResult, CropRect, IngestResult, MaskRect, Series, Stack, StackSelection, WindowLevel } from '@shared/types'
 import { keptSlices, sanitiseDropped } from '@shared/selection'
 import { cleanupTempDir } from './ingest'
+import { bySlice, carriedEdits } from './ingest/arrange'
 import { createSessionDir } from './tempDirs'
 
 /**
@@ -50,6 +51,8 @@ class Session {
   ingest: IngestResult | null = null
   anon: AnonResult | null = null
   private workDirPath: string | null = null
+  /** The phase stacks of each series laid out by slice, to go back to. */
+  private phaseStacks = new Map<string, Stack[]>()
 
   async workDir(): Promise<string> {
     if (!this.workDirPath) {
@@ -108,7 +111,52 @@ class Session {
     }
   }
 
+  /**
+   * Lay a dynamic series out by phase or by slice, and hand back the series.
+   *
+   * Done here because this is the tree anonymisation and upload read; the
+   * renderer's copy is replaced with what comes back. Blanked areas go with the
+   * series whichever way it is turned (see carriedEdits). A trim or a dropped
+   * image is a choice about one stack of one arrangement and does not.
+   */
+  arrange(seriesId: string, arrangement: 'phase' | 'slice'): Series {
+    const series = this.ingest?.studies.flatMap((study) => study.series).find((s) => s.id === seriesId)
+    if (!series || series.arrangement === undefined) throw new Error('That series cannot be rearranged')
+    if (series.arrangement === arrangement) return series
+
+    const edits = carriedEdits(series.stacks)
+    let stacks: Stack[]
+    if (arrangement === 'slice') {
+      const turned = bySlice(series.id, series.stacks)
+      if (turned === null) throw new Error('That series cannot be rearranged')
+      this.phaseStacks.set(series.id, series.stacks)
+      stacks = turned
+    } else {
+      stacks = (this.phaseStacks.get(series.id) ?? []).map((stack) => ({
+        ...stack,
+        selected: stack.unsupported === null,
+        trimStart: 0,
+        trimEnd: stack.slices.length - 1,
+        dropped: []
+      }))
+      if (stacks.length === 0) throw new Error('That series cannot be rearranged')
+    }
+    series.stacks = stacks.map((stack) => ({
+      ...stack,
+      masks: sanitiseMasks([...stack.masks, ...edits.masks].filter(
+        (mask, i, all) => all.findIndex((other) => JSON.stringify(other) === JSON.stringify(mask)) === i
+      )),
+      crop: edits.crop,
+      window: edits.window
+    }))
+    series.arrangement = arrangement
+    // Anonymised files are of the stacks they were made from, as for a selection.
+    this.anon = null
+    return series
+  }
+
   async reset(): Promise<void> {
+    this.phaseStacks.clear()
     await cleanupTempDir(this.ingest?.tempDir ?? null)
     await cleanupTempDir(this.workDirPath)
     this.ingest = null

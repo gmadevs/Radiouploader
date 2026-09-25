@@ -244,3 +244,44 @@ describe('applySelection — masks, crop and window', () => {
     expect(session.selectedStacks()[0].window).toBeNull()
   })
 })
+
+describe('arrange', () => {
+  function dynamic(): void {
+    const phases = [1, 2, 3].map((index) => ({
+      ...stack(`series::stack-${index}`, 4),
+      kind: 'phase' as const,
+      phaseIndex: index
+    }))
+    session.ingest = ingestWith(phases)
+    const series = session.ingest.studies[0].series[0]
+    series.splitReason = 'phase'
+    series.arrangement = 'phase'
+  }
+
+  it('lays a dynamic series out by slice and back, keeping every blanked area', () => {
+    dynamic()
+    const banner = { x: 0, y: 0, width: 1, height: 0.1 }
+    session.applySelection([{ id: 'series::stack-2', selected: true, trimStart: 0, trimEnd: 3, dropped: [], masks: [banner], crop: null, window: null }])
+
+    const bySlice = session.arrange('series', 'slice')
+    expect(bySlice.arrangement).toBe('slice')
+    expect(bySlice.stacks).toHaveLength(4)
+    expect(bySlice.stacks.every((s) => s.slices.length === 3 && s.masks.length === 1)).toBe(true)
+
+    const back = session.arrange('series', 'phase')
+    expect(back.stacks.map((s) => s.id)).toEqual(['series::stack-1', 'series::stack-2', 'series::stack-3'])
+    // The mask drawn on one phase is on all of them now: it went round by slice.
+    expect(back.stacks.every((s) => s.masks.length === 1)).toBe(true)
+  })
+
+  it('refuses a series that is not a dynamic one', () => {
+    expect(() => session.arrange('series', 'slice')).toThrow(/cannot be rearranged/)
+  })
+
+  it('makes the anonymised files stale', () => {
+    dynamic()
+    session.anon = { outputDir: '/tmp/out', files: [], warnings: [], errors: [] }
+    session.arrange('series', 'slice')
+    expect(session.anon).toBeNull()
+  })
+})

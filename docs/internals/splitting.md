@@ -58,6 +58,13 @@ The app reads both at import and applies the table above to each frame:
 A dynamic enhanced series therefore appears as one stack per phase, as it would from a
 classic export, and each phase can be selected separately.
 
+A dynamic series whose phases all hold the same slice positions can also be
+[laid out by slice](/guide/choose#dynamic-series-by-phase-or-by-slice). This is done in the
+main process, which holds the tree that is anonymised and uploaded
+(`src/main/ingest/arrange.ts`): slice k of every phase, in phase order, becomes one stack. A
+position is compared to 0.01 mm, the same rounding the phase split uses, and a series where
+any phase lacks a position or has a different one cannot be laid out by slice.
+
 The app also reads `StackID` (0020,9056), in `FrameContentSequence`. One enhanced object can
 contain several volumes, typically three orthogonal localisers. Each `StackID` becomes a
 separate stack, labelled **Stack 1**, **Stack 2** and so on, and the series heading shows

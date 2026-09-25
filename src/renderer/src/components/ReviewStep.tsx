@@ -8,6 +8,8 @@ interface Props {
   onToggle: (id: string, selected: boolean) => void
   onTrim: (id: string, trimStart: number, trimEnd: number) => void
   onKeepOnePhase: (series: Series) => void
+  /** Lay a dynamic series out as a stack per time point or a stack per slice. */
+  onArrange: (series: Series, arrangement: 'phase' | 'slice') => void
   /** Open one stack full size, to blank burnt-in text or set the contrast. */
   onOpen: (stack: Stack, series: Series, study: Study) => void
   /** Open the reformat dialog on one stack. */
@@ -62,6 +64,7 @@ export function ReviewStep({
   onToggle,
   onTrim,
   onKeepOnePhase,
+  onArrange,
   onOpen,
   onReformat,
   onSelectAll,
@@ -175,9 +178,27 @@ export function ReviewStep({
                   {series.splitReason && (
                     <span className="badge split">{SPLIT_LABELS[series.splitReason] ?? 'Split'}</span>
                   )}
+                  {series.arrangement !== undefined && (
+                    <span className="tools segmented">
+                      <button
+                        className={series.arrangement === 'phase' ? 'small on' : 'small'}
+                        title="One stack per time point, with its slices in order"
+                        onClick={() => onArrange(series, 'phase')}
+                      >
+                        By phase
+                      </button>
+                      <button
+                        className={series.arrangement === 'slice' ? 'small on' : 'small'}
+                        title="One stack per slice position, with its images in time order. Scroll a stack to follow the enhancement."
+                        onClick={() => onArrange(series, 'slice')}
+                      >
+                        By slice
+                      </button>
+                    </span>
+                  )}
                   {series.splitReason === 'phase' && (
                     <button className="small ghost" onClick={() => onKeepOnePhase(series)}>
-                      Keep one phase
+                      {series.arrangement === 'slice' ? 'Keep one slice' : 'Keep one phase'}
                     </button>
                   )}
                   {series.stacks.length > 1 && (
