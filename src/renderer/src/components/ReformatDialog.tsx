@@ -23,9 +23,9 @@ const PANE_NAMES: Record<PaneId, string> = { axial: 'Axial', coronal: 'Coronal',
 
 const PROJECTIONS: { id: Projection; label: string; title: string }[] = [
   { id: 'slice', label: 'Slice', title: 'One plane through the volume' },
-  { id: 'mip', label: 'MIP', title: 'The brightest sample through the slab: vessels, contrast, bone' },
-  { id: 'minip', label: 'MinIP', title: 'The darkest sample through the slab: airways, emphysema, fat' },
-  { id: 'mean', label: 'Mean', title: 'The average through the slab: quieter noise, softer detail' }
+  { id: 'mip', label: 'MIP', title: 'Brightest value through the slab, for vessels, contrast and bone' },
+  { id: 'minip', label: 'MinIP', title: 'Darkest value through the slab, for airways, emphysema and fat' },
+  { id: 'mean', label: 'Mean', title: 'Average value through the slab, with less noise and less fine detail' }
 ]
 
 /** Round to something a slider can land on and a person can read. */
@@ -290,7 +290,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
                 key={pane}
                 className={output === pane ? 'small on' : 'small'}
                 disabled={info === null}
-                title={`Build the series from the ${PANE_NAMES[pane].toLowerCase()} pane`}
+                title={`Make the new series in the ${PANE_NAMES[pane].toLowerCase()} plane`}
                 onClick={() => setOutput(pane)}
               >
                 {PANE_NAMES[pane]}
@@ -327,7 +327,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
               <ReformatPanel
                 key={pane}
                 label={PANE_NAMES[pane]}
-                title="Drag the middle to move the crosshair, an arm to turn the axes; the wheel steps through"
+                title="Drag the centre of the crosshair to move it, or an arm to turn the other two planes. The mouse wheel moves through the images."
                 frame={frames[pane] ?? null}
                 window={level}
                 lines={crosshair(pane)}
@@ -342,7 +342,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
             <ReformatPanel
               result
               label={`${nameOf(frame.n)} · ${PROJECTIONS.find((p) => p.id === projection)?.label ?? ''}`}
-              title="The image that will be added. Drag to window it; the wheel steps through the series"
+              title="The images that will be added. Drag to set the window. The mouse wheel moves through the series."
               frame={result}
               window={level}
               onWindow={onWindowDrag}
@@ -352,7 +352,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
         )}
 
         <div className="viewer-controls">
-          <div className="viewer-slider" title="Where the slab sits in the volume; the crosshair moves this too">
+          <div className="viewer-slider" title="Position of the slab in the volume. Moving the crosshair changes it too.">
             <span>Position</span>
             <input
               type="range"
@@ -367,7 +367,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
             <span className="n">{step(offsetOf(frame.n))} mm</span>
           </div>
 
-          <div className="viewer-slider" title="How thick a slab each image is flattened from">
+          <div className="viewer-slider" title="Thickness of the slab each image is projected from">
             <span>Slab</span>
             <input
               type="range"
@@ -382,7 +382,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
             <span className="n">{projection === 'slice' ? '—' : `${step(thickness)} mm`}</span>
           </div>
 
-          <div className="viewer-slider" title="How far apart the images that come out are">
+          <div className="viewer-slider" title="Distance between the images that are added">
             <span>Spacing</span>
             <input
               type="range"
@@ -391,7 +391,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
               step={0.5}
               value={spacing}
               disabled={info === null}
-              aria-label="Spacing between the images produced"
+              aria-label="Distance between the images that are added"
               onChange={(e) => setSpacing(Number(e.target.value))}
             />
             <span className="n">{step(spacing)} mm</span>
@@ -406,7 +406,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
                 <button
                   key={option.name}
                   className={preset?.name === option.name ? 'small on' : 'small ghost'}
-                  title={`${option.hint} — width ${option.window.width}, centre ${option.window.centre} HU`}
+                  title={`${option.hint}: width ${option.window.width}, centre ${option.window.centre} HU`}
                   onClick={() => setWindow(option.window)}
                 >
                   {option.name}
@@ -435,7 +435,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
                     disabled={info === null || throughColour}
                     title={
                       throughColour
-                        ? 'These images are in colour, and a projection through colour mixes the colours of different voxels'
+                        ? 'Not available for colour images: a projection would mix the colours of different voxels'
                         : option.title
                     }
                     onClick={() => setProjection(option.id)}
@@ -461,8 +461,8 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
               {info === null
                 ? ''
                 : `${count} image${count === 1 ? '' : 's'} · ${step(spacing)} mm apart, interpolated from ${step(info.spacing.z)} mm slices${
-                    info.anatomical ? '' : ' · these files do not say which way they face, so the planes are the acquisition’s'
-                  }${info.colour ? ' · in colour, so it can be cut but not projected through' : ''}`}
+                    info.anatomical ? '' : ' · the files have no orientation, so the planes are those of the acquisition'
+                  }${info.colour ? ' · colour images: slices only, no projections' : ''}`}
             </span>
             <button className="primary" disabled={info === null || busy || count === 0} onClick={() => void add()}>
               Add to the case
