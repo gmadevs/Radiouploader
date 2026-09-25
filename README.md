@@ -46,14 +46,14 @@ reformats to a case. It runs on macOS, Linux and Windows.
 
 <!-- downloads: npm run links -->
 
-Version **1.5.5**. The installers are not signed, so the first launch needs one extra step
+Version **1.5.6**. The installers are not signed, so the first launch needs one extra step
 on each platform: [how to open it](https://gmadevs.github.io/Radiouploader/guide/install).
 
 | | Also built |
 |---|---|
-| [![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-111111?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.5/Radiouploader-1.5.5-arm64.dmg) | Intel: [.dmg](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.5/Radiouploader-1.5.5.dmg) |
-| [![Linux](https://img.shields.io/badge/Linux-AppImage%20x64-FCC624?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.5/Radiouploader-1.5.5.AppImage) | AppImage arm64: [.AppImage](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.5/Radiouploader-1.5.5-arm64.AppImage) · Debian amd64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.5/radiouploader_1.5.5_amd64.deb) · Debian arm64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.5/radiouploader_1.5.5_arm64.deb) |
-| [![Windows](https://img.shields.io/badge/Windows-x64%20installer-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.5/Radiouploader.Setup.1.5.5.exe) |  |
+| [![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-111111?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.6/Radiouploader-1.5.6-arm64.dmg) | Intel: [.dmg](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.6/Radiouploader-1.5.6.dmg) |
+| [![Linux](https://img.shields.io/badge/Linux-AppImage%20x64-FCC624?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.6/Radiouploader-1.5.6.AppImage) | AppImage arm64: [.AppImage](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.6/Radiouploader-1.5.6-arm64.AppImage) · Debian amd64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.6/radiouploader_1.5.6_amd64.deb) · Debian arm64: [.deb](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.6/radiouploader_1.5.6_arm64.deb) |
+| [![Windows](https://img.shields.io/badge/Windows-x64%20installer-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/gmadevs/Radiouploader/releases/download/v1.5.6/Radiouploader.Setup.1.5.6.exe) |  |
 
 On macOS you can also install it with Homebrew. The second command removes the quarantine
 flag Homebrew adds to downloads, which macOS would otherwise use to block the unsigned app:
