@@ -7,124 +7,127 @@ npm run lab -- connect i-0123456789abcdef0
 npm run lab -- down i-0123456789abcdef0
 ```
 
-The [install job](/develop/packaging#installing-what-was-built) proves on every build that
-each package installs and the app boots. What it cannot see is what a person sees:
-SmartScreen on an installer Edge downloaded, the installer's own window, the Start menu,
-removing the app from Settings, an AppImage opened with a double-click, a sign-in to
-Radiopaedia with a keyring behind it. `scripts/lab.mjs` rents a desktop on EC2 for that, for
-as long as the trying takes, and makes sure it does not outlive it.
+The [install job](/develop/packaging#installing-what-was-built) checks on every build that
+each package installs and the app starts. It cannot check what a person sees: SmartScreen on
+an installer downloaded with Edge, the installer window, the Start menu, uninstalling from
+Settings, opening an AppImage with a double-click, or signing in to Radiopaedia with a
+keyring. `scripts/lab.mjs` rents a desktop on EC2 for this, for as long as the test takes,
+and makes sure it is deleted afterwards.
 
-What has been tried, on which system and with which installer, is kept in
-[live tests](/develop/live-tests), along with the machines still to try.
+The results of these tests, and the systems still to test, are in
+[live tests](/develop/live-tests).
 
 ::: danger Sample data only
-An instance is a computer in somebody else's building. Nothing from a real patient goes on
-one — the study `npm run sample` writes is what to upload from it.
+An instance is a computer run by someone else. Never put real patient data on it; upload the
+study that `npm run sample` generates.
 :::
 
-## The systems
+## Systems
 
-| `up` takes | What starts | Instance | ~$/hour in London |
+| `up` argument | System | Instance | Approx. $/hour in London |
 |---|---|---|---|
 | `windows-2025` | Windows Server 2025 | `t3.large`, 8 GB | 0.12 |
 | `windows-2022` | Windows Server 2022 | `t3.large`, 8 GB | 0.12 |
 | `ubuntu-2404` | Ubuntu 24.04 with XFCE | `t3.medium`, 4 GB | 0.05 |
 | `ubuntu-2204` | Ubuntu 22.04 with XFCE | `t3.medium`, 4 GB | 0.05 |
 
-Two of those are near misses, and knowingly. **EC2 has no Windows 10 or 11**, only Windows
-Server: 2022 is built on the same base as Windows 10 and 2025 on the same as Windows 11
-24H2, which is close enough for an installer and not the same thing. **The Ubuntu desktops
-are XFCE over xrdp, not GNOME**: the kernel, AppArmor, the libraries and apt are Ubuntu's
-own, and the shell around them is not.
+EC2 has no Windows 10 or 11, only Windows Server. Windows Server 2022 is based on the same
+code as Windows 10, and 2025 on the same as Windows 11 24H2: close enough to test an
+installer, but not identical. The Ubuntu desktops are XFCE over xrdp, not GNOME; the kernel,
+AppArmor, libraries and apt are Ubuntu's.
 
-A windows instance is ready about five minutes after `up`; an Ubuntu one takes about ten,
-because the desktop is installed on its first boot rather than baked into an image that
+A Windows instance is ready about five minutes after `up`, an Ubuntu instance after about
+ten, because its desktop is installed at first boot instead of from a stored image, which
 would cost money to keep.
 
-## Once
+## One-time setup
 
-1. An AWS account, with a **budget alert** set in Billing before anything is launched.
-2. An IAM user with console access, `AdministratorAccess` and MFA — not the root user — and
-   on the Mac:
+1. An AWS account, with a budget alert set in Billing before you launch anything.
+2. An IAM user with console access, `AdministratorAccess` and MFA (not the root user), and on
+   the Mac:
    ```bash
    brew install awscli
    brew install --cask session-manager-plugin
    aws login --profile lab
    ```
-   The script uses that `lab` profile by itself whenever `AWS_PROFILE` is not set, so a new
-   terminal window needs no export.
-   `aws login`, in AWS CLI 2.32 and later, signs in through the browser as that user and
-   hands the CLI credentials that last minutes and renew themselves for twelve hours — never
-   an access key, least of all anywhere near this repository, which is public. IAM Identity
-   Center would do the same, but on a single account it offers no permission sets until an
-   AWS Organization has been created around it.
-3. **Windows App** from the Mac App Store, which is the remote-desktop client for both.
-4. `npm run lab -- setup`, which creates, if they are not there already:
-   - a role for the instances that lets their agent reach Session Manager and nothing more;
-   - a role for EventBridge Scheduler that may terminate an instance only if it carries this
-     lab's `project` tag;
-   - a security group in the default VPC with **no inbound rule at all**.
+   The script uses the `lab` profile when `AWS_PROFILE` is not set. `aws login` (AWS CLI 2.32
+   and later) signs in through the browser and gives the CLI short-lived credentials that
+   renew for twelve hours, so no access key is needed. Never put an access key in this
+   repository, which is public. IAM Identity Center would also work, but on a single account
+   it needs an AWS Organization first.
+3. **Windows App** from the Mac App Store, the remote-desktop client for both systems.
+4. `npm run lab -- setup`, which creates, if they do not exist yet:
+   - a role for the instances that allows their agent to reach Session Manager and nothing
+     else;
+   - a role for EventBridge Scheduler that can terminate only instances with this lab's
+     `project` tag;
+   - a security group in the default VPC with no inbound rules.
 
-The region is `eu-west-2`, London, unless `AWS_REGION` says otherwise. A new account came
-with 1280 on-demand vCPUs there and five in Frankfurt — two lab machines at once, and no
-third — and a remote desktop does not notice the difference in distance. Milan is closer
-still, but has to be enabled on an account by hand.
+The region is `eu-west-2` (London) unless `AWS_REGION` is set. A new account had 1280
+on-demand vCPUs there and only five in Frankfurt, enough for two lab machines. The distance
+makes no noticeable difference to a remote desktop. Milan is closer, but has to be enabled
+on the account by hand.
 
 ## A session
 
-`up` prints the instance and when it expires. `connect` waits for the instance to reach
-Session Manager and for its desktop to finish installing, then opens a tunnel and prints
-where to point Windows App and which user to sign in as. The password goes on the clipboard,
-not on the screen, where a terminal's scrollback would keep it. Download the installer inside the
-instance, from the releases page, with its browser: a file that arrived that way is the one
-SmartScreen reacts to.
+`up` prints the instance ID and when it expires. `connect` waits until the instance is
+reachable through Session Manager and its desktop is installed, then opens a tunnel and
+prints the address and user name for Windows App. The password is copied to the clipboard,
+not printed, so it does not stay in the terminal's scrollback.
 
-## How it ends
+Download the installer inside the instance, from the releases page, with its browser:
+SmartScreen reacts only to files downloaded that way.
 
-Three ways to end it yourself, and two ways it ends on its own:
+## How a session ends
 
-- **`npm run lab -- down <instance>`**, or `--all`;
-- **closing the tunnel**: Ctrl+C in `connect`, which then asks whether to terminate;
-- **shutting it down from inside** — every instance is launched to terminate, not stop, when
-  its own system powers off;
-- **its own clock**: a scheduled task on Windows, which a reboot does not forget, and
+You can end it in three ways:
+
+- `npm run lab -- down <instance>`, or `--all`;
+- closing the tunnel with Ctrl+C in `connect`, which then asks whether to terminate the
+  instance;
+- shutting down the system inside the instance, which terminates it, because every instance
+  is launched to terminate, not stop, when it powers off.
+
+It also ends on its own in two ways:
+
+- a timer inside the instance: a scheduled task on Windows, which survives a reboot, and
   `shutdown -h` on Linux;
-- **a clock outside it**: a one-time EventBridge Scheduler schedule that terminates the
-  instance five minutes after it expires, and then deletes itself. That one works when the
-  system inside has hung, and a launch whose schedule cannot be created is terminated on the
-  spot rather than left with one clock.
+- a timer outside it: a one-time EventBridge Scheduler schedule that terminates the instance
+  five minutes after it expires, and then deletes itself. This works even if the system
+  inside has stopped responding. If the schedule cannot be created, the instance is
+  terminated immediately.
 
-Nothing is ever stopped rather than terminated. A stopped instance still pays for its disk,
-and the disk here is deleted with the instance.
+Instances are always terminated, never stopped, because a stopped instance still costs money
+for its disk. The disk is deleted with the instance.
 
-## Why no port is open
+## No open ports
 
-The desktop is never on the internet. The instance's own agent connects **out** to Session
+The desktop is not reachable from the internet. The instance's agent connects out to Session
 Manager, and `connect` asks Session Manager for a tunnel to port 3389 through that
-connection; the security group has nothing in it for a scanner to find.
+connection. The security group has no inbound rules.
 
-The password is made at random for each launch and passed in the instance's user data. That
-is readable by anyone with access to the account and by any process on the machine, which is
-acceptable for a machine with no open port that lives for hours — and `connect` reads it back
-from there rather than leaving a copy on this disk.
+The password is generated at random for each launch and passed in the instance's user data,
+where anyone with access to the account and any process on the instance can read it. That is
+acceptable for a machine with no open ports that exists for a few hours. `connect` reads the
+password from the user data instead of storing a copy on the Mac.
 
-## What it costs
+## Cost
 
-An afternoon of two hours on Windows and two on Ubuntu comes to about forty cents. What keeps
-it there:
+Two hours on Windows and two on Ubuntu cost about 40 cents. The costs stay low because:
 
-- **CPU credits on standard.** A `t3` launches as *unlimited* and bills for a CPU kept busy,
-  which a desktop installing itself does; on standard it slows down instead.
-- **The disk goes with the instance.**
-- **`--spot`**, for Linux, takes 60–70% off in exchange for AWS being allowed to take the
-  machine back. Not the default: losing a desktop halfway through a test costs more than it
-  saves.
+- the CPU credits are set to *standard*. A `t3` instance launches as *unlimited* by default,
+  which charges extra for a busy CPU, as during the desktop installation; on *standard* it
+  slows down instead;
+- the disk is deleted with the instance;
+- `--spot`, for Linux, reduces the price by 60–70%, but AWS can take the machine back at any
+  time. It is not the default, because losing a desktop during a test costs more time than
+  it saves.
 
-A public IPv4 address adds half a cent an hour. The agent needs it to reach Session Manager;
-nothing comes in through it.
+The public IPv4 address costs about half a cent an hour. The agent needs it to reach Session
+Manager; nothing connects in through it.
 
-## Why it does not run the install test
+## Why the lab does not run the install test
 
-It could: Session Manager runs commands on the instance. But it runs them as SYSTEM or root,
-in a session with no desktop, which is what the containers in the install job already do on
-every build for nothing. What a rented machine adds is somebody sitting in front of it.
+Session Manager could run commands on the instance, but it runs them as SYSTEM or root,
+without a desktop. The containers in the install job already do that on every build, at no
+cost. A rented machine is useful only for a person to test on.
