@@ -135,7 +135,12 @@ describe('uploadStack', () => {
     await uploadStack(client, 'case', 'study', files, undefined, clock)
 
     expect(presigned).toEqual([files.map((f) => f.sha256), ['hash-4', 'hash-5']])
-    expect(puts.filter((url) => url.startsWith('https://s3/2/'))).toEqual(['https://s3/2/hash-4', 'https://s3/2/hash-5'])
+    // Sorted: four workers race for the last two files, and which starts first
+    // is up to the event loop. What matters is the signing they went under.
+    expect(puts.filter((url) => url.startsWith('https://s3/2/')).sort()).toEqual([
+      'https://s3/2/hash-4',
+      'https://s3/2/hash-5'
+    ])
     // The series is attached in its own order, with the id of whichever
     // signing each file went up under.
     expect(attached).toEqual([[100, 101, 102, 103, 204, 205]])
