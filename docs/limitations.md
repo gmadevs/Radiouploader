@@ -53,7 +53,9 @@ requires individual frames.
   300-frame clip at 1024×768 is about 28 MB, compared with about 700 MB uncompressed. This is
   a second lossy compression of frames that were already lossy; the difference is not
   visible. Images that were lossless are never compressed this way. While the session is
-  open, the decoded clip is stored uncompressed on disk: about 700 MB for the same clip.
+  open, the decoded clip is stored uncompressed on disk: about 700 MB for the same clip. If
+  decoding would leave less than about 500 MB of free disk space, the app refuses before it
+  starts and shows how much space it needs.
 - **Time.** Compressing the frames takes most of the anonymisation time: about 18 seconds for
   300 frames. The first time you open a video, the whole video is decoded, which takes a few
   seconds for a long clip; after that, frames appear immediately.

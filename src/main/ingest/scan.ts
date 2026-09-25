@@ -77,9 +77,9 @@ export async function createTempDir(): Promise<string> {
  * Room left over once an archive is out: the anonymised copies, and whatever
  * else on the machine wants the disk, have to fit in it too.
  */
-const HEADROOM_BYTES = 512 * 1024 * 1024
+export const HEADROOM_BYTES = 512 * 1024 * 1024
 
-async function diskFree(dir: string): Promise<number> {
+export async function diskFree(dir: string): Promise<number> {
   const { bavail, bsize } = await fs.statfs(dir)
   return bavail * bsize
 }
@@ -118,7 +118,7 @@ function readStream(zipFile: yauzl.ZipFile, entry: yauzl.Entry): Promise<NodeJS.
   })
 }
 
-const gigabytes = (bytes: number): string => `${(bytes / 1024 ** 3).toFixed(1)} GB`
+export const gigabytes = (bytes: number): string => `${(bytes / 1024 ** 3).toFixed(1)} GB`
 
 /**
  * Extract a zip into a fresh temp directory.
