@@ -54,9 +54,9 @@ export function describeError(value: unknown): ShownError {
 
   if (/credentials are not configured/i.test(message)) {
     return {
-      title: "Radiopaedia credentials aren't set yet",
+      title: 'Radiopaedia credentials are not set',
       detail:
-        'The application ID and secret live in your account panel. Nothing can be read from the site, or sent to it, until they are there.',
+        'Enter the application ID and secret in the account panel. The app cannot read from Radiopaedia or send anything to it until they are set.',
       fix: 'credentials'
     }
   }
@@ -77,8 +77,8 @@ export function describeError(value: unknown): ShownError {
     return {
       title: 'The upload stopped partway',
       detail:
-        `${stopped[1]} — what had gone up is on Radiopaedia as a draft. ` +
-        'Press Upload to Radiopaedia again to carry on in that case rather than start another.',
+        `${stopped[1].replace(/\.$/, '')}. The images uploaded so far are on Radiopaedia in a draft case. ` +
+        'Click Upload to Radiopaedia again to continue in that case.',
       fix: null
     }
   }
@@ -87,7 +87,7 @@ export function describeError(value: unknown): ShownError {
   // the codes are what a proxy or a dropped connection leaves in the message.
   if (/fetch failed|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|network/i.test(message)) {
     return {
-      title: "Couldn't reach radiopaedia.org",
+      title: 'Could not reach radiopaedia.org',
       detail: 'Check the connection and try again.',
       fix: null
     }

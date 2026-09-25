@@ -81,13 +81,13 @@ export function CaseStep({
         <div className="card">
           <h2>Anonymisation warnings</h2>
           <p className="muted small" style={{ marginTop: 4 }}>
-            These fields were kept because they carry imaging parameters, but they are free text and could contain
-            personal data.
+            These fields were kept because they describe the images. They are free text and can contain personal data
+            such as names, so read them before uploading.
           </p>
           <ul className="small muted" style={{ margin: 0, paddingLeft: 18 }}>
             {warnings.slice(0, 8).map((w) => (
               <li key={w.tag}>
-                <code>{w.tag}</code> — {w.text} <span style={{ opacity: 0.6 }}>({w.count} images)</span>
+                <code>{w.tag}</code>: {w.text} <span style={{ opacity: 0.6 }}>({w.count} images)</span>
               </li>
             ))}
           </ul>
@@ -156,12 +156,12 @@ export function CaseStep({
                 ? 'Reading your draft cases…'
                 : drafts.length === 0
                   ? 'This account has no draft cases to add to.'
-                  : `The studies below are added to ${joined?.title ?? 'this case'} as new studies. Its title, age and the rest stay as they are — the API cannot change them, so edit those on Radiopaedia.`}
+                  : `The studies below are added to ${joined?.title ?? 'this case'} as new studies. Its title, age and other details stay unchanged, because the API cannot change them. Edit them on Radiopaedia if needed.`}
             </p>
           </>
         ) : (
           <p className="muted small" style={{ margin: 0 }}>
-            A new draft case is created from the details below, and counts against your draft quota.
+            A new draft case is created from the details below, and counts towards your draft quota.
           </p>
         )}
       </div>
@@ -230,8 +230,8 @@ export function CaseStep({
         </div>
         {(studies[0]?.patientAge !== null || studies[0]?.patientSex !== null) && (
           <p className="muted small" style={{ margin: '-6px 0 0' }}>
-            Age and sex were read from the original files, before anonymisation removed them. The age is the nearest
-            value on Radiopaedia's list to the one the files gave.
+            Age and gender were read from the original files before anonymisation. The age is rounded to the nearest
+            value in Radiopaedia's list.
           </p>
         )}
 
@@ -247,9 +247,8 @@ export function CaseStep({
 
         {studies.length > 1 && (
           <p className="muted small" style={{ margin: 0 }}>
-            The study endpoint takes no date, and the real dates are removed during anonymisation anyway. The interval
-            between studies goes in each caption instead, pre-filled from the originals — edit it if you prefer
-            different wording.
+            Study dates are not uploaded: the API has no date field, and anonymisation removes the dates. Each caption
+            is filled in with the interval since the first study, read from the original files. You can edit it.
           </p>
         )}
 
@@ -271,7 +270,6 @@ export function CaseStep({
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                 <h3>{study.studyDescription ?? `Study ${i + 1}`}</h3>
                 <span className="badge">{describeInterval(study.intervalDays, i === 0)}</span>
-                <span className="muted small">position {i + 2}</span>
               </div>
 
               <div className="row2">

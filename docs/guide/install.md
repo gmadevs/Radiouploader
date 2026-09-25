@@ -120,7 +120,7 @@ After you sign in, the header shows your username and how many of your draft cas
 use. When the draft quota is full, you can still import a study and add it to a draft you
 already have, but you cannot create a new case.
 
-If the app shows **Radiopaedia credentials aren't set yet**, click **Enter credentials** to
+If the app shows **Radiopaedia credentials are not set**, click **Enter credentials** to
 open the sign-in panel. To sign out, click your account name in the header, then **Sign out**.
 
 ## Using the app on another computer

@@ -24,7 +24,7 @@ describe('describeError', () => {
         "Error invoking remote method 'api:draftCases': Error: Radiopaedia application credentials are not configured yet"
       )
     )
-    expect(shown.title).toBe("Radiopaedia credentials aren't set yet")
+    expect(shown.title).toBe('Radiopaedia credentials are not set')
     expect(shown.fix).toBe('credentials')
     // The channel is this codebase's business, not the reader's.
     expect(JSON.stringify(shown)).not.toContain('api:draftCases')
@@ -37,7 +37,7 @@ describe('describeError', () => {
 
   it('says the site could not be reached, without guessing what got through', () => {
     const shown = describeError(new Error('fetch failed'))
-    expect(shown.title).toBe("Couldn't reach radiopaedia.org")
+    expect(shown.title).toBe('Could not reach radiopaedia.org')
     expect(shown.fix).toBeNull()
   })
 
@@ -47,7 +47,7 @@ describe('describeError', () => {
     )
     expect(shown.title).toBe('The upload stopped partway')
     expect(shown.detail).toContain('fetch failed')
-    expect(shown.detail).toContain('carry on in that case')
+    expect(shown.detail).toContain('continue in that case')
   })
 
   it('shows an unrecognised message as it was thrown', () => {

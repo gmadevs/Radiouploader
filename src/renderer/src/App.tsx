@@ -390,7 +390,7 @@ export function App(): React.JSX.Element {
         setError(
           stated(
             `${res.errors.length} file${res.errors.length === 1 ? '' : 's'} could not be anonymised`,
-            'Those files are not uploaded. The rest of the selection went through.'
+            'Those files will not be uploaded. The other files were anonymised.'
           )
         )
       }
@@ -709,8 +709,8 @@ export function App(): React.JSX.Element {
             </div>
 
             <p className="muted small prose">
-              Plane and sequence type have no API parameter, so every case has to be edited on the site anyway. It
-              is left as a draft, which is what adding more images to it later needs.
+              Plane and sequence type cannot be set through the API, so add them on Radiopaedia. The case stays a
+              draft, so you can add more images to it later.
             </p>
 
             <div className="done-actions">
@@ -826,7 +826,7 @@ export function App(): React.JSX.Element {
             <div className="small muted" style={{ marginBottom: 4 }}>
               {progress.phase}
               {progress.total > 0 ? ` ${progress.done}/${progress.total}` : ''}
-              {progress.detail ? ` — ${progress.detail}` : ''}
+              {progress.detail ? ` · ${progress.detail}` : ''}
             </div>
             <div className="progress">
               <div style={{ width: `${fraction * 100}%` }} />
