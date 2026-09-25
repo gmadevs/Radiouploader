@@ -228,8 +228,13 @@ application icon folder above 512 pixels; a deb with only the 1024-pixel icon sh
 in the menu ([#8](https://github.com/gmadevs/Radiouploader/issues/8)). The install job checks
 that the icon named by the deb's menu entry exists in a size hicolor supports.
 
-Generate the icons with the script instead of editing them by hand, so they stay consistent
-with the artwork.
+It also draws the README's banner, `docs/public/banner-light.png` and `banner-dark.png`: the
+icon, the app name and a one-line description, with text colours for GitHub's light and dark
+themes. The README chooses between them with a `<picture>` element. The text uses the system
+font, so generate the banner on macOS.
+
+Generate the icons and the banner with the script instead of editing them by hand, so they
+stay consistent with the artwork.
 
 ## Signing
 

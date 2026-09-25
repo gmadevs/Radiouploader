@@ -67,6 +67,17 @@ const OUTPUTS = [
   }))
 ]
 
+/**
+ * The wide banner at the top of the README: the icon, the name and one line
+ * saying what the app does. The text colours are GitHub's own for body text and
+ * secondary text in each theme. The font is the system's, so the banner is drawn
+ * on macOS, where it is SF Pro, and committed like the icon.
+ */
+const BANNERS = [
+  { file: 'banner-light.png', text: '#1f2328', muted: '#59636e' },
+  { file: 'banner-dark.png', text: '#f0f6fc', muted: '#9198a1' }
+]
+
 app.whenReady().then(run).catch((err) => {
   console.error(err)
   app.exit(1)
@@ -119,6 +130,18 @@ async function run() {
     `from ${source.name}: shape ${last.width}x${last.height} at ${last.scale.toFixed(2)}x` +
       (last.scale > 1 ? ' — enlarged, so a bigger original would be better' : '')
   )
+
+  // The README's banner, from the full-size cut, in one version for GitHub's
+  // light theme and one for its dark theme; the README picks with <picture>.
+  for (const { file, text, muted } of BANNERS) {
+    const dataUrl = await win.webContents.executeJavaScript(
+      `(${banner.toString()})(${JSON.stringify(last.png)}, ${JSON.stringify(text)}, ${JSON.stringify(muted)})`
+    )
+    const png = Buffer.from(dataUrl.replace(/^data:image\/png;base64,/, ''), 'base64')
+    const target = path.join(root, 'docs/public', file)
+    await fs.writeFile(target, png)
+    console.log(`${path.relative(root, target).padEnd(32)}: ${Math.round(png.byteLength / 1024)} KB`)
+  }
   console.log('ICON OK')
   app.exit(0)
 }
@@ -246,5 +269,50 @@ function cutOut(dataUrl, size, shape) {
       resolve({ png: out.toDataURL('image/png'), width: shapeWidth, height: shapeHeight, scale })
     }
     image.src = dataUrl
+  })
+}
+
+/**
+ * Runs in the page. Draws the banner at twice the size it is shown at, on a
+ * transparent background, and makes the canvas exactly as wide as its text.
+ */
+function banner(iconUrl, textColour, mutedColour) {
+  const NAME = 'Radiouploader'
+  const TAGLINE = 'Prepare DICOM studies and upload them to Radiopaedia'
+  const HEIGHT = 320
+  const ICON = 256
+  const PAD = 32
+  const GAP = 44
+  const nameFont = '700 128px -apple-system, "SF Pro Display", "Segoe UI", system-ui, sans-serif'
+  const tagFont = '400 44px -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif'
+
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onerror = () => reject(new Error('the icon did not load'))
+    image.onload = () => {
+      const measure = document.createElement('canvas').getContext('2d')
+      measure.font = nameFont
+      const nameWidth = measure.measureText(NAME).width
+      measure.font = tagFont
+      const tagWidth = measure.measureText(TAGLINE).width
+
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.ceil(PAD + ICON + GAP + Math.max(nameWidth, tagWidth) + PAD)
+      canvas.height = HEIGHT
+      const g = canvas.getContext('2d')
+      g.imageSmoothingQuality = 'high'
+      g.drawImage(image, PAD, (HEIGHT - ICON) / 2, ICON, ICON)
+
+      const x = PAD + ICON + GAP
+      g.textBaseline = 'alphabetic'
+      g.fillStyle = textColour
+      g.font = nameFont
+      g.fillText(NAME, x, 168)
+      g.fillStyle = mutedColour
+      g.font = tagFont
+      g.fillText(TAGLINE, x, 238)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    image.src = iconUrl
   })
 }

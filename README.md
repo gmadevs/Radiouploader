@@ -1,8 +1,9 @@
 <div align="center">
 
-<img src="resources/icon.png" alt="" width="128" height="128">
-
-# Radiouploader
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/public/banner-dark.png">
+  <img src="docs/public/banner-light.png" alt="Radiouploader" width="708">
+</picture>
 
 [![Licence: AGPL-3.0-only](https://img.shields.io/badge/licence-AGPL--3.0--only-blue?style=flat-square)](LICENSE)
 [![Platform: macOS, Linux, Windows](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square)](https://gmadevs.github.io/Radiouploader/develop/packaging)
