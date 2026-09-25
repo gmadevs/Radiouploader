@@ -45,6 +45,6 @@ describe('codeFrom', () => {
   })
 
   it('says so when an address carries no code at all', () => {
-    expect(() => codeFrom('https://example.org/callback', pending.state)).toThrow(/no authorization code/)
+    expect(() => codeFrom('https://example.org/callback', pending.state)).toThrow(/no authorisation code/)
   })
 })

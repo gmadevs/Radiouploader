@@ -147,7 +147,7 @@ export async function extractZip(
       const rel = path.relative(destDir, target)
       // `..` itself or a step up — not merely a name that starts with two dots.
       if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
-        throw new Error(`Refusing to extract entry outside the destination: ${entry.fileName}`)
+        throw new Error(`The zip contains a file that would be extracted outside its folder, so it was not opened: ${entry.fileName}`)
       }
       return target
     })

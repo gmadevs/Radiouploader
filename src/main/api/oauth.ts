@@ -163,10 +163,10 @@ export function codeFrom(pasted: string, state: string): string {
   if (error) throw new Error(`Authorisation declined: ${error}`)
   const returnedState = url.searchParams.get('state')
   if (returnedState !== null && returnedState !== state) {
-    throw new Error('That address answers a different sign-in — start again and paste the new one')
+    throw new Error('That address belongs to a different sign-in. Start the sign-in again and paste the new address.')
   }
   const code = url.searchParams.get('code')
-  if (!code) throw new Error('That address has no authorization code in it')
+  if (!code) throw new Error('That address has no authorisation code in it')
   return code
 }
 

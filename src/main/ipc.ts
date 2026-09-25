@@ -41,7 +41,7 @@ function broadcast(progress: Progress): void {
 
 async function requireClient(): Promise<RadiopaediaClient> {
   client ??= await RadiopaediaClient.fromStoredConfig()
-  if (!client) throw new Error('Radiopaedia application credentials are not configured yet')
+  if (!client) throw new Error('Radiopaedia application credentials are not configured')
   return client
 }
 

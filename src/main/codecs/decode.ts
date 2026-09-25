@@ -138,7 +138,7 @@ async function decodeWithWasm(
     const info = decoder.getFrameInfo()
     if (info.width !== header.columns || info.height !== header.rows) {
       throw new Error(
-        `Compressed frame is ${info.width}x${info.height} where the header says ${header.columns}x${header.rows}`
+        `The compressed frame is ${info.width}x${info.height}, and the header gives ${header.columns}x${header.rows}`
       )
     }
     // The decoded buffer is a view onto the codec's own heap, which the next

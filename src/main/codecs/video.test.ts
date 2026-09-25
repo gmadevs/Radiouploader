@@ -141,7 +141,7 @@ describe('decodeVideoFile', () => {
   it('refuses a stream whose pictures are not the size the header says', async () => {
     const source = await videoDicom('video-h264.mpegts', '1.2.840.10008.1.2.4.102', 1, { rows: 40, columns: 64 })
     await expect(decodeVideoFile(source, path.join(dir, 'wrong-size.rgb'), { rows: 40, columns: 64 })).rejects.toThrow(
-      /64x48 where the header says 64x40/
+      /64x48, and the header gives 64x40/
     )
   })
 
@@ -162,7 +162,7 @@ describe('decodeVideoFile', () => {
       path.join(dir, 'past.rgb'),
       { rows: HEIGHT, columns: WIDTH }
     )
-    await expect(readVideoFrame(video, FRAMES)).rejects.toThrow(/holds 12 frames, and frame 13/)
+    await expect(readVideoFrame(video, FRAMES)).rejects.toThrow(/has 12 frames, so frame 13/)
   })
 })
 

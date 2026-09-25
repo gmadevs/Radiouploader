@@ -79,7 +79,7 @@ export function ffmpegPath(): string {
     if (existsSync(fetched)) return fetched
     if (path.dirname(dir) === dir) break
   }
-  throw new Error(`The video decoder is missing from this build (no ffmpeg for ${target}); run npm run ffmpeg`)
+  throw new Error(`The video decoder is missing from this build (no ffmpeg for ${target}). Run npm run ffmpeg.`)
 }
 
 let version: Promise<string | null> | null = null
@@ -126,7 +126,7 @@ export function ffmpegVersion(): Promise<string | null> {
 export function videoBitstream(bytes: Uint8Array): Uint8Array {
   const dataSet = dicomParser.parseDicom(bytes)
   const element = dataSet.elements.x7fe00010
-  if (!element?.fragments?.length) throw new Error('This file has no video stream in its pixel data')
+  if (!element?.fragments?.length) throw new Error('The file has no video stream in its pixel data')
   return dicomParser.readEncapsulatedPixelDataFromFragments(dataSet, element, 0, element.fragments.length)
 }
 
@@ -143,7 +143,7 @@ function ppmHeader(bytes: Buffer): { width: number; height: number; length: numb
     return { width: Number(match[1]), height: Number(match[2]), length: match[0].length }
   }
   if (bytes.length >= 64 || (bytes.length >= 2 && text.slice(0, 2) !== 'P6')) {
-    throw new Error('The video decoder wrote something that is not a frame')
+    throw new Error('The video decoder produced output that is not a frame')
   }
   return null
 }
@@ -213,7 +213,7 @@ export async function decodeVideo(
         if (header === null) break
         if (header.width !== expected.columns || header.height !== expected.rows) {
           throw new Error(
-            `The video is ${header.width}x${header.height} where the header says ${expected.columns}x${expected.rows}`
+            `The video is ${header.width}x${header.height}, and the header gives ${expected.columns}x${expected.rows}`
           )
         }
         pending = pending.subarray(header.length)
@@ -227,7 +227,7 @@ export async function decodeVideo(
       throw new Error(`The video could not be decoded: ${stderr.trim() || how}`)
     }
     if (remaining > 0) throw new Error('The video stream ends in the middle of a frame')
-    if (frames === 0) throw new Error('The video stream holds no frames')
+    if (frames === 0) throw new Error('The video stream has no frames')
   } catch (error) {
     // Waited out, not only signalled: Windows will not delete a file a process
     // still has open, and the stream beside this is deleted next.
@@ -268,14 +268,14 @@ export async function decodeVideoFile(
 /** One frame of a decoded video, as the samples the rest of the app reads. */
 export async function readVideoFrame(video: DecodedVideo, frame: number): Promise<DecodedSamples> {
   if (frame < 0 || frame >= video.frames) {
-    throw new Error(`The video holds ${video.frames} frames, and frame ${frame + 1} is not one of them`)
+    throw new Error(`The video has ${video.frames} frames, so frame ${frame + 1} does not exist`)
   }
   const length = video.rows * video.columns * 3
   const handle = await fs.open(video.path, 'r')
   try {
     const bytes = new Uint8Array(length)
     const { bytesRead } = await handle.read(bytes, 0, length, frame * length)
-    if (bytesRead !== length) throw new Error(`Frame ${frame + 1} of the video is cut short`)
+    if (bytesRead !== length) throw new Error(`Frame ${frame + 1} of the video is incomplete`)
     return { bytes, bitsAllocated: 8, samplesPerPixel: 3, signed: false, planarConfiguration: 0, photometric: 'RGB' }
   } finally {
     await handle.close()

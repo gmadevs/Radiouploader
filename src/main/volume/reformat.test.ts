@@ -235,6 +235,6 @@ describe('colour volumes', () => {
   it('refuses to project through colour rather than mixing voxels together', () => {
     expect(() =>
       reformatSlice(colours(), { frame: FRAMES.axial, projection: 'mip', thickness: 4, offset: 2, pixelSpacing: 1 })
-    ).toThrow(/not projected through/)
+    ).toThrow(/but not projected/)
   })
 })

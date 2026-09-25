@@ -14,7 +14,7 @@ export function encodedFrame(
   frames: number
 ): Uint8Array {
   const element = dataSet.elements.x7fe00010
-  if (!element?.fragments?.length) throw new Error('This file has no compressed pixel data to read')
+  if (!element?.fragments?.length) throw new Error('The file has no compressed pixel data')
 
   // A single-frame object owns every fragment, however many it was split into.
   if (frames <= 1) {
@@ -35,5 +35,5 @@ export function encodedFrame(
   if (scanned.length > frame) {
     return dicomParser.readEncapsulatedImageFrame(dataSet, element, frame, scanned)
   }
-  throw new Error(`Cannot tell where frame ${frame + 1} starts: this file has no basic offset table`)
+  throw new Error(`Cannot find where frame ${frame + 1} starts: the file has no basic offset table`)
 }

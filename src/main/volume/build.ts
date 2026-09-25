@@ -52,7 +52,7 @@ export class VolumeError extends Error {
 /** Millimetres between slices, from the positions the ingest already worked out. */
 function sliceSpacing(locations: (number | null)[]): number {
   if (locations.some((location) => location === null)) {
-    throw new VolumeError('These images do not say where they sit, so they cannot be stacked into a volume')
+    throw new VolumeError('These images have no position (ImagePositionPatient), so they cannot be stacked into a volume')
   }
   const sorted = [...(locations as number[])].sort((a, b) => a - b)
   const gaps = sorted.slice(1).map((location, i) => location - sorted[i])
@@ -60,12 +60,12 @@ function sliceSpacing(locations: (number | null)[]): number {
 
   const middle = [...gaps].sort((a, b) => a - b)[Math.floor(gaps.length / 2)]
   if (middle <= 0) {
-    throw new VolumeError('These images all sit at the same place, so there is no depth to reformat')
+    throw new VolumeError('All these images have the same position, so there is no depth to reformat')
   }
   const worst = Math.max(...gaps.map((gap) => Math.abs(gap - middle) / middle))
   if (worst > SPACING_TOLERANCE) {
     throw new VolumeError(
-      `The gap between images varies by ${Math.round(worst * 100)}%, so a reformat of them would be stretched where the images are missing`
+      `The distance between images varies by ${Math.round(worst * 100)}%, so a reformat would be stretched where images are missing`
     )
   }
   return middle
@@ -131,11 +131,11 @@ function interleave<T extends Int16Array | Uint16Array | Uint8Array>(samples: T,
 export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
   const slices = stack.slices
   if (slices.length < 3) {
-    throw new VolumeError('A reformat needs at least three images to have something to cut through')
+    throw new VolumeError('A reformat needs at least three images')
   }
   if (!stack.sharedPlane) {
     throw new VolumeError(
-      'These images look from different directions — projections around the patient rather than slices through them, so there is no volume to cut'
+      'These images are projections from different directions, not parallel slices, so they do not form a volume'
     )
   }
 
@@ -153,7 +153,7 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
   // whatever the table happens to hold there.
   if (channels === 1 && header.photometric.startsWith('PALETTE')) {
     throw new VolumeError(
-      'These images are palette colour: the stored values are places in a colour table, so nothing between two of them means anything'
+      'These images use palette colour. Their values are positions in a colour table, so they cannot be interpolated'
     )
   }
   if (channels === 3 && header.photometric !== 'RGB') {
@@ -162,10 +162,10 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
     )
   }
   if (header.pixelSpacing === null) {
-    throw new VolumeError('These images do not say how big a pixel is, so a reformat would have no scale')
+    throw new VolumeError('These images have no pixel spacing (PixelSpacing), so a reformat would have no scale')
   }
   if (header.slope <= 0) {
-    throw new VolumeError('These images carry a negative rescale, which would turn a maximum into a minimum')
+    throw new VolumeError('These images have a negative rescale slope, which would turn a maximum into a minimum')
   }
   spacing.x = header.pixelSpacing.column
   spacing.y = header.pixelSpacing.row
@@ -195,7 +195,7 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
   const bytes = voxels * (header.bitsAllocated <= 8 ? 1 : 2)
   if (bytes > MAX_BYTES) {
     throw new VolumeError(
-      `This stack would need ${Math.round(bytes / (1024 * 1024))} MB in memory to reformat, which is more than this app will take`
+      `Reformatting this stack would need ${Math.round(bytes / (1024 * 1024))} MB of memory, more than the app allows`
     )
   }
 
@@ -230,10 +230,10 @@ export async function buildVolume(stack: Stack): Promise<BuiltVolume> {
     // Checked before the crop is taken, so a stack of mixed sizes is caught by
     // the size it really is rather than by the rectangle asked of it.
     if (other.rows !== header.rows || other.columns !== header.columns) {
-      throw new VolumeError('The images in this stack are not all the same size, so they do not stack')
+      throw new VolumeError('The images in this stack are not all the same size, so they cannot be stacked')
     }
     if (other.slope !== header.slope || other.intercept !== header.intercept) {
-      throw new VolumeError('The images in this stack are not all in the same units, so a projection of them would not be either')
+      throw new VolumeError('The images in this stack do not all use the same rescale, so their values cannot be combined')
     }
     const read = planar ? interleave(whole.slice(0, perSlice), pixels, channels) : whole.slice(0, perSlice)
     blank(read, header, masks, stack.window)

@@ -397,7 +397,7 @@ export async function anonymiseFile(
   const rewriting = compression !== null && changingPixels
   if (rewriting && !isVideo && !canDecode(transferSyntax ?? '')) {
     throw new Error(
-      `Cannot read the pixel data of ${path.basename(sourcePath)}: ${compression} is not a format this app decodes`
+      `Cannot read the pixel data of ${path.basename(sourcePath)}: the app cannot decode ${compression}`
     )
   }
   // Frames of an encapsulated object are fragments rather than offsets, and
@@ -475,18 +475,18 @@ export async function anonymiseFile(
       photometric = decoded.photometric
     } else if (totalFrames > 1) {
       if (!allPixels || frameLength === 0) {
-        throw new Error(`Cannot split frames of ${path.basename(sourcePath)}: pixel data is not addressable`)
+        throw new Error(`Cannot split the frames of ${path.basename(sourcePath)}: its pixel data could not be read`)
       }
       const start = task.frame * frameLength
       if (start + frameLength > allPixels.byteLength) {
-        throw new Error(`Frame ${task.frame + 1} runs past the pixel data of ${path.basename(sourcePath)}`)
+        throw new Error(`${path.basename(sourcePath)} is truncated: frame ${task.frame + 1} is incomplete`)
       }
       pixelElement.Value = [allPixels.slice(start, start + frameLength)]
       dict['00280008'] = { vr: 'IS', Value: ['1'] }
       dict['00200013'] = { vr: 'IS', Value: [String(task.instanceNumber)] }
     } else if (allPixels) {
       if (masks.length > 0 && frameLength === 0) {
-        throw new Error(`Cannot redact ${path.basename(sourcePath)}: pixel data is not addressable`)
+        throw new Error(`Cannot blank ${path.basename(sourcePath)}: its pixel data could not be read`)
       }
       // Masking works on a copy, and every task re-points at one — otherwise a
       // second task from the same file would inherit the first one's redaction.
@@ -498,7 +498,7 @@ export async function anonymiseFile(
     // where it was drawn, so the file is refused and stays out of the upload.
     if (changingPixels) {
       const problem = sampleLayoutProblem(geometry.bitsAllocated, photometric)
-      if (problem) throw new Error(`Cannot blank, crop or split ${path.basename(sourcePath)}: it stores ${problem}`)
+      if (problem) throw new Error(`Cannot blank, crop or split ${path.basename(sourcePath)}: the app cannot change images stored as ${problem}`)
     }
 
     if (masks.length > 0) {
@@ -540,7 +540,7 @@ export async function anonymiseFile(
     if (bounds) {
       const element = dict['7FE00010']
       const stored = element?.Value?.[0] as ArrayBuffer | undefined
-      if (!stored) throw new Error(`Cannot crop ${path.basename(sourcePath)}: pixel data is not addressable`)
+      if (!stored) throw new Error(`Cannot crop ${path.basename(sourcePath)}: its pixel data could not be read`)
       const cut = cropFrameBytes(new Uint8Array(stored), geometry, bounds)
       element.Value = [cut.buffer.slice(cut.byteOffset, cut.byteOffset + cut.byteLength) as ArrayBuffer]
 

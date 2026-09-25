@@ -96,7 +96,7 @@ export class RadiopaediaClient {
   async completeSignIn(pasted: string): Promise<void> {
     if (!this.pending) throw new Error('Start the sign-in before submitting a code')
     const code = codeFrom(pasted, this.pending.state)
-    if (code === '') throw new Error('Paste the authorization code from Radiopaedia')
+    if (code === '') throw new Error('Paste the authorisation code from Radiopaedia')
 
     this.tokens = await exchangeCode(this.config, code, this.pending.codeVerifier)
     this.pending = null
@@ -118,7 +118,7 @@ export class RadiopaediaClient {
   private async expire(): Promise<never> {
     this.tokens = null
     await this.persist()
-    throw new Error('Session expired — please sign in again')
+    throw new Error('Session expired. Sign in again.')
   }
 
   /**
@@ -167,7 +167,7 @@ export class RadiopaediaClient {
   async request(pathOrUrl: string, init: RequestInit = {}): Promise<Response> {
     const target = new URL(pathOrUrl, API_BASE)
     if (target.origin !== RADIOPAEDIA_ORIGIN) {
-      throw new Error(`Refusing to send the Radiopaedia token to ${target.origin}`)
+      throw new Error(`The Radiopaedia token is sent only to radiopaedia.org, not to ${target.origin}`)
     }
     const url = target.toString()
 
@@ -188,7 +188,7 @@ export class RadiopaediaClient {
     }
     if (!res.ok) {
       const body = await res.text().catch(() => '')
-      const hint = res.status === 429 ? 'Rate limited by Radiopaedia — retry in a moment' : res.statusText
+      const hint = res.status === 429 ? 'Too many requests to Radiopaedia, try again in a moment' : res.statusText
       throw new RadiopaediaApiError(res.status, `${res.status} ${hint} (${url})`, body)
     }
     return res
@@ -285,7 +285,7 @@ export class RadiopaediaClient {
     // The reference calls system_id required and the picker enforces it, so it
     // is refused here too rather than sent as null for the server to reject.
     if (draft.systemId === null) {
-      throw new Error('Choose a system before uploading — Radiopaedia requires one on every case')
+      throw new Error('Choose a system before uploading. Radiopaedia requires one on every case.')
     }
 
     const payload = {

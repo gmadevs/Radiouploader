@@ -168,7 +168,7 @@ export function reformatSlice(volume: Volume, request: ReformatRequest): Reforma
   // volume. The dialog does not offer it; this is the same statement in code.
   const channels = volume.channels
   if (channels > 1 && request.projection !== 'slice') {
-    throw new Error('A colour volume can be cut on any plane, but not projected through')
+    throw new Error('Colour images can be reformatted as slices, but not projected')
   }
 
   const samples = new Float32Array(width * height * channels)

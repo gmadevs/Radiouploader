@@ -113,7 +113,7 @@ describe('RadiopaediaClient.request', () => {
     const client = await signedIn({ accessToken: 'old', refreshToken: 'r', expiresAt: later() })
     const calls = stubNetwork(() => new Response('{}'))
 
-    await expect(client.request('https://example.org/steal')).rejects.toThrow(/Refusing to send/)
+    await expect(client.request('https://example.org/steal')).rejects.toThrow(/sent only to radiopaedia.org/)
     await expect(client.request('https://radiopaedia.org/direct_s3_uploads')).resolves.toBeDefined()
     expect(calls.api).toEqual(['old'])
   })

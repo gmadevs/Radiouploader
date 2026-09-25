@@ -123,7 +123,7 @@ describe('anonymiseFile — multiframe', () => {
   it('refuses a frame beyond the end rather than writing rubbish', async () => {
     await expect(
       anonymiseFile(source(), outDir, [{ frame: 9, outputName: 'bad.dcm', instanceNumber: 1 }])
-    ).rejects.toThrow(/runs past the pixel data/)
+    ).rejects.toThrow(/is truncated: frame/)
   })
 
   it('reads the source once for any number of frames', async () => {
@@ -280,7 +280,7 @@ describe('anonymiseFile — multiframe', () => {
 
     await expect(
       anonymiseFile(outputPath, outDir, [{ frame: 1, outputName: 'mpeg.dcm', instanceNumber: 1 }])
-    ).rejects.toThrow(/is not a format this app decodes/)
+    ).rejects.toThrow(/the app cannot decode/)
   })
 })
 

@@ -69,7 +69,7 @@ export function decodeRleFrame(encoded: Uint8Array, header: ImageHeader): Decode
 
   const bytesPerSample = header.bitsAllocated <= 8 ? 1 : 2
   if (header.bitsAllocated > 16) {
-    throw new Error(`RLE at ${header.bitsAllocated} bits per sample is not something this app reads`)
+    throw new Error(`The app cannot read RLE with ${header.bitsAllocated} bits per sample`)
   }
 
   const table = new DataView(encoded.buffer, encoded.byteOffset, encoded.byteLength)
@@ -82,7 +82,7 @@ export function decodeRleFrame(encoded: Uint8Array, header: ImageHeader): Decode
       `RLE frame has ${declared} segments where ${header.samplesPerPixel} samples of ${bytesPerSample} byte(s) need ${wanted}`
     )
   }
-  if (declared < 1 || declared > MAX_SEGMENTS) throw new Error(`RLE frame claims ${declared} segments`)
+  if (declared < 1 || declared > MAX_SEGMENTS) throw new Error(`RLE frame has ${declared} segments, which is not valid`)
 
   const offsets: number[] = []
   for (let i = 0; i < declared; i++) offsets.push(table.getUint32(4 + i * 4, true))

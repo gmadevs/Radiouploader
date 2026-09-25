@@ -127,6 +127,6 @@ describe('decodeEncapsulatedFrame', () => {
     const encoded = await encode('@cornerstonejs/codec-charls/wasmjs', 'JpegLSEncoder', 32, 16, samples)
     await expect(
       decodeEncapsulatedFrame(encoded, header({ transferSyntax: '1.2.840.10008.1.2.4.80', rows: 64, columns: 64 }))
-    ).rejects.toThrow(/where the header says/)
+    ).rejects.toThrow(/and the header gives/)
   })
 })

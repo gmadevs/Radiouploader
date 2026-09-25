@@ -92,5 +92,5 @@ this happens.
 A dynamic enhanced MR or CT file is [split into its phases](/internals/splitting), and each
 phase can be uploaded. [Reformat](/guide/reformat) cannot build a volume from it, because an
 enhanced file stores the pixel size per frame, which the app does not read for reformatting.
-The dialog shows *"These images do not say how big a pixel is, so a reformat would have no
-scale"*.
+The dialog shows *"These images have no pixel spacing (PixelSpacing), so a reformat would
+have no scale"*.

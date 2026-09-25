@@ -292,7 +292,7 @@ function unsupportedReason(units: Unit[]): string | null {
   )?.instance
   if (blocked === undefined) return null
   const codec = compressionOf(blocked.transferSyntaxUid)
-  return `${codec} multiframe — this app has no decoder for it, so the run cannot be split or uploaded`
+  return `${codec} multiframe: the app cannot decode this format, so the run cannot be split or uploaded`
 }
 
 function buildLabel(d: Dimensions, phaseIndex: number | null, echoTime: number | null, multi: Set<StackKind>): string {

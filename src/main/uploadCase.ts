@@ -98,8 +98,8 @@ async function caseFor(
     if (!still) {
       if (record?.caseId === requested) await clearInterruptedUpload()
       throw new Error(
-        'That case is no longer a draft on Radiopaedia, so it cannot take new images. ' +
-          'It may have been published, sent for review, or deleted since the list was read.'
+        'That case is no longer a draft on Radiopaedia, so images cannot be added to it. ' +
+          'It may have been published, submitted for review or deleted since the list was loaded.'
       )
     }
     return carryOn ? { ...record, planned: [...new Set([...record.planned, ...keys])] } : fresh(requested)
@@ -114,7 +114,7 @@ async function caseFor(
     throw new Error(
       `Draft quota full: ${quota.draftCaseCount} of ${quota.allowedDraftCases} used. ` +
         'Publish or delete a draft case on Radiopaedia first. ' +
-        'You can raise your quota at https://radiopaedia.org/supporters'
+        'You can raise your quota at https://radiopaedia.org/supporters.'
     )
   }
   return fresh(await c.createCase(request.caseDraft))

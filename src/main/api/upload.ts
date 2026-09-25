@@ -120,7 +120,7 @@ async function presign(client: RadiopaediaClient, clock: Clock, files: UploadFil
     return ((await res.json()) as { uploads: PresignedUpload[] }).uploads
   })
   if (!Array.isArray(uploads) || uploads.length !== files.length) {
-    throw new Error(`direct_s3_uploads returned ${uploads?.length ?? 0} slots for ${files.length} files`)
+    throw new Error(`Radiopaedia returned ${uploads?.length ?? 0} upload URLs for ${files.length} files`)
   }
   return uploads
 }

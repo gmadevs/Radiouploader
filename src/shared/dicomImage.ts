@@ -67,7 +67,7 @@ export function compressionOf(transferSyntax: string | null | undefined): string
 export class UnsupportedTransferSyntaxError extends Error {
   constructor(transferSyntax: string) {
     const name = TRANSFER_SYNTAX_NAMES[transferSyntax] ?? transferSyntax
-    super(`${name} is not supported for preview yet`)
+    super(`The app cannot decode ${name} images`)
     this.name = 'UnsupportedTransferSyntaxError'
   }
 }

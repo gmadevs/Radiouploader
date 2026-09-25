@@ -188,7 +188,7 @@ describe('buildStacks — compressed multiframe', () => {
 
   it('refuses a run it cannot decode', () => {
     const { stacks } = buildStacks('s', undecodableCine())
-    expect(stacks[0].unsupported).toContain('this app has no decoder for it')
+    expect(stacks[0].unsupported).toContain('the app cannot decode this format')
     expect(stacks[0].selected).toBe(false)
   })
 
