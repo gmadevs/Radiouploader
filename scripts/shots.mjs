@@ -66,6 +66,10 @@ async function run() {
     username: 'your-account',
     quota: { draftCaseCount: 0, allowedDraftCases: 5 }
   }))
+  // Unstubbed, the case step asked the real account: where no credentials were
+  // configured the screenshot carried their error in the footer, and where they
+  // were it would have listed somebody's drafts. An account with none.
+  stub('api:draftCases', () => [])
   stub('source:pick', () => [sampleDir])
   // Whether a release exists on GitHub is not a property of this build, and a
   // banner that appears the day after a release would rewrite these PNGs with

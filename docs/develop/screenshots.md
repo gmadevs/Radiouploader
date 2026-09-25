@@ -34,8 +34,9 @@ seeded generator, so regenerating the study produces identical files.
 
 ## How the app is driven
 
-`scripts/shots.mjs` replaces four things at the IPC layer: sign-in (`auth:status` and
-`api:currentUser`), the folder picker, the upload and the update check. The app itself has no
+`scripts/shots.mjs` replaces five things at the IPC layer: sign-in (`auth:status` and
+`api:currentUser`), the list of draft cases (`api:draftCases`), the folder picker, the upload
+and the update check. The app itself has no
 test code. The update check is replaced because its result depends on GitHub, not on the
 build: without the stub, a new release would change the screenshots the next day. Everything
 else is the real app: import, preview decoding and anonymisation.
