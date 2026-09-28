@@ -6,7 +6,7 @@ All screenshots on this site are generated from the running app with one command
 npm run shots
 ```
 
-It builds the app, starts it, goes through every step of the wizard and writes ten PNG files
+It builds the app, starts it, goes through every step of the wizard and writes eleven PNG files
 to `docs/public/shots/`.
 
 ## Why they are generated

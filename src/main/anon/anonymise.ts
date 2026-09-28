@@ -135,7 +135,7 @@ function decimalListOf(dict: Dict, tag: string, count: number): number[] | null 
 }
 
 /** The items of a sequence element, which dcmio holds as plain dicts. */
-function itemsOf(dict: Dict | null, tag: string): Dict[] {
+export function itemsOf(dict: Dict | null, tag: string): Dict[] {
   const value = dict?.[tag]?.Value
   return Array.isArray(value) ? (value as Dict[]) : []
 }
@@ -166,7 +166,7 @@ function copyTag(from: Dict | null, to: Dict, tag: string): void {
  *
  * Returns the window this frame asks for, which lives per frame too.
  */
-function promoteFrameTags(dict: Dict, frame: Dict | null, shared: Dict | null): WindowLevel | null {
+export function promoteFrameTags(dict: Dict, frame: Dict | null, shared: Dict | null): WindowLevel | null {
   if (frame === null && shared === null) return null
   // A value the file states once for every frame is in the shared sequence;
   // the per-frame one wins where both say something.

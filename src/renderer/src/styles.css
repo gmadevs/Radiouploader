@@ -318,7 +318,9 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
    invisible until the pointer was on the card, which hid them from anyone
    reading a screenshot and covered the anatomy of anyone who found them — on
    the screen whose whole instruction is to open a series and look at it. */
-.stack-actions { display: flex; gap: 6px; padding: 0 10px 10px; }
+/* Wrapped: three buttons are wider than a card, and the third one was cut off
+   at its edge. */
+.stack-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 10px 10px; }
 .stack-actions button { white-space: nowrap; }
 
 .viewer-backdrop {
@@ -438,6 +440,49 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 .reformat-panel .placeholder {
   position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px;
 }
+
+/* The image and the list of structures beside it. The list is narrow and
+   scrolls, so the image keeps the height it needs to be drawn on. */
+.annotate-body { flex: 1; min-height: 0; display: flex; }
+.annotate-body .viewer-stage { flex: 1; min-width: 0; }
+.viewer-stage.drawing canvas { cursor: none; }
+.viewer-stage.drawing.polygon canvas { cursor: crosshair; }
+/* Over the canvas and in the grid's own pixels, so a brush ring is the size of
+   what it paints. It takes no pointer: every stroke belongs to the canvas. */
+.draw-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.brush-ring { fill: none; stroke: #fff; stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.8; }
+.polygon-line { fill: none; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.polygon-start { fill: rgba(255, 255, 255, 0.25); stroke: #fff; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.annotate-aside {
+  width: 260px; flex: none; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px; border-left: 1px solid var(--border);
+}
+.structure {
+  display: flex; align-items: center; gap: 8px; padding: 4px 6px;
+  border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+}
+.structure.on { border-color: var(--accent); background: var(--panel-2); }
+.structure input[type='checkbox'] { width: auto; margin: 0; flex: none; accent-color: var(--accent); }
+.structure input[type='text'] { flex: 1; min-width: 0; padding: 4px 6px; font-size: 13px; }
+.swatch { width: 14px; height: 14px; flex: none; border-radius: 3px; }
+.structure-detail { display: grid; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
+.structure-detail .viewer-slider > span:first-child { width: 56px; }
+.structure-detail .viewer-slider .n { width: 40px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.swatch-button { width: 20px; height: 20px; padding: 0; border-radius: 4px; border: 2px solid transparent; }
+.swatch-button.on { border-color: var(--text); }
+.swatches input[type='color'] { width: 26px; height: 22px; padding: 0; border: none; background: transparent; }
+.annotate-help { line-height: 1.5; margin-top: auto; }
+/* Which images of the chosen structure are drawn, filled in or cleared, laid
+   over the slider at the same positions. Inset by half a thumb, which is where
+   the slider's own ends are. */
+.strip-track { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.strip-track input[type='range'] { width: 100%; padding: 0; border: none; background: transparent; accent-color: var(--accent); }
+.key-strip { position: relative; height: 10px; margin: 0 8px; }
+.key-strip .mark { position: absolute; top: 0; width: 3px; margin-left: -1px; height: 10px; border-radius: 1px; }
+.key-strip .mark.filled { top: 6px; height: 4px; opacity: 0.6; }
+.key-strip .mark.empty { border: 1px solid var(--muted); background: transparent; }
 
 .viewer-controls { flex: none; display: grid; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
 /* The image number and the button that drops that one image, on one line: a

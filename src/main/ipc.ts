@@ -4,6 +4,7 @@ import { BrowserWindow, clipboard, dialog, ipcMain } from 'electron'
 // exactly the case when the app is driven by a script.
 import { version } from '../../package.json'
 import type {
+  AnnotationRequest,
   AppInfo,
   AnonResult,
   BurnInFinding,
@@ -18,6 +19,7 @@ import type {
   UpdateStatus,
   VolumeInfo
 } from '@shared/types'
+import { commitAnnotation } from './annotate'
 import { anonymiseStacks, summariseWarnings } from './anon'
 import { ffmpegVersion } from './codecs/video'
 import { scanForBurnIn } from './burnInScan'
@@ -104,6 +106,12 @@ export function registerIpc(): void {
   ipcMain.handle('volume:count', (_e, plan: ReformatPlan): number => planCount(plan))
   ipcMain.handle('volume:commit', async (_e, plan: ReformatPlan) => commitReformat(plan))
   ipcMain.handle('volume:close', () => closeVolume())
+
+  // Annotating. The keys of the drawing come over; the pixels are read, painted
+  // and written here, at full size, and never cross back.
+  ipcMain.handle('annotate:commit', async (_e, stackId: string, request: AnnotationRequest) =>
+    commitAnnotation(stackId, request)
+  )
 
   // Runs on the selection as it stands — trim, masks and crop included — so an
   // area already blanked, or about to be cut off, is not reported back as

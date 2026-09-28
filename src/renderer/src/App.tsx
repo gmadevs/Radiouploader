@@ -21,6 +21,8 @@ import { modalityFromDicom } from '@shared/radiopaedia'
 import { splitByReview, type StackEntry } from './burnIn'
 import { BurnInCheck } from './components/BurnInCheck'
 import { ReformatDialog } from './components/ReformatDialog'
+import { AnnotateDialog } from './components/AnnotateDialog'
+import type { SavedAnnotation } from './annotateEdit'
 import { CaseStep, type CaseForm } from './components/CaseStep'
 import { InfoDialog } from './components/InfoDialog'
 import { ReviewStep } from './components/ReviewStep'
@@ -85,6 +87,18 @@ export function App(): React.JSX.Element {
     heading: string
     modality: string | null
   } | null>(null)
+  /** The stack whose annotation dialog is open. */
+  const [annotating, setAnnotating] = useState<{
+    stackId: string
+    seriesId: string
+    heading: string
+    modality: string | null
+  } | null>(null)
+  /**
+   * Drawings by stack, kept for as long as the import is, so closing the dialog
+   * and opening it again finds the structures where they were left.
+   */
+  const [annotations, setAnnotations] = useState<Record<string, SavedAnnotation>>({})
   /** What the pixel check noticed, or null while it is still looking. */
   const [findings, setFindings] = useState<BurnInFinding[] | null>(null)
   /** The account's draft cases, or null until they have been read. */
@@ -197,6 +211,11 @@ export function App(): React.JSX.Element {
   const reformatStack = useMemo(
     () => allStacks.find((stack) => stack.id === reformatting?.stackId) ?? null,
     [allStacks, reformatting]
+  )
+
+  const annotateStack = useMemo(
+    () => allStacks.find((stack) => stack.id === annotating?.stackId) ?? null,
+    [allStacks, annotating]
   )
 
   const viewedStack = useMemo(
@@ -396,6 +415,7 @@ export function App(): React.JSX.Element {
         return
       }
       setIngest(res)
+      setAnnotations({})
       setStep('review')
     } catch (e) {
       setError(describeError(e))
@@ -523,6 +543,7 @@ export function App(): React.JSX.Element {
     setViewing(null)
     setOpened(new Set())
     setConfirming(false)
+    setAnnotations({})
     setIngest(null)
     setResult(null)
     setInterrupted(null)
@@ -566,7 +587,11 @@ export function App(): React.JSX.Element {
   const fraction = fractionOf(progress)
 
   const dialogUp =
-    confirming || showInfo || (viewing !== null && viewedStack !== null) || (reformatting !== null && reformatStack !== null)
+    confirming ||
+    showInfo ||
+    (viewing !== null && viewedStack !== null) ||
+    (reformatting !== null && reformatStack !== null) ||
+    (annotating !== null && annotateStack !== null)
 
   return (
     <div className="app">
@@ -671,6 +696,17 @@ export function App(): React.JSX.Element {
               // before the dialog opens and asks for it.
               await pushSelection()
               setReformatting({
+                stackId: stack.id,
+                seriesId: series.id,
+                heading: `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`,
+                modality: series.modality
+              })
+            }}
+            onAnnotate={async (stack, series, study) => {
+              // The copy is written in the main process from its own tree, and
+              // it takes the redactions from there.
+              await pushSelection()
+              setAnnotating({
                 stackId: stack.id,
                 seriesId: series.id,
                 heading: `${study.studyDescription ?? 'Study'} · ${series.description ?? 'Unnamed series'}`,
@@ -792,6 +828,35 @@ export function App(): React.JSX.Element {
                   if (study.id !== studyId) return study
                   const after = study.series.findIndex((existing) => existing.id === reformatting.seriesId)
                   const next = [...study.series]
+                  next.splice(after < 0 ? next.length : after + 1, 0, series)
+                  return { ...study, series: next }
+                })
+              }
+            })
+          }
+        />
+      )}
+
+      {annotating && annotateStack && (
+        <AnnotateDialog
+          // Per stack, since the drawing is read once when it opens.
+          key={annotateStack.id}
+          stack={annotateStack}
+          heading={annotating.heading}
+          modality={annotating.modality}
+          saved={annotations[annotateStack.id] ?? null}
+          onSave={(saved) => setAnnotations((current) => ({ ...current, [annotateStack.id]: saved }))}
+          onClose={() => setAnnotating(null)}
+          // The main process has already made the same change to its tree.
+          onAdded={(studyId, series, replaced) =>
+            setIngest((current) => {
+              if (current === null) return current
+              return {
+                ...current,
+                studies: current.studies.map((study) => {
+                  if (study.id !== studyId) return study
+                  const next = study.series.filter((existing) => existing.id !== replaced)
+                  const after = next.findIndex((existing) => existing.id === annotating.seriesId)
                   next.splice(after < 0 ? next.length : after + 1, 0, series)
                   return { ...study, series: next }
                 })

@@ -13,10 +13,11 @@ interface Props {
   onOpen: (stack: Stack) => void
   /** Cut this stack another way, if there is enough of it to cut. */
   onReformat: (stack: Stack) => void
+  onAnnotate: (stack: Stack) => void
 }
 
 /** One stack: a scrubable preview, the trim range, and the include control. */
-export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props): React.JSX.Element {
+export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat, onAnnotate }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const [frame, setFrame] = useState<PreviewFrame | null>(null)
@@ -219,6 +220,15 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat }: Props
               onClick={() => onReformat(stack)}
             >
               Reformat
+            </button>
+          )}
+          {!stack.unsupported && (
+            <button
+              className="small"
+              title="Draw coloured structures on the images and add a copy with them to the case"
+              onClick={() => onAnnotate(stack)}
+            >
+              Annotate
             </button>
           )}
         </div>

@@ -52,8 +52,8 @@ Below the preview, a card shows:
   [blank or crop](/guide/review) is uploaded uncompressed and becomes larger.
 
 Nothing is drawn over the preview, because patient banners are often in the top corners of
-an image. The **Open for review** and **Reformat** buttons are below the card and always
-visible.
+an image. The **Open for review**, **Reformat** and [**Annotate**](/guide/annotate) buttons are
+below the card and always visible.
 
 ## Selected and unselected stacks
 

@@ -32,6 +32,9 @@ features:
   - title: Reformats
     details: Coronal and sagittal reformats, and MIP, MinIP or mean slabs of any thickness, added to the case as new series.
     link: /guide/reformat
+  - title: Annotation
+    details: Coloured structures drawn on a few images of a stack and filled in on the images between them, added to the case as a copy of the stack.
+    link: /guide/annotate
   - title: DICOM video
     details: MPEG-2, H.264 and HEVC video is decoded into frames, which you can review, blank and crop like any other series. The frames are uploaded as JPEG.
     link: /limitations

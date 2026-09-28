@@ -14,6 +14,8 @@ interface Props {
   onOpen: (stack: Stack, series: Series, study: Study) => void
   /** Open the reformat dialog on one stack. */
   onReformat: (stack: Stack, series: Series, study: Study) => void
+  /** Open the annotation dialog on one stack. */
+  onAnnotate: (stack: Stack, series: Series, study: Study) => void
   onSelectAll: (series: Series, selected: boolean) => void
   /** Select or clear every stack in the import at once. */
   onSelectEverything: (selected: boolean) => void
@@ -67,6 +69,7 @@ export function ReviewStep({
   onArrange,
   onOpen,
   onReformat,
+  onAnnotate,
   onSelectAll,
   onSelectEverything,
   onMoveSeries,
@@ -246,6 +249,7 @@ export function ReviewStep({
                       onTrim={onTrim}
                       onOpen={() => onOpen(stack, series, study)}
                       onReformat={() => onReformat(stack, series, study)}
+                      onAnnotate={() => onAnnotate(stack, series, study)}
                     />
                   ))}
                 </div>

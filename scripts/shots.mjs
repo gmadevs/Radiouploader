@@ -117,6 +117,30 @@ async function run() {
   await click('Cancel')
   await sleep(500)
 
+  await openStackAction('Chest 1.0 mm', 'Annotate')
+  await until(`(document.querySelector('.annotate canvas')?.width ?? 0) > 0`, 'the annotation canvas')
+  await click('Polygon')
+  await until(isOn('Polygon'), 'the polygon to be the tool in hand')
+  // Round the left lung, which the phantom draws as the dark oval on the right
+  // of the image, and closed on its first corner.
+  for (const at of [
+    { x: 0.53, y: 0.3 },
+    { x: 0.66, y: 0.24 },
+    { x: 0.8, y: 0.36 },
+    { x: 0.82, y: 0.6 },
+    { x: 0.7, y: 0.76 },
+    { x: 0.56, y: 0.68 },
+    { x: 0.53, y: 0.3 }
+  ]) {
+    await clickOnCanvas(at)
+  }
+  await until(`document.querySelectorAll('.key-strip .mark').length === 1`, 'the drawn image to be marked')
+  await shot('11-annotate', 'a structure drawn on the chest CT', `document.querySelectorAll('.key-strip .mark').length === 1`)
+  // Closed rather than added: the copy would be one more series on every
+  // screen after this one.
+  await click('Close')
+  await sleep(500)
+
   await openViewerOn('Upper abdomen')
   await settle(2500)
   await shot(
@@ -260,6 +284,37 @@ async function run() {
       return 'ok'
     })()`)
     if (result !== 'ok') problems.push(`reformat ${JSON.stringify(name)}: ${result}`)
+  }
+
+  /** Press one of the buttons under the card of the series whose description contains `name`. */
+  async function openStackAction(name, label) {
+    const result = await evaluate(`(() => {
+      const series = [...document.querySelectorAll('.series')]
+        .find((s) => s.querySelector('h3')?.textContent.includes(${JSON.stringify(name)}))
+      const button = [...(series?.querySelectorAll('.stack-actions button') ?? [])]
+        .find((b) => b.textContent.trim() === ${JSON.stringify(label)})
+      if (!button) return 'missing'
+      button.click()
+      return 'ok'
+    })()`)
+    if (result !== 'ok') problems.push(`${label} on ${JSON.stringify(name)}: ${result}`)
+  }
+
+  /** A click at a point given as a fraction of the dialog's canvas. */
+  async function clickOnCanvas(at) {
+    const rect = await evaluate(
+      `(() => { const c = document.querySelector('.viewer-stage canvas'); if (!c) return null
+                const r = c.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height } })()`
+    )
+    if (!rect) {
+      problems.push('no canvas to click on')
+      return
+    }
+    const point = { x: Math.round(rect.x + rect.w * at.x), y: Math.round(rect.y + rect.h * at.y) }
+    win.webContents.sendInputEvent({ type: 'mouseMove', ...point })
+    win.webContents.sendInputEvent({ type: 'mouseDown', button: 'left', clickCount: 1, ...point })
+    win.webContents.sendInputEvent({ type: 'mouseUp', button: 'left', clickCount: 1, ...point })
+    await sleep(120)
   }
 
   /** Open the viewer on the series whose description contains `name`. */

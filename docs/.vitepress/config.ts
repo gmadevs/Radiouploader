@@ -54,6 +54,7 @@ export default withMermaid(
             { text: 'Choose what to upload', link: '/guide/choose' },
             { text: 'Erase, crop and set contrast', link: '/guide/review' },
             { text: 'Reformat, MIP and MinIP', link: '/guide/reformat' },
+            { text: 'Annotate', link: '/guide/annotate' },
             { text: 'The check before anonymising', link: '/guide/check' },
             { text: 'Case details and upload', link: '/guide/upload' }
           ]

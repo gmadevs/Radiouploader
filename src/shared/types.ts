@@ -1,5 +1,7 @@
 /** Types shared between the main process, the preload bridge and the renderer. */
 
+import type { StructureMessage } from './annotate/structures'
+
 export type SourceKind = 'folder' | 'zip' | 'files'
 
 /** How a stack was split out of its parent DICOM series. */
@@ -230,6 +232,24 @@ export interface ReformatPlan {
 /** One image of a reformat, which is a plan plus where along the normal it sits. */
 export interface ReformatRequestMessage extends ReformatPlan {
   offset: number
+}
+
+/**
+ * An annotated copy of a stack to write, as the annotation dialog describes it.
+ *
+ * Only the drawn keys cross the bridge. The images between them are filled in
+ * again over there by the same code that filled them on screen.
+ */
+export interface AnnotationRequest {
+  /** The size of the frames the masks were drawn on. */
+  grid: { width: number; height: number }
+  /** Indices into the stack's slices, in the order they are to be written. */
+  indices: number[]
+  structures: StructureMessage[]
+  /** The window the greyscale images were shown with. Null keeps each file's own. */
+  window: WindowLevel | null
+  /** A series this one takes the place of: the copy written the last time. */
+  replaces: string | null
 }
 
 /** What a stack can be reformatted into, measured once the volume is built. */
