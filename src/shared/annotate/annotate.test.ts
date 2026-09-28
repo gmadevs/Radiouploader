@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { blend, keyField } from './interpolate'
-import { paintStructures } from './paint'
+import { paintLegend, paintStructures } from './paint'
 import { fillPolygon, stroke } from './raster'
 import {
   History,
@@ -163,5 +163,21 @@ describe('painting', () => {
     const untouched = new Uint8ClampedArray(25 * 4).fill(200)
     paintStructures(untouched, 5, 5, 4, [s], 2, grid)
     expect(untouched.every((v) => v === 200)).toBe(true)
+  })
+})
+
+describe('the legend', () => {
+  it('is laid over the image by its own alpha, at twice the size of the grid', () => {
+    // Two legend pixels: opaque red, then half-transparent white.
+    const legend = { x: 1, y: 1, width: 2, height: 1, rgba: new Uint8ClampedArray([255, 0, 0, 255, 255, 255, 255, 128]) }
+    const pixels = new Uint8Array(8 * 8 * 3).fill(0)
+    paintLegend(pixels, 8, 8, 3, legend, { width: 4, height: 4 })
+    const at = (x: number, y: number): number[] => [...pixels.subarray((y * 8 + x) * 3, (y * 8 + x) * 3 + 3)]
+    expect(at(2, 2)).toEqual([255, 0, 0])
+    expect(at(3, 3)).toEqual([255, 0, 0])
+    expect(at(4, 2)).toEqual([128, 128, 128])
+    expect(at(1, 1)).toEqual([0, 0, 0])
+    expect(at(6, 2)).toEqual([0, 0, 0])
+    expect(at(2, 4)).toEqual([0, 0, 0])
   })
 })

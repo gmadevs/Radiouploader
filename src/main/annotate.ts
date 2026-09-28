@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as dcmio from 'dicomanon'
-import { paintStructures } from '@shared/annotate/paint'
+import { paintLegend, paintStructures } from '@shared/annotate/paint'
 import { fromMessage, type Structure } from '@shared/annotate/structures'
 import { applyWindow, fillMasks } from '@shared/dicomImage'
 import type { AnnotationRequest, Series, SliceRef, Stack, Study } from '@shared/types'
@@ -106,8 +106,8 @@ function fileDescription(source: Dict): string {
 /**
  * One annotated image, as RGB samples at the image's full size.
  *
- * The stack's own redactions are painted in last, over the structures: a
- * structure drawn across a blanked banner must not bring back its outline, and
+ * The stack's own redactions are painted in last, over the structures and the
+ * legend: a structure drawn across a blanked banner must not bring back its outline, and
  * the anonymiser, which blanks them again from the stack, would find them
  * already black.
  */
@@ -135,6 +135,7 @@ async function annotatedPixels(
     rgb[j + 2] = rgba[i + 2]
   }
   paintStructures(rgb, frame.width, frame.height, 3, structures, index, request.grid)
+  if (request.legend) paintLegend(rgb, frame.width, frame.height, 3, request.legend, request.grid)
   fillMasks(
     rgb,
     {

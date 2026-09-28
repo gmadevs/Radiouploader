@@ -117,6 +117,7 @@ describe('an annotated copy of a stack', () => {
       indices: [1, 2],
       structures: [quarter(1)],
       window: { centre: 100, width: 200 },
+      legend: null,
       replaces: null
     })
 
@@ -159,6 +160,7 @@ describe('an annotated copy of a stack', () => {
       indices: [0],
       structures: [quarter(0, '#ffffff')],
       window: null,
+      legend: null,
       replaces: null
     })
     const ds = await parse(series.stacks[0].slices[0].path)
@@ -182,6 +184,7 @@ describe('an annotated copy of a stack', () => {
       indices: [0],
       structures: [toMessage(structure)],
       window: null,
+      legend: null,
       replaces: null
     })
     const ds = await parse(series.stacks[0].slices[0].path)
@@ -212,6 +215,7 @@ describe('an annotated copy of a stack', () => {
         indices: [0],
         structures: [quarter(0)],
         window: null,
+        legend: null,
         replaces: null
       })
       const written = await fs.readFile(series.stacks[0].slices[0].path)
@@ -225,6 +229,28 @@ describe('an annotated copy of a stack', () => {
     }
   })
 
+  it('puts the legend on every image, under the stack’s redactions', async () => {
+    const stack = { ...stackOf('run', 'multiframe_4.dcm', 4), masks: [{ x: 0, y: 0.75, width: 0.125, height: 0.25 }] }
+    load(stack)
+    // A 3 × 2 box of solid white in the lower left of the 8 × 8 grid.
+    const legend = { x: 0, y: 6, width: 3, height: 2, rgba: new Uint8ClampedArray(3 * 2 * 4).fill(255) }
+    const { series } = await commitAnnotation('run', {
+      grid: { width: 8, height: 8 },
+      indices: [0, 3],
+      structures: [quarter(0)],
+      window: null,
+      legend,
+      replaces: null
+    })
+    for (const slice of series.stacks[0].slices) {
+      const ds = await parse(slice.path)
+      expect(pixel(ds, 1, 7)).toEqual([255, 255, 255])
+      expect(pixel(ds, 2, 6)).toEqual([255, 255, 255])
+      // The redaction covers column 0 of rows 6–7, legend or not.
+      expect(pixel(ds, 0, 7)).toEqual([0, 0, 0])
+    }
+  })
+
   it('refuses a drawing made on images of another shape', async () => {
     load(stackOf('jpeg', 'TestPattern_JPEG-Baseline_YBRFull.dcm', 1))
     await expect(
@@ -233,6 +259,7 @@ describe('an annotated copy of a stack', () => {
         indices: [0],
         structures: [quarter(0)],
         window: null,
+        legend: null,
         replaces: null
       })
     ).rejects.toThrow(/same shape/)
@@ -245,6 +272,7 @@ describe('an annotated copy of a stack', () => {
       indices: [0, 1, 2, 3],
       structures: [quarter(0)],
       window: null,
+      legend: null,
       replaces: null
     }
     const first = await commitAnnotation('run', request)
@@ -260,6 +288,7 @@ describe('an annotated copy of a stack', () => {
       indices: [0],
       structures: [quarter(0)],
       window: null,
+      legend: null,
       replaces: null
     })
     const out = await fs.mkdtemp(path.join(os.tmpdir(), 'annotate-test-'))

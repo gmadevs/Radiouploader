@@ -1,5 +1,6 @@
 /** Types shared between the main process, the preload bridge and the renderer. */
 
+import type { LegendBitmap } from './annotate/paint'
 import type { StructureMessage } from './annotate/structures'
 
 export type SourceKind = 'folder' | 'zip' | 'files'
@@ -248,6 +249,8 @@ export interface AnnotationRequest {
   structures: StructureMessage[]
   /** The window the greyscale images were shown with. Null keeps each file's own. */
   window: WindowLevel | null
+  /** The box of names and colours to put on every image, drawn by the renderer; null for none. */
+  legend: LegendBitmap | null
   /** A series this one takes the place of: the copy written the last time. */
   replaces: string | null
 }

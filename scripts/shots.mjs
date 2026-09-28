@@ -135,7 +135,22 @@ async function run() {
     await clickOnCanvas(at)
   }
   await until(`document.querySelectorAll('.key-strip .mark').length === 1`, 'the drawn image to be marked')
-  await shot('11-annotate', 'a structure drawn on the chest CT', `document.querySelectorAll('.key-strip .mark').length === 1`)
+  await evaluate(`(() => {
+    const input = document.querySelector('.structure input[type=text]')
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Left lung')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.blur()
+    ;[...document.querySelectorAll('.annotate label.setting')]
+      .find((l) => l.textContent.trim() === 'Legend')
+      ?.querySelector('input')
+      .click()
+  })()`)
+  await shot(
+    '11-annotate',
+    'a structure drawn on the chest CT, with its legend',
+    `document.querySelectorAll('.key-strip .mark').length === 1 &&
+     [...document.querySelectorAll('.annotate label.setting')].some((l) => l.textContent.trim() === 'Legend' && l.querySelector('input').checked)`
+  )
   // Closed rather than added: the copy would be one more series on every
   // screen after this one.
   await click('Close')

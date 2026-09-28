@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { paintStructures, type Grid } from '@shared/annotate/paint'
+import { paintLegend, paintStructures, type Grid } from '@shared/annotate/paint'
 import { fillPolygon, stroke, type Point } from '@shared/annotate/raster'
 import {
   History,
@@ -19,6 +19,7 @@ import type { PreviewFrame, Series, Stack, WindowLevel } from '@shared/types'
 import { CT_WINDOW_PRESETS, matchingPreset, usesHounsfield } from '@shared/windowPresets'
 import { closesPolygon, indicesToWrite, stripMarks, vertexReach, type SavedAnnotation } from '../annotateEdit'
 import { loadFrame, previewErrorText } from '../dicomPreview'
+import { renderLegend } from '../legend'
 import { useFocusTrap } from '../focusTrap'
 import { useWheelScrub } from '../wheelScrub'
 
@@ -98,7 +99,7 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
   // drawing — so the component re-renders on a counter instead.
   const structures = useRef<Structure[] | null>(null)
   structures.current ??= newStructures(saved)
-  const [, setVersion] = useState(0)
+  const [version, setVersion] = useState(0)
   const bump = (): void => setVersion((v) => v + 1)
   const history = useRef(new History())
 
@@ -111,6 +112,7 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
   const [polygon, setPolygon] = useState<Point[]>([])
   const [pointer, setPointer] = useState<Point | null>(null)
   const [onlyDrawn, setOnlyDrawn] = useState(saved?.onlyDrawn ?? false)
+  const [showLegend, setShowLegend] = useState(saved?.legend ?? false)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [stage, setStage] = useState<{ width: number; height: number } | null>(null)
@@ -150,6 +152,13 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
 
   const drawable = frame !== null && grid !== null && error === null
 
+  // Drawn again when a structure changes, which is what the counter says; the
+  // names and colours are read out of the structures themselves.
+  const legend = useMemo(
+    () => (showLegend && grid ? renderLegend(structures.current!, grid) : null),
+    [showLegend, grid, version]
+  )
+
   // The picture is the same function the written files come from, at the size
   // of this frame: the colours on screen are the colours that go up.
   useEffect(() => {
@@ -160,6 +169,7 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
         ? applyWindow(frame, level ?? frame.window).rgba
         : new Uint8ClampedArray(frame.rgba)
     paintStructures(rgba, frame.width, frame.height, 4, structures.current!, index, grid)
+    if (legend) paintLegend(rgba, frame.width, frame.height, 4, legend, grid)
     canvas.width = frame.width
     canvas.height = frame.height
     const ctx = canvas.getContext('2d')
@@ -326,7 +336,8 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
           structures: structures.current!.map(toMessage),
           seriesId,
           window: window_,
-          onlyDrawn
+          onlyDrawn,
+          legend: showLegend
         }
 
   const close = (): void => {
@@ -351,6 +362,7 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
         indices,
         structures: structures.current!.map(toMessage),
         window: greyscale ? window_ : null,
+        legend,
         replaces
       })
       const next = snapshot(series.id)
@@ -724,6 +736,10 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
             <label className="setting" title="Leave out the images before the first and after the last one with colour on it">
               <input type="checkbox" checked={onlyDrawn} onChange={(e) => setOnlyDrawn(e.target.checked)} />
               <span>Only the annotated images</span>
+            </label>
+            <label className="setting" title="A box in the lower left corner with the colour and name of each structure">
+              <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} />
+              <span>Legend</span>
             </label>
             <div className="spacer" />
             <span className="muted small">

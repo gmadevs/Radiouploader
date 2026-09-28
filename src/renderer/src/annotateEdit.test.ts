@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createStructure, reinterpolate } from '@shared/annotate/structures'
 import { closesPolygon, indicesToWrite, stripMarks, vertexReach } from './annotateEdit'
+import { legendEntries, legendLayout } from './legend'
 
 const W = 16
 const H = 16
@@ -57,5 +58,29 @@ describe('the images written', () => {
     expect(indicesToWrite([s], kept, true)).toEqual([3, 4, 5])
     s.visible = false
     expect(indicesToWrite([s], kept, true)).toEqual(kept)
+  })
+})
+
+describe('the legend', () => {
+  it('lists the structures that are shown and drawn on', () => {
+    const drawn = createStructure('Canal', '#ff0000')
+    drawn.keys.set(0, dot(5, 5))
+    const empty = createStructure('Cord', '#00ff00')
+    empty.keys.set(0, new Uint8Array(W * H))
+    const hidden = createStructure('Mass', '#0000ff')
+    hidden.keys.set(0, dot(5, 5))
+    hidden.visible = false
+    expect(legendEntries([drawn, empty, hidden]).map((s) => s.name)).toEqual(['Canal'])
+  })
+
+  it('sits in the lower left corner, sized to the image', () => {
+    const small = legendLayout(2, 60, { width: 256, height: 256 })
+    expect(small.font).toBe(11)
+    expect(small.x).toBe(small.pad)
+    expect(small.y + small.height).toBe(256 - small.pad)
+    const large = legendLayout(2, 60, { width: 1024, height: 1024 })
+    expect(large.font).toBe(33)
+    // Never wider than the image, however long a name is.
+    expect(legendLayout(1, 5000, { width: 256, height: 256 }).width).toBeLessThanOrEqual(256)
   })
 })

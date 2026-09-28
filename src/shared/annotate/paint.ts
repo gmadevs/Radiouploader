@@ -72,3 +72,49 @@ export function paintStructures(
     }
   }
 }
+
+/**
+ * The legend, as pixels: the structures' colours and names in a box.
+ *
+ * Text needs a canvas and the main process has none, so the renderer draws the
+ * box once, at the size of the grid, and both sides lay these pixels over the
+ * image the way they lay the masks. `x` and `y` place it on the grid.
+ */
+export interface LegendBitmap {
+  x: number
+  y: number
+  width: number
+  height: number
+  /** Straight RGBA, as a canvas hands it back. */
+  rgba: Uint8ClampedArray
+}
+
+/** Lay the legend over an image, in place, by nearest pixel at the image's own size. */
+export function paintLegend(
+  pixels: Uint8Array | Uint8ClampedArray,
+  width: number,
+  height: number,
+  channels: 3 | 4,
+  legend: LegendBitmap,
+  grid: Grid
+): void {
+  const sx = width / grid.width
+  const sy = height / grid.height
+  const x0 = Math.max(0, Math.floor(legend.x * sx))
+  const y0 = Math.max(0, Math.floor(legend.y * sy))
+  const x1 = Math.min(width, Math.ceil((legend.x + legend.width) * sx))
+  const y1 = Math.min(height, Math.ceil((legend.y + legend.height) * sy))
+  for (let y = y0; y < y1; y++) {
+    const ly = Math.min(legend.height - 1, Math.max(0, Math.floor(y / sy - legend.y)))
+    for (let x = x0; x < x1; x++) {
+      const lx = Math.min(legend.width - 1, Math.max(0, Math.floor(x / sx - legend.x)))
+      const l = (ly * legend.width + lx) * 4
+      const alpha = legend.rgba[l + 3] / 255
+      if (alpha === 0) continue
+      const o = (y * width + x) * channels
+      pixels[o] = Math.round(legend.rgba[l] * alpha + pixels[o] * (1 - alpha))
+      pixels[o + 1] = Math.round(legend.rgba[l + 1] * alpha + pixels[o + 1] * (1 - alpha))
+      pixels[o + 2] = Math.round(legend.rgba[l + 2] * alpha + pixels[o + 2] * (1 - alpha))
+    }
+  }
+}

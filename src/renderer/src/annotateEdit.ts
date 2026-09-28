@@ -16,6 +16,7 @@ export interface SavedAnnotation {
   seriesId: string | null
   window: WindowLevel | null
   onlyDrawn: boolean
+  legend: boolean
 }
 
 export type StripMark = { position: number; kind: 'key' | 'empty' | 'filled' }

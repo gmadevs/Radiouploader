@@ -59,6 +59,15 @@ images then have colour.
 
 Undo keeps the last 200 changes.
 
+## Legend
+
+**Legend** puts a box in the lower left corner of every image of the copy, with the colour and
+name of each structure. It lists the structures that are shown and drawn on at least one image.
+The text is sized to the image: 11 pixels high on a 256-pixel image, 33 on a 1024-pixel one.
+
+The legend is text in the pixels, so [the check before anonymising](/guide/check) may mark it.
+It holds only the names you typed, so check that they contain no patient data.
+
 ## Contrast
 
 The copy is written in colour, so the window cannot be changed on it later. The images are
@@ -82,7 +91,8 @@ stack again shows it where you left it. After a copy has been added, the button 
 
 ## What the copy keeps from the stack
 
-- Areas you erased in **Open for review** are black in the copy, over the drawing.
+- Areas you erased in **Open for review** are black in the copy, over the drawing and the
+  legend.
 - The crop of the stack applies to the copy.
 - Each image keeps the position and orientation of its source image, so the copy scrolls in
   step with the stack.
@@ -98,4 +108,3 @@ is the stack's with ` (annotated)` after it.
 - All images of the stack must have the same size.
 - A drawing is kept per stack. Switching a dynamic series between **By phase** and **By slice**
   makes new stacks, and drawings on the old ones are no longer shown.
-- The copy has no legend. The names of the structures belong in the case's captions.
