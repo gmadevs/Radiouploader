@@ -7,6 +7,7 @@ import { fromMessage, type Structure } from '@shared/annotate/structures'
 import { applyWindow, fillMasks } from '@shared/dicomImage'
 import type { AnnotationRequest, Series, SliceRef, Stack, Study } from '@shared/types'
 import { itemsOf, promoteFrameTags } from './anon/anonymise'
+import { textAsUnicode } from './anon/text'
 import { readPreviewFrame } from './preview'
 import { session } from './session'
 
@@ -92,13 +93,9 @@ const MULTIFRAME_TAGS = [
 
 /**
  * The series description written into the files: the parent's own, as the
- * file holds it, and a plain-ASCII word after it.
- *
- * ASCII because the anonymiser reads every string a byte at a time as Latin-1
- * and writes it back as UTF-8: an em dash written here came out of it as
- * "Ã¢ÂÂ". The parent's text goes through that same round trip whatever
- * happens here, so it is copied as the file has it rather than as the picker
- * shows it. LO holds 64 characters.
+ * file holds it, with a word after it. Taken from the file rather than from
+ * the picker so `textAsUnicode` reads all of it by the file's character set.
+ * LO holds 64 characters.
  */
 function fileDescription(source: Dict): string {
   const suffix = ' (annotated)'
@@ -243,6 +240,9 @@ export async function commitAnnotation(
     dict['00200011'] = { vr: 'IS', Value: [String(seriesNumber)] }
     dict['00200013'] = { vr: 'IS', Value: [String(n + 1)] }
     dict['0008103E'] = { vr: 'LO', Value: [fileDescription(source)] }
+
+    // dcmio writes UTF-8 whatever the file was in; see anon/text.ts.
+    textAsUnicode(dict)
 
     message.meta['00020002'] = { vr: 'UI', Value: [SECONDARY_CAPTURE] }
     message.meta['00020003'] = { vr: 'UI', Value: [sopUid] }

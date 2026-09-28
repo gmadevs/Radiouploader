@@ -21,6 +21,7 @@ import { canDecode, decodeEncapsulatedFrame, type DecodedSamples } from '../code
 import { encodeJpegRgb } from '../codecs/encode'
 import { encodedFrame } from '../codecs/frames'
 import { isVideoSyntax, readVideoFrame, type DecodedVideo } from '../codecs/video'
+import { textAsAscii } from './text'
 
 export interface AnonymisedFile {
   sourcePath: string
@@ -581,6 +582,8 @@ export async function anonymiseFile(
     }
 
     const anonymised = dcmio.Anonymize(dict as never) as unknown as Dict
+    // Last, so what the anonymiser kept is what is spelled out; see text.ts.
+    textAsAscii(anonymised, dict)
     const warnings = collectWarnings(anonymised, sourcePath, task.frame)
     if (message.meta) anonymiseMeta(message.meta, originalMetaUid, anonymised)
 

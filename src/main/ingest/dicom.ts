@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import dicomParser from 'dicom-parser'
 import type { ImageComponent } from '@shared/types'
+import { decoderForCharset } from '../anon/text'
 
 /**
  * Metadata read from a single instance.
@@ -108,6 +109,20 @@ type DataSet = dicomParser.DataSet
 function str(ds: DataSet, tag: string): string | null {
   const v = ds.string(tag)
   return v === undefined || v === '' ? null : v.trim()
+}
+
+/**
+ * A text tag read by the file's own character set. dicom-parser reads every
+ * string as Latin-1, which showed a UTF-8 "Encéfalo" as "EncÃ©falo" in the
+ * picker; this is for the tags a person reads, the descriptions.
+ */
+function text(ds: DataSet, tag: string): string | null {
+  const element = ds.elements[tag]
+  if (!element || element.length === 0 || element.dataOffset === undefined) return null
+  const bytes = ds.byteArray.subarray(element.dataOffset, element.dataOffset + element.length)
+  const charset = (ds.string('x00080005') ?? '').split('\\')
+  const v = decoderForCharset(charset).decode(bytes).replace(/\0+$/, '').trim()
+  return v === '' ? null : v
 }
 
 function num(ds: DataSet, tag: string): number | null {
@@ -404,11 +419,11 @@ export async function readInstance(filePath: string): Promise<InstanceMeta> {
     studyInstanceUid,
     seriesInstanceUid,
     sopInstanceUid: str(ds, 'x00080018'),
-    studyDescription: str(ds, 'x00081030'),
+    studyDescription: text(ds, 'x00081030'),
     // SeriesDate and AcquisitionDate are the fallbacks when an exporter drops StudyDate.
     studyDate: readDate(ds, 'x00080020', 'x00080021', 'x00080022'),
     studyTime: str(ds, 'x00080030'),
-    seriesDescription: str(ds, 'x0008103e'),
+    seriesDescription: text(ds, 'x0008103e'),
     modality: str(ds, 'x00080060'),
     seriesNumber: num(ds, 'x00200011'),
     instanceNumber: num(ds, 'x00200013'),

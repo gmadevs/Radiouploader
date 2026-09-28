@@ -75,6 +75,25 @@ the anonymiser again on such a file and checks that it changes nothing.
 
 Formats the app cannot decode are refused.
 
+## Text outside ASCII
+
+The anonymiser reads each byte of a text tag as one Latin-1 character and writes text back as
+UTF-8. A byte above 0x7F therefore becomes two bytes on every run: "Encéfalo" stored as Latin-1
+came out as "EncÃ©falo". Radiopaedia runs the same anonymiser again on each upload and refuses
+a file that the second run would change.
+
+The app writes the text tags of the anonymised files in ASCII, which the anonymiser leaves
+unchanged. It first reads the text by the file's own character set (`SpecificCharacterSet`,
+0008,0005), and then removes accents and replaces a few characters with their usual ASCII
+spelling: "Encéfalo" becomes "Encefalo", "ß" becomes "ss" and "±" becomes "+/-". Characters with
+no ASCII spelling, such as Greek or Japanese text, become question marks. `SpecificCharacterSet`
+is removed, because ASCII is the default character set. The code is in `src/main/anon/text.ts`.
+
+Reformatted and annotated series are written before anonymisation. Their text is read by the
+source file's character set and written as UTF-8 with `SpecificCharacterSet` set to
+`ISO_IR 192`. The series and study descriptions shown in the app are also read by the file's
+character set.
+
 ## Images that cannot be changed
 
 Erasing, cropping and splitting assume 8-bit or 16-bit samples, with the colour values of each

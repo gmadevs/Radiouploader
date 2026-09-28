@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import dicomParser from 'dicom-parser'
+import * as dcmio from 'dicomanon'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createStructure, toMessage } from '@shared/annotate/structures'
 import type { AnnotationRequest, IngestResult, Series, Stack } from '@shared/types'
@@ -121,8 +122,7 @@ describe('an annotated copy of a stack', () => {
 
     expect(series.description).toBe('T2 sag — Annotated')
     expect(series.seriesNumber).toBe(204)
-    // Plain ASCII in the file, since the anonymiser's round trip mangles
-    // anything else; the fixture has no description of its own to go before it.
+    // The fixture has no description of its own to go before it.
     expect((await parse(series.stacks[0].slices[0].path)).string('x0008103e')).toBe('Annotated')
     const written = series.stacks[0].slices
     expect(written).toHaveLength(2)
@@ -190,6 +190,39 @@ describe('an annotated copy of a stack', () => {
     expect(ds.string('x00020010')).toBe('1.2.840.10008.1.2.1')
     expect(pixel(ds, 1, 1)).toEqual([0, 255, 0])
     expect(pixel(ds, 2, 2)).not.toEqual([0, 255, 0])
+  })
+
+  it('writes the parent’s description by its character set, and says it is UTF-8', async () => {
+    type Dict = Record<string, { vr: string; Value: unknown[] }>
+    const bytes = new Uint8Array(await fs.readFile(path.join(FIXTURES, '01_ras_physician.dcm')))
+    const message = dcmio.Message.readFile(bytes.buffer.slice(0) as ArrayBuffer)
+    const dict = message.dict as unknown as Dict
+    dict['0008103E'] = { vr: 'LO', Value: ['EncQfalo'] }
+    dict['00080005'] = { vr: 'CS', Value: ['ISO_IR 100'] }
+    const out = new Uint8Array(message.write())
+    out[Buffer.from(out).indexOf('EncQfalo') + 3] = 0xe9
+    const source = path.join(os.tmpdir(), `annotate-latin1-${process.pid}.dcm`)
+    await fs.writeFile(source, out)
+    try {
+      const stack = stackOf('latin1', '01_ras_physician.dcm', 1)
+      stack.slices[0].path = source
+      load(stack)
+      const { series } = await commitAnnotation('latin1', {
+        grid: { width: 8, height: 8 },
+        indices: [0],
+        structures: [quarter(0)],
+        window: null,
+        replaces: null
+      })
+      const written = await fs.readFile(series.stacks[0].slices[0].path)
+      const ds = dicomParser.parseDicom(new Uint8Array(written))
+      expect(ds.string('x00080005')).toBe('ISO_IR 192')
+      const element = ds.elements.x0008103e
+      const text = new TextDecoder().decode(written.subarray(element.dataOffset, element.dataOffset + element.length))
+      expect(text.trim()).toBe('Encéfalo (annotated)')
+    } finally {
+      await fs.rm(source, { force: true })
+    }
   })
 
   it('refuses a drawing made on images of another shape', async () => {

@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as dcmio from 'dicomanon'
 import { describePlane, type Vec3 } from '@shared/geometry'
+import { textAsUnicode } from '../anon/text'
 import { toPatient } from './orientation'
 import type { Projection, ReformatPlan, Series, SliceRef, WindowLevel } from '@shared/types'
 import { pixelSpacingOf, type BuiltVolume } from './build'
@@ -203,6 +204,9 @@ export async function writeReformatted(
       delete dict['00281055']
       delete dict['00283010']
     }
+
+    // dcmio writes UTF-8 whatever the file was in; see anon/text.ts.
+    textAsUnicode(dict)
 
     const outputPath = path.join(outputDir, `${String(index).padStart(4, '0')}.dcm`)
     const written = Buffer.from(message.write())

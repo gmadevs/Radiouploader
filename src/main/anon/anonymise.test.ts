@@ -716,3 +716,64 @@ describe('anonymiseFile — sample layouts it cannot edit', () => {
     await expect(anonymiseFile(source, outDir, whole('wide-plain-out.dcm'))).resolves.toHaveLength(1)
   })
 })
+
+describe('anonymiseFile — text outside ASCII', () => {
+  type Dict = Record<string, { vr: string; Value: unknown[] }>
+
+  /**
+   * The fixture with a series description written in the file's own character
+   * set. dcmio writes UTF-8 whatever it is given, so the description goes in
+   * as a placeholder of the right length and its bytes are put in afterwards.
+   */
+  async function described(name: string, charset: string | null, bytes: number[]): Promise<string> {
+    const source = new Uint8Array(await fs.readFile(path.join(fixtures, '01_ras_physician.dcm')))
+    const message = dcmio.Message.readFile(source.buffer.slice(0) as ArrayBuffer)
+    const dict = message.dict as unknown as Dict
+    const placeholder = 'Q'.repeat(bytes.length + (bytes.length % 2))
+    dict['0008103E'] = { vr: 'LO', Value: [placeholder] }
+    if (charset === null) delete dict['00080005']
+    else dict['00080005'] = { vr: 'CS', Value: [charset] }
+    const out = new Uint8Array(message.write())
+    const at = Buffer.from(out).indexOf(placeholder)
+    out.set(bytes.length % 2 ? [...bytes, 0x20] : bytes, at)
+    const outputPath = path.join(outDir, name)
+    await fs.writeFile(outputPath, out)
+    return outputPath
+  }
+
+  const latin1 = (text: string): number[] => [...Buffer.from(text, 'latin1')]
+  const utf8 = (text: string): number[] => [...Buffer.from(text, 'utf8')]
+
+  it.each([
+    ['ISO_IR 100', latin1('Encéfalo T2 coronale')],
+    ['ISO_IR 192', utf8('Encéfalo T2 coronale')],
+    // No character set is the default repertoire, which is ASCII; exporters
+    // that write Latin-1 there anyway are read as Latin-1.
+    [null, latin1('Encéfalo T2 coronale')]
+  ])('writes a description in %s as ASCII a reader can still read', async (charset, bytes) => {
+    const source = await described(`text-${charset ?? 'none'}.dcm`, charset, bytes)
+    const [result] = await anonymiseFile(source, outDir, whole(`text-${charset ?? 'none'}-out.dcm`))
+    const ds = await tagsOf(result.outputPath)
+    expect(ds.string('x0008103e')).toBe('Encefalo T2 coronale')
+    expect(ds.string('x00080005')).toBeUndefined()
+  })
+
+  it('writes a file Radiopaedia’s re-run of the anonymiser leaves byte for byte alone', async () => {
+    // Before, every byte above 0x7F grew into two on each run, and Radiopaedia
+    // refuses a file its own run would change.
+    const source = await described('text-again.dcm', 'ISO_IR 100', latin1('Colonna sagittale «T2» ±5°'))
+    const [result] = await anonymiseFile(source, outDir, whole('text-again-out.dcm'))
+    const written = await fs.readFile(result.outputPath)
+    const message = dcmio.Message.readFile(written.buffer.slice(written.byteOffset, written.byteOffset + written.byteLength) as ArrayBuffer)
+    message.dict = dcmio.Anonymize(message.dict as never) as never
+    expect(Buffer.from(message.write()).equals(written)).toBe(true)
+    expect((await tagsOf(result.outputPath)).string('x0008103e')).toBe('Colonna sagittale "T2" +/-5 deg')
+  })
+
+  it('reads a character set that is not Latin-1 by its own table', async () => {
+    // ISO_IR 101 is Latin-2: "Łódź", where Latin-1 would read "£ód¼".
+    const source = await described('text-latin2.dcm', 'ISO_IR 101', [0xa3, 0xf3, 0x64, 0xbc])
+    const [result] = await anonymiseFile(source, outDir, whole('text-latin2-out.dcm'))
+    expect((await tagsOf(result.outputPath)).string('x0008103e')).toBe('Lodz')
+  })
+})
