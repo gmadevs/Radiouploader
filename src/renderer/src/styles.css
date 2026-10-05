@@ -189,16 +189,22 @@ h3 { font-size: 14px; margin: 0; font-weight: 600; }
   overflow: hidden;
 }
 .series-head {
-  display: flex; align-items: center; gap: 12px;
+  display: grid; gap: 10px;
   padding: 12px 16px;
   background: var(--panel-2);
   border-bottom: 1px solid var(--border);
 }
+.series-title { display: flex; align-items: center; gap: 12px; }
 /* The group is as wide as its cards, so a long description is cut rather than
    allowed to stretch it. A flex child does not shrink below its content
    without this. */
-.series-head > div:first-child { min-width: 0; }
-.series-head h3 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.series-title > div:first-child { flex: 1; min-width: 0; }
+.series-title h3 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.series-title .badge { flex: none; white-space: nowrap; }
+/* Wrapped, with every label on one line: a button that broke its own text
+   into three lines was the tallest thing in the header. */
+.series-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.series-tools button { white-space: nowrap; }
 .badge {
   font-size: 12px; padding: 2px 9px; border-radius: 999px;
   border: 1px solid var(--border); color: var(--muted);

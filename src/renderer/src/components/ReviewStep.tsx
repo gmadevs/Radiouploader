@@ -37,6 +37,11 @@ const CARD_WIDTH = 240
 const CARD_GAP = 12
 const ROW_PADDING = 32
 
+/** Whether a series has any control to show under its title. */
+function hasTools(series: Series): boolean {
+  return series.arrangement !== undefined || series.splitReason === 'phase' || series.stacks.length > 1
+}
+
 /**
  * Is another study in this import on the same date?
  *
@@ -168,76 +173,87 @@ export function ReviewStep({
                   className="series-head"
                   style={{ maxWidth: series.stacks.length * (CARD_WIDTH + CARD_GAP) - CARD_GAP + ROW_PADDING }}
                 >
-                  <div style={{ flex: 1 }}>
-                    <h3>
-                      {series.seriesNumber !== null && <span className="muted">{series.seriesNumber}. </span>}
-                      {series.description ?? 'Unnamed series'}
-                    </h3>
-                    <div className="muted small">
-                      {series.modality ?? '—'} · {series.instanceCount} image
-                      {series.instanceCount === 1 ? '' : 's'}
+                  <div className="series-title">
+                    <div>
+                      <h3>
+                        {series.seriesNumber !== null && <span className="muted">{series.seriesNumber}. </span>}
+                        {series.description ?? 'Unnamed series'}
+                      </h3>
+                      <div className="muted small">
+                        {series.modality ?? '—'} · {series.instanceCount} image
+                        {series.instanceCount === 1 ? '' : 's'}
+                      </div>
                     </div>
+                    {series.splitReason && (
+                      <span className="badge split">{SPLIT_LABELS[series.splitReason] ?? 'Split'}</span>
+                    )}
+                    {/* The order of these strips is the order the case gets: the
+                        series endpoint has no position of its own, so what the
+                        app posts first is what appears first. */}
+                    {study.series.length > 1 && (
+                      <span className="reorder">
+                        <button
+                          className="small ghost"
+                          disabled={index === 0}
+                          title="Move this series earlier in the case"
+                          aria-label={`Move ${series.description ?? 'this series'} earlier`}
+                          onClick={() => onMoveSeries(study.id, series.id, -1)}
+                        >
+                          ←
+                        </button>
+                        <button
+                          className="small ghost"
+                          disabled={index === study.series.length - 1}
+                          title="Move this series later in the case"
+                          aria-label={`Move ${series.description ?? 'this series'} later`}
+                          onClick={() => onMoveSeries(study.id, series.id, 1)}
+                        >
+                          →
+                        </button>
+                      </span>
+                    )}
                   </div>
-                  {series.splitReason && (
-                    <span className="badge split">{SPLIT_LABELS[series.splitReason] ?? 'Split'}</span>
-                  )}
-                  {series.arrangement !== undefined && (
-                    <span className="tools segmented">
-                      <button
-                        className={series.arrangement === 'phase' ? 'small on' : 'small'}
-                        title="One stack per time point, with its slices in order"
-                        onClick={() => onArrange(series, 'phase')}
-                      >
-                        By phase
-                      </button>
-                      <button
-                        className={series.arrangement === 'slice' ? 'small on' : 'small'}
-                        title="One stack per slice position, with its images in time order. Scroll a stack to follow the enhancement."
-                        onClick={() => onArrange(series, 'slice')}
-                      >
-                        By slice
-                      </button>
-                    </span>
-                  )}
-                  {series.splitReason === 'phase' && (
-                    <button className="small ghost" onClick={() => onKeepOnePhase(series)}>
-                      {series.arrangement === 'slice' ? 'Keep one slice' : 'Keep one phase'}
-                    </button>
-                  )}
-                  {series.stacks.length > 1 && (
-                    <>
-                      <button className="small ghost" onClick={() => onSelectAll(series, true)}>
-                        All
-                      </button>
-                      <button className="small ghost" onClick={() => onSelectAll(series, false)}>
-                        None
-                      </button>
-                    </>
-                  )}
-                  {/* The order of these strips is the order the case gets: the
-                      series endpoint has no position of its own, so what the
-                      app posts first is what appears first. */}
-                  {study.series.length > 1 && (
-                    <span className="reorder">
-                      <button
-                        className="small ghost"
-                        disabled={index === 0}
-                        title="Move this series earlier in the case"
-                        aria-label={`Move ${series.description ?? 'this series'} earlier`}
-                        onClick={() => onMoveSeries(study.id, series.id, -1)}
-                      >
-                        ←
-                      </button>
-                      <button
-                        className="small ghost"
-                        disabled={index === study.series.length - 1}
-                        title="Move this series later in the case"
-                        aria-label={`Move ${series.description ?? 'this series'} later`}
-                        onClick={() => onMoveSeries(study.id, series.id, 1)}
-                      >
-                        →
-                      </button>
-                    </span>
+                  {/* A row of their own, and one that wraps. On one line with the
+                      title a series two cards wide had no room for either: the
+                      description was cut to nothing and the badge sat on top of
+                      the image count. The arrows stay above, where every series
+                      has them in the same place. */}
+                  {hasTools(series) && (
+                    <div className="series-tools">
+                      {series.arrangement !== undefined && (
+                        <span className="tools segmented">
+                          <button
+                            className={series.arrangement === 'phase' ? 'small on' : 'small'}
+                            title="One stack per time point, with its slices in order"
+                            onClick={() => onArrange(series, 'phase')}
+                          >
+                            By phase
+                          </button>
+                          <button
+                            className={series.arrangement === 'slice' ? 'small on' : 'small'}
+                            title="One stack per slice position, with its images in time order. Scroll a stack to follow the enhancement."
+                            onClick={() => onArrange(series, 'slice')}
+                          >
+                            By slice
+                          </button>
+                        </span>
+                      )}
+                      {series.splitReason === 'phase' && (
+                        <button className="small ghost" onClick={() => onKeepOnePhase(series)}>
+                          {series.arrangement === 'slice' ? 'Keep one slice' : 'Keep one phase'}
+                        </button>
+                      )}
+                      {series.stacks.length > 1 && (
+                        <>
+                          <button className="small ghost" onClick={() => onSelectAll(series, true)}>
+                            All
+                          </button>
+                          <button className="small ghost" onClick={() => onSelectAll(series, false)}>
+                            None
+                          </button>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div className="stacks">
