@@ -33,7 +33,7 @@ interface Props {
  * stretch the group past the cards and leave a single one adrift in it. The
  * heading is truncated to this instead.
  */
-const CARD_WIDTH = 240
+const CARD_WIDTH = 264
 const CARD_GAP = 12
 const ROW_PADDING = 32
 

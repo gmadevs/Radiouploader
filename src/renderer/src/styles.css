@@ -176,20 +176,26 @@ h3 { font-size: 14px; margin: 0; font-weight: 600; }
 
 /* A study is a row to run along rather than a page to scroll down: the series
    stay side by side, which is where they can be compared. */
+/* A grid of two rows that every series shares, so the headers of one study are
+   all as tall as the tallest of them. A series with a row of buttons under its
+   title would otherwise start its images lower than its neighbours, and a row
+   of previews that steps up and down is hard to run an eye along. */
 .study-strip {
-  display: flex; align-items: flex-start; gap: 14px;
+  display: grid; grid-auto-flow: column; grid-auto-columns: max-content;
+  grid-template-rows: auto auto; justify-content: start; column-gap: 14px;
   overflow-x: auto; overscroll-behavior-x: contain;
   padding-bottom: 10px;
 }
 .series {
-  flex: none;
+  grid-row: span 2;
+  display: grid; grid-template-rows: subgrid;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel);
   overflow: hidden;
 }
 .series-head {
-  display: grid; gap: 10px;
+  display: grid; gap: 10px; align-content: start;
   padding: 12px 16px;
   background: var(--panel-2);
   border-bottom: 1px solid var(--border);
@@ -211,10 +217,10 @@ h3 { font-size: 14px; margin: 0; font-weight: 600; }
 }
 .badge.split { color: var(--warn); border-color: var(--warn); }
 
-.stacks { display: flex; gap: 12px; padding: 14px 16px; }
+.stacks { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; }
 
 .stack {
-  width: 240px; flex: none;
+  width: 264px; flex: none;
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
@@ -324,10 +330,11 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
    invisible until the pointer was on the card, which hid them from anyone
    reading a screenshot and covered the anatomy of anyone who found them — on
    the screen whose whole instruction is to open a series and look at it. */
-/* Wrapped: three buttons are wider than a card, and the third one was cut off
-   at its edge. */
-.stack-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 10px 10px; }
-.stack-actions button { white-space: nowrap; }
+/* One row. Three buttons at the size of the others are wider than a card, and
+   wrapped they left Annotate alone on a line of its own; so these are a size
+   down, the size Trim already is, and share the width between them. */
+.stack-actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 10px 10px; }
+.stack-actions button { flex: 1 1 auto; padding: 5px; font-size: 12px; white-space: nowrap; }
 
 .viewer-backdrop {
   position: fixed; inset: 0; z-index: 50;
@@ -460,7 +467,7 @@ label.field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 .polygon-line { fill: none; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .polygon-start { fill: rgba(255, 255, 255, 0.25); stroke: #fff; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .annotate-aside {
-  width: 260px; flex: none; overflow-y: auto;
+  width: 264px; flex: none; overflow-y: auto;
   display: flex; flex-direction: column; gap: 8px;
   padding: 12px; border-left: 1px solid var(--border);
 }
