@@ -23,6 +23,14 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const shotsDir = path.join(root, 'docs/public/shots')
 const sampleDir = path.join(root, '.sample-study')
 
+/**
+ * Drawn in software. On the GPU three pixels of the trim sliders' antialiasing
+ * came out differently on every other frame, so that picture never held still,
+ * and what a graphics card rounds is a property of the machine in any case.
+ * Before the app is loaded, since it has to be said before `ready`.
+ */
+app.disableHardwareAcceleration()
+
 await import(path.join(root, 'out/main/index.js'))
 
 const problems = []
@@ -32,6 +40,10 @@ const buttonLabels = `[...document.querySelectorAll('button')].map((b) => b.text
 const litButtonLabels = `[...document.querySelectorAll('button.on')].map((b) => b.textContent.trim())`
 /** The bytes of the last PNG written, which the next one must not repeat. */
 let lastShot = null
+/** The content every screenshot has, in points. */
+const SHOT = { width: 1680, height: 966 }
+/** Whether the app opened maximised, to leave it that way for the person whose app it is. */
+let wasMaximised = false
 
 app.whenReady().then(run).catch((err) => {
   console.error(err)
@@ -46,8 +58,30 @@ async function run() {
     return
   }
 
-  // A fixed size, so every screenshot on the site has the same proportions.
-  win.setSize(1280, 860)
+  /*
+   * A fixed size and a fixed density, so the pictures do not depend on the
+   * screen they were taken on. They used to: the app reopens the way it was
+   * last closed, and it maximises as it is shown, which is after a size set
+   * here — so every PNG was as large as the maintainer's laptop screen, and at
+   * its two pixels to a point. On a Mac mini with a 1080p monitor the same run
+   * wrote all eleven at another size and half the resolution.
+   *
+   * So wait for the window to be shown, take it out of maximised, and have the
+   * page drawn at two device pixels to a point whatever the monitor has. The
+   * override is DevTools' own, from outside; macOS ignores Chromium's
+   * force-device-scale-factor switch. 1680 by 966 is the content the pictures
+   * have had since the first.
+   */
+  while (!win.isVisible()) await sleep(50)
+  wasMaximised = win.isMaximized()
+  if (wasMaximised) win.unmaximize()
+  win.setContentSize(SHOT.width, SHOT.height)
+  win.webContents.debugger.attach('1.3')
+  await win.webContents.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
+    ...SHOT,
+    deviceScaleFactor: 2,
+    mobile: false
+  })
   win.webContents.on('console-message', (e) => {
     if (e.level === 'error' || e.level === 3) problems.push(`console: ${e.message}`)
   })
@@ -204,6 +238,13 @@ async function run() {
   await click('Upload to Radiopaedia')
   await settle(2500)
   await shot('08-done', 'the confirmation', `!!document.querySelector('a[href$="/cases/000000/edit"]')`)
+
+  // The app remembers its window a moment after it changes, in the same file
+  // the person at this machine opens it from.
+  if (wasMaximised) {
+    win.maximize()
+    await sleep(1000)
+  }
 
   if (problems.length > 0) {
     console.error('PROBLEMS:\n' + problems.join('\n'))
@@ -456,7 +497,8 @@ async function run() {
        * nothing here is mid-drag when a shot is taken.
        */
       win.webContents.sendInputEvent({ type: 'mouseLeave', x: 0, y: 0 })
-      const png = (await win.webContents.capturePage()).toPNG()
+      const { data } = await win.webContents.debugger.sendCommand('Page.captureScreenshot', { format: 'png' })
+      const png = Buffer.from(data, 'base64')
       if (lastShot && png.equals(lastShot)) {
         waiting = 'the window to show something other than the previous shot'
         last = null

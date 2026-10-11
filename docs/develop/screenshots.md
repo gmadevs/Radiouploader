@@ -59,6 +59,15 @@ both caused by a connected mouse:
 - the pointer can rest over a stack card, which shows the card's hover controls. The script
   sends a `mouseLeave` event before each capture.
 
+Two more things depend on the screen and the graphics card:
+
+- the app reopens at the size it was last closed at, and maximised if it was. The script
+  waits for the window to be shown, takes it out of maximised and sets the content to 1680 by
+  966 points. It draws the page at two device pixels per point with the DevTools device
+  metrics override, so a monitor that is not Retina gives the same 3360 by 1932 pictures.
+- on the GPU, three pixels of the trim sliders changed on every other frame. The script
+  turns hardware acceleration off, so the page is drawn in software.
+
 If a run changes PNG files although the app has not changed, run it twice more and check
 that those two runs are identical before looking for the cause in your change.
 
