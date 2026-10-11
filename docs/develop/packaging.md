@@ -238,19 +238,33 @@ stay consistent with the artwork.
 
 ## Signing
 
-The installers are not signed:
+The installers are not signed with a certificate:
 
 - **macOS** signing and notarisation need an Apple Developer ID ($99 a year). Without one the
   dmg installs, but Gatekeeper blocks the first launch. Users run `xattr -dr
-  com.apple.quarantine /Applications/Radiouploader.app`, or allow the app in System Settings →
-  Privacy & Security. macOS 15 removed the Control-click → Open option for blocked apps.
+  com.apple.quarantine /Applications/Radiouploader.app`. On an Intel Mac they can instead
+  allow the app in System Settings → Privacy & Security. macOS 15 removed the Control-click →
+  Open option for blocked apps.
+
+  The app is signed ad hoc (`identity: '-'` in `electron-builder.yml`), which needs no
+  certificate and seals the whole bundle. Up to 1.6.2 the bundle was not signed at all. The
+  arm64 executable then carried only the signature the linker adds, `codesign --verify`
+  failed on the bundle, and a downloaded copy opened on Apple silicon with "is damaged and
+  can't be opened", with no button in System Settings to allow it. The install job runs
+  `codesign --verify --deep --strict` on the installed app.
+
+  `codesign` refuses a file that has Finder information, and iCloud Drive adds it to files
+  in a synced folder, including one whose name ends in `.nosync`. To package on a Mac where
+  the repository is under `~/Documents` with iCloud on, make `release` a symlink to a folder
+  outside it, for example `ln -s ~/rp-release release`. `.gitignore` names `release` without
+  a trailing slash so that it also matches the link.
 - **Windows** signing needs an Authenticode certificate. Without one, SmartScreen shows a
   warning until the installer has built up a reputation; users choose More info → Run anyway.
 - **Linux** installers need no signature. The AppImage runs on any distribution after
   `chmod +x`, and the deb is for Debian and Ubuntu.
 
-CI sets `CSC_IDENTITY_AUTO_DISCOVERY=false`; without it, electron-builder looks for a signing
-identity and fails instead of building an unsigned dmg.
+CI sets `CSC_IDENTITY_AUTO_DISCOVERY=false`, so electron-builder does not search the keychain
+for a signing identity.
 
 The workflow's token is read-only. Only the job that creates the draft release has
 `contents: write`, so the jobs that install dependencies and build installers cannot push

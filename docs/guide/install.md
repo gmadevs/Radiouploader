@@ -15,9 +15,13 @@ The installers are not signed, so the first launch needs one extra step:
 
 | Platform | First launch |
 |---|---|
-| macOS | Run `xattr -dr com.apple.quarantine /Applications/Radiouploader.app`, or allow the app in System Settings → Privacy & Security (on macOS 14 and earlier, Control-click the app and choose Open). |
+| macOS | Run `xattr -dr com.apple.quarantine /Applications/Radiouploader.app` in Terminal. On an Intel Mac you can instead allow the app in System Settings → Privacy & Security (on macOS 14 and earlier, Control-click the app and choose Open). |
 | Windows | SmartScreen shows a warning: choose More info → Run anyway. |
 | Linux | Make the AppImage executable with `chmod +x`, or install the deb. The AppImage needs FUSE 2, which Ubuntu does not install by default: `sudo apt install libfuse2t64` on 24.04, `sudo apt install libfuse2` on 22.04. |
+
+On a Mac with Apple silicon, versions up to 1.6.2 open with the message "Radiouploader is
+damaged and can't be opened", and System Settings offers no button to allow them. The disk
+image is intact. The `xattr` command above opens the app.
 
 Signing would need an Apple Developer ID and a Windows code-signing certificate, which the
 project does not have. See [packaging](/develop/packaging#signing).

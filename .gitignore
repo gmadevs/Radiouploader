@@ -1,10 +1,11 @@
 # node_modules is a symlink to node_modules.nosync on the maintainer's machine,
 # which keeps iCloud from syncing it; no trailing slash, so the link matches.
+# release is a link for a related reason: codesign refuses what iCloud tags.
 node_modules
 node_modules.nosync/
 out/
 dist/
-release/
+release
 .DS_Store
 *.log
 .env

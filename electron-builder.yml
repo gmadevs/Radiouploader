@@ -45,6 +45,11 @@ mac:
     - target: dmg
       arch: [arm64, x64]
   category: public.app-category.medical
+  # Ad hoc: there is no Developer ID, but the bundle still has to be sealed.
+  # Left unsigned, an arm64 build carries only the signature the linker put on
+  # the executable, which promises resources nothing seals, and Gatekeeper
+  # answers a quarantined copy of that with "is damaged" on Apple silicon.
+  identity: '-'
   # Renderer needs no camera/mic; hardened runtime is required for notarisation.
   hardenedRuntime: true
   gatekeeperAssess: false

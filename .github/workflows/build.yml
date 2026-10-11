@@ -83,8 +83,9 @@ jobs:
       - name: Build installers
         run: npm run ${{ matrix.script }}
         env:
-          # There is no Developer ID on CI. Without this electron-builder hunts
-          # for a signing identity and fails instead of producing an unsigned dmg.
+          # There is no Developer ID on CI, and the Mac build is signed ad hoc
+          # (electron-builder.yml). This keeps electron-builder from hunting the
+          # keychain for an identity all the same.
           CSC_IDENTITY_AUTO_DISCOVERY: false
           # GH_TOKEN is deliberately not set: electron-builder would then try to
           # publish a release itself rather than leaving the files as artifacts.

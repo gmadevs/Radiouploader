@@ -119,6 +119,17 @@ const macOS = {
     }
     console.log(`architectures  : ${archs.join(' + ')}`)
 
+    // There is no Developer ID, but the bundle is sealed ad hoc all the same.
+    // Up to 1.6.2 it was not: the arm64 executable carried only the linker's
+    // signature, which verifies against nothing, and Apple silicon called a
+    // downloaded copy damaged where an Intel Mac only called it unidentified.
+    const installed = path.join(APPLICATIONS, `${PRODUCT}.app`)
+    const sealed = read('codesign', ['--verify', '--deep', '--strict', installed])
+    if (sealed.status !== 0) {
+      throw new Problem(`the app's signature does not verify, which Apple silicon reports as a damaged app: ${sealed.stderr.trim()}`)
+    }
+    console.log('signature      : ad hoc, verifies')
+
     // The Dock and the Finder draw the icon at up to 512 points, which on a
     // Retina screen is 1024 pixels. 1.3.4's first draft built its icns from the
     // Linux icon set, which stops at 512, and only a byte count noticed.
