@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AXES, negate, normalise, rotate, type Frame } from '@shared/geometry'
-import { extent, imageOrigin, normalExtent, reformatSlice, sampleAt, slabOffsets, type Volume } from './reformat'
+import { averageCentres, extent, imageOrigin, normalExtent, reformatSlice, sampleAt, slabOffsets, type Volume } from './reformat'
 
 /** The three anatomical frames, which are three particular bases and no more. */
 const FRAMES: Record<'axial' | 'coronal' | 'sagittal', Frame> = {
@@ -236,5 +236,33 @@ describe('colour volumes', () => {
     expect(() =>
       reformatSlice(colours(), { frame: FRAMES.axial, projection: 'mip', thickness: 4, offset: 2, pixelSpacing: 1 })
     ).toThrow(/but not projected/)
+  })
+})
+
+describe('averageCentres', () => {
+  // The ramp's value is its z index, so the mean of a slab is the mean of the
+  // indices it read: exactly those, or the averaging blurred across a face.
+  for (const slices of [2, 3, 4, 5]) {
+    it(`averages exactly ${slices} images into each one`, () => {
+      const volume = ramp(2, 2, 23, { x: 1, y: 1, z: 1.25 })
+      const centres = averageCentres(volume.depth, volume.spacing.z, slices)
+      expect(centres).toHaveLength(Math.floor(23 / slices))
+      const first = Math.floor((23 - centres.length * slices) / 2)
+      centres.forEach((centre, i) => {
+        const image = reformatSlice(volume, {
+          frame: FRAMES.axial,
+          projection: 'mean',
+          thickness: slices * volume.spacing.z,
+          offset: centre,
+          pixelSpacing: 1
+        })
+        const start = first + i * slices
+        expect(image.samples[0]).toBeCloseTo(start + (slices - 1) / 2, 6)
+      })
+    })
+  }
+
+  it('splits the images left over between the two ends', () => {
+    expect(averageCentres(11, 1, 3)).toEqual([2, 5, 8])
   })
 })

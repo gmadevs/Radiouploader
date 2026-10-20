@@ -251,6 +251,28 @@ describe('an annotated copy of a stack', () => {
     }
   })
 
+  it('puts each image’s measurements on that image only, and ignores a bitmap of the wrong size', async () => {
+    load(stackOf('run', 'multiframe_4.dcm', 4))
+    const green = (width: number, height: number) =>
+      Uint8ClampedArray.from({ length: width * height * 4 }, (_, i) => [0, 255, 0, 255][i % 4])
+    const { series } = await commitAnnotation('run', {
+      grid: { width: 8, height: 8 },
+      indices: [0, 1, 2],
+      structures: [],
+      window: null,
+      legend: null,
+      overlays: [
+        { index: 1, bitmap: { x: 5, y: 5, width: 2, height: 2, rgba: green(2, 2) } },
+        { index: 2, bitmap: { x: 5, y: 5, width: 2, height: 2, rgba: green(1, 1) } }
+      ],
+      replaces: null
+    })
+    const [first, second, third] = await Promise.all(series.stacks[0].slices.map((slice) => parse(slice.path)))
+    expect(pixel(second, 6, 6)).toEqual([0, 255, 0])
+    expect(pixel(first, 6, 6)).not.toEqual([0, 255, 0])
+    expect(pixel(third, 6, 6)).toEqual(pixel(first, 6, 6))
+  })
+
   it('refuses a drawing made on images of another shape', async () => {
     load(stackOf('jpeg', 'TestPattern_JPEG-Baseline_YBRFull.dcm', 1))
     await expect(

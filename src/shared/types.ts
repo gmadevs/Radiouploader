@@ -98,6 +98,12 @@ export interface Stack {
    */
   dropped: number[]
   /**
+   * Keep one image in this many, counted from the first image of the trim. One,
+   * or absent, keeps them all. For a stack of thin slices that has more images
+   * than a case can use, where averaging them is not wanted or not possible.
+   */
+  every?: number
+  /**
    * Regions painted out in the viewer, applied to every slice of the stack —
    * burnt-in text sits in the same place on all of them. Written into the pixel
    * data at anonymisation, so what is uploaded really is redacted.
@@ -161,6 +167,18 @@ export interface Stack {
  * drag without asking for the frame again; a colour frame has no window to
  * choose, so it travels as finished pixels.
  */
+/**
+ * Millimetres per pixel of a preview frame, between rows and between columns.
+ * `detector` when only ImagerPixelSpacing gave it: that is measured at the
+ * detector, and on a radiograph the patient is smaller than that by the
+ * magnification.
+ */
+export interface PixelScale {
+  row: number
+  column: number
+  detector: boolean
+}
+
 export type PreviewFrame =
   | {
       kind: 'grey'
@@ -177,8 +195,17 @@ export type PreviewFrame =
        * upload will be plain samples, and larger than the file it came from.
        */
       compressed: boolean
+      /** Absent where the frame is not of a file, such as a reformat; null where the file gives no scale. */
+      scale?: PixelScale | null
     }
-  | { kind: 'colour'; width: number; height: number; rgba: Uint8ClampedArray; compressed: boolean }
+  | {
+      kind: 'colour'
+      width: number
+      height: number
+      rgba: Uint8ClampedArray
+      compressed: boolean
+      scale?: PixelScale | null
+    }
 
 /**
  * What the check for burnt-in text found in one stack.
@@ -251,6 +278,11 @@ export interface AnnotationRequest {
   window: WindowLevel | null
   /** The box of names and colours to put on every image, drawn by the renderer; null for none. */
   legend: LegendBitmap | null
+  /**
+   * The measurements of each image that has any, drawn by the renderer for the
+   * same reason as the legend: they carry text. Absent for none.
+   */
+  overlays?: { index: number; bitmap: LegendBitmap }[]
   /** A series this one takes the place of: the copy written the last time. */
   replaces: string | null
 }
@@ -323,6 +355,8 @@ export interface StackSelection {
   trimEnd: number
   /** Absent from a stack nothing was dropped out of. */
   dropped?: number[]
+  /** Absent from a stack that keeps every image. */
+  every?: number
   /** Absent from a stack nobody opened. */
   masks?: MaskRect[]
   crop?: CropRect | null

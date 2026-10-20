@@ -20,6 +20,17 @@ import { CT_WINDOW_PRESETS, matchingPreset, usesHounsfield } from '@shared/windo
 import { closesPolygon, indicesToWrite, stripMarks, vertexReach, type SavedAnnotation } from '../annotateEdit'
 import { loadFrame, previewErrorText } from '../dicomPreview'
 import { renderLegend } from '../legend'
+import {
+  KIND_NAMES,
+  POINTS,
+  createMeasurement,
+  describe as describeMeasurement,
+  handleAt,
+  isDegenerate,
+  type MeasureKind,
+  type Measurement
+} from '../measure'
+import { renderMeasurements } from '../measureDraw'
 import { useFocusTrap } from '../focusTrap'
 import { useWheelScrub } from '../wheelScrub'
 
@@ -36,7 +47,9 @@ interface Props {
   onClose: () => void
 }
 
-type Tool = 'brush' | 'eraser' | 'polygon'
+type Tool = 'brush' | 'eraser' | 'polygon' | MeasureKind
+
+const isMeasure = (tool: Tool): tool is MeasureKind => tool in POINTS
 
 const TOOLS: { id: Tool; label: string; key: string; title: string }[] = [
   { id: 'brush', label: 'Brush', key: 'B', title: 'Paint the structure. Hold Alt to erase.' },
@@ -48,6 +61,17 @@ const TOOLS: { id: Tool; label: string; key: string; title: string }[] = [
     title: 'Click the corners, then click the first one, double-click or press Return. Hold Alt as you close it to cut the shape out.'
   }
 ]
+
+/** On one image each, and written into the copy with their figures beside them. */
+const MEASURE_TOOLS: { id: MeasureKind; label: string; key: string; title: string }[] = [
+  { id: 'ruler', label: 'Ruler', key: 'R', title: 'Drag across what to measure' },
+  { id: 'angle', label: 'Angle', key: 'A', title: 'Click the end of one arm, the vertex, then the end of the other arm' },
+  { id: 'roi', label: 'ROI', key: 'O', title: 'Drag an ellipse to read the mean, deviation and area inside it' },
+  { id: 'arrow', label: 'Arrow', key: 'W', title: 'Drag from the tail to the point' }
+]
+
+/** Yellow, which reads on grey and is not the colour of a structure drawn first. */
+const MEASURE_COLOUR = '#ffcc00'
 
 /** The same size the viewer asks for, so a drawing lands where it was aimed. */
 const VIEWER_EDGE = 1024
@@ -116,6 +140,11 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [stage, setStage] = useState<{ width: number; height: number } | null>(null)
+  const [measurements, setMeasurements] = useState<Measurement[]>(saved?.measurements ?? [])
+  const [chosenMeasure, setChosenMeasure] = useState<string | null>(null)
+  const [measureColour, setMeasureColour] = useState(MEASURE_COLOUR)
+  /** The points of an angle clicked so far; it is made on the third. */
+  const [angle, setAngle] = useState<Point[]>([])
 
   const greyscale = frame?.kind === 'grey'
   const level: WindowLevel | null = window_ ?? (frame?.kind === 'grey' ? frame.window : null)
@@ -159,6 +188,12 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
     [showLegend, grid, version]
   )
 
+  const overlay = useMemo(
+    () => (grid ? renderMeasurements(measurements, index, grid) : null),
+    [measurements, index, grid]
+  )
+  const here = measurements.filter((measurement) => measurement.index === index)
+
   // The picture is the same function the written files come from, at the size
   // of this frame: the colours on screen are the colours that go up.
   useEffect(() => {
@@ -169,6 +204,7 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
         ? applyWindow(frame, level ?? frame.window).rgba
         : new Uint8ClampedArray(frame.rgba)
     paintStructures(rgba, frame.width, frame.height, 4, structures.current!, index, grid)
+    if (overlay) paintLegend(rgba, frame.width, frame.height, 4, overlay, grid)
     if (legend) paintLegend(rgba, frame.width, frame.height, 4, legend, grid)
     canvas.width = frame.width
     canvas.height = frame.height
@@ -199,6 +235,7 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
 
   const go = (next: number): void => {
     setPolygon([])
+    setAngle([])
     setPosition(Math.min(Math.max(next, 0), kept.length - 1))
   }
   useWheelScrub(stageRef, (steps) => go(at + steps))
@@ -258,12 +295,63 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
     bump()
   }
 
-  // A drag is a paint stroke or a change of window, decided when it starts.
+  // A drag is a paint stroke, a change of window or a measurement point being
+  // moved, decided when it starts.
   const drag = useRef<
     | { kind: 'paint'; structure: Structure; image: number; value: 0 | 1; last: Point; before: Uint8Array | undefined; mask: Uint8Array }
     | { kind: 'window'; x: number; y: number; from: WindowLevel }
+    | { kind: 'measure'; id: string; point: number }
     | null
   >(null)
+
+  /** The text beside a measurement is read off the frame on screen, which is its own image. */
+  const labelled = (measurement: Measurement): Measurement =>
+    frame ? { ...measurement, label: describeMeasurement(measurement, frame, modality) } : measurement
+
+  const moveMeasurePoint = (id: string, point: number, to: Point): void =>
+    setMeasurements((current) =>
+      current.map((m) => (m.id === id ? labelled({ ...m, points: m.points.map((p, i) => (i === point ? to : p)) }) : m))
+    )
+
+  const deleteMeasurement = (id: string): void => {
+    setMeasurements((current) => current.filter((m) => m.id !== id))
+    if (chosenMeasure === id) setChosenMeasure(null)
+  }
+
+  const recolourMeasurement = (colour: string): void => {
+    setMeasureColour(colour)
+    if (chosenMeasure) setMeasurements((current) => current.map((m) => (m.id === chosenMeasure ? { ...m, color: colour } : m)))
+  }
+
+  /** A press with a measuring tool: move a point under it, or start a new measurement. */
+  const measureDown = (event: React.PointerEvent<HTMLCanvasElement>, kind: MeasureKind, point: Point): void => {
+    if (!grid) return
+    const reach = vertexReach(grid, fitted?.width ?? 0)
+    const hit = angle.length === 0 ? handleAt(measurements, index, point, reach) : null
+    if (hit) {
+      event.currentTarget.setPointerCapture(event.pointerId)
+      setChosenMeasure(hit.id)
+      drag.current = { kind: 'measure', id: hit.id, point: hit.point }
+      return
+    }
+    if (kind === 'angle') {
+      const points = [...angle, point]
+      if (points.length < 3) {
+        setAngle(points)
+        return
+      }
+      const made = labelled(createMeasurement('angle', index, points, measureColour))
+      setMeasurements((current) => [...current, made])
+      setChosenMeasure(made.id)
+      setAngle([])
+      return
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    const made = labelled(createMeasurement(kind, index, [point, point], measureColour))
+    setMeasurements((current) => [...current, made])
+    setChosenMeasure(made.id)
+    drag.current = { kind: 'measure', id: made.id, point: 1 }
+  }
 
   const gridPoint = (event: React.PointerEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>): Point => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -282,8 +370,13 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
       drag.current = { kind: 'window', x: event.clientX, y: event.clientY, from: level }
       return
     }
-    if (event.button !== 0 || !active) return
+    if (event.button !== 0) return
     const point = gridPoint(event)
+    if (isMeasure(tool)) {
+      measureDown(event, tool, point)
+      return
+    }
+    if (!active) return
 
     if (tool === 'polygon') {
       if (closesPolygon(polygon, point, vertexReach(grid, fitted?.width ?? 0))) finishPolygon(event.altKey)
@@ -309,6 +402,10 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
     setPointer(point)
     const current = drag.current
     if (!current || !grid) return
+    if (current.kind === 'measure') {
+      moveMeasurePoint(current.id, current.point, point)
+      return
+    }
     if (current.kind === 'window') {
       const unit = Math.max(current.from.width, 1) / 300
       setWindow({
@@ -326,6 +423,10 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
     const current = drag.current
     drag.current = null
     if (current?.kind === 'paint') record(current.structure, current.image, current.before, current.mask)
+    // A click where a drag was meant leaves nothing to keep.
+    if (current?.kind === 'measure') {
+      setMeasurements((all) => all.filter((m) => m.id !== current.id || !isDegenerate(m)))
+    }
   }
 
   const snapshot = (seriesId: string | null): SavedAnnotation | null =>
@@ -337,7 +438,8 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
           seriesId,
           window: window_,
           onlyDrawn,
-          legend: showLegend
+          legend: showLegend,
+          measurements
         }
 
   const close = (): void => {
@@ -346,10 +448,12 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
     onClose()
   }
 
-  const indices = indicesToWrite(structures.current, kept, onlyDrawn)
-  const anything = structures.current.some(
-    (s) => s.visible && [...s.keys.values()].some((mask) => mask.some((v) => v))
-  )
+  const keptSet = new Set(kept)
+  const measured = [...new Set(measurements.map((m) => m.index))].filter((i) => keptSet.has(i))
+  const indices = indicesToWrite(structures.current, kept, onlyDrawn, measured)
+  const anything =
+    measured.length > 0 ||
+    structures.current.some((s) => s.visible && [...s.keys.values()].some((mask) => mask.some((v) => v)))
 
   const add = async (): Promise<void> => {
     if (!grid) return
@@ -363,6 +467,10 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
         structures: structures.current!.map(toMessage),
         window: greyscale ? window_ : null,
         legend,
+        overlays: indices.flatMap((i) => {
+          const bitmap = renderMeasurements(measurements, i, grid)
+          return bitmap ? [{ index: i, bitmap }] : []
+        }),
         replaces
       })
       const next = snapshot(series.id)
@@ -381,6 +489,7 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
     const typing = event.target instanceof HTMLInputElement && event.target.type === 'text'
     if (event.key === 'Escape') {
       if (polygon.length > 0) setPolygon([])
+      else if (angle.length > 0) setAngle([])
       else close()
       return
     }
@@ -402,7 +511,10 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
         finishPolygon(event.altKey)
         break
       case 'Backspace':
+      case 'Delete':
         if (polygon.length > 0) setPolygon((current) => current.slice(0, -1))
+        else if (angle.length > 0) setAngle((current) => current.slice(0, -1))
+        else if (chosenMeasure && here.some((m) => m.id === chosenMeasure)) deleteMeasurement(chosenMeasure)
         break
       case 'ArrowUp':
       case 'ArrowLeft':
@@ -433,10 +545,11 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
         copyFrom(1)
         break
       default: {
-        const chosen = TOOLS.find((t) => t.key.toLowerCase() === event.key.toLowerCase())
+        const chosen = [...TOOLS, ...MEASURE_TOOLS].find((t) => t.key.toLowerCase() === event.key.toLowerCase())
         if (chosen) {
           setTool(chosen.id)
           setPolygon([])
+          setAngle([])
         } else return
       }
     }
@@ -499,6 +612,23 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
                 onClick={() => {
                   setTool(option.id)
                   setPolygon([])
+                  setAngle([])
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="tools segmented" aria-label="Measure">
+            {MEASURE_TOOLS.map((option) => (
+              <button
+                key={option.id}
+                className={tool === option.id ? 'small on' : 'small'}
+                title={`${option.title} (${option.key})`}
+                onClick={() => {
+                  setTool(option.id)
+                  setPolygon([])
+                  setAngle([])
                 }}
               >
                 {option.label}
@@ -526,7 +656,7 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
         </header>
 
         <div className="annotate-body">
-          <div className={`viewer-stage drawing ${tool}`} ref={stageRef}>
+          <div className={`viewer-stage drawing ${isMeasure(tool) ? 'measure' : tool}`} ref={stageRef}>
             {error ? (
               <div className="placeholder">
                 This image cannot be drawn on
@@ -550,8 +680,27 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
                 />
                 {grid && (
                   <svg className="draw-layer" viewBox={`0 0 ${grid.width} ${grid.height}`} preserveAspectRatio="none">
-                    {tool !== 'polygon' && pointer && (
+                    {(tool === 'brush' || tool === 'eraser') && pointer && (
                       <circle cx={pointer[0]} cy={pointer[1]} r={radius} className="brush-ring" />
+                    )}
+                    {isMeasure(tool) &&
+                      here.flatMap((measurement) =>
+                        measurement.points.map(([x, y], i) => (
+                          <circle
+                            key={`${measurement.id}-${i}`}
+                            cx={x}
+                            cy={y}
+                            r={vertexReach(grid, fitted?.width ?? 0) / 2}
+                            className={measurement.id === chosenMeasure ? 'measure-handle on' : 'measure-handle'}
+                          />
+                        ))
+                      )}
+                    {angle.length > 0 && (
+                      <polyline
+                        points={[...angle, ...(pointer ? [pointer] : [])].map(([x, y]) => `${x},${y}`).join(' ')}
+                        className="polygon-line"
+                        style={{ stroke: measureColour }}
+                      />
                     )}
                     {polygon.length > 0 && (
                       <>
@@ -650,10 +799,66 @@ export function AnnotateDialog({ stack, heading, modality, saved, onSave, onAdde
               </div>
             )}
 
+            <div className="measure-list">
+              <div className="muted small">Measurements on this image</div>
+              {here.length === 0 ? (
+                <div className="muted small">
+                  None. Choose Ruler, Angle, ROI or Arrow above.
+                </div>
+              ) : (
+                here.map((measurement) => (
+                  <div
+                    key={measurement.id}
+                    className={measurement.id === chosenMeasure ? 'structure on' : 'structure'}
+                    onClick={() => setChosenMeasure(measurement.id)}
+                  >
+                    <span className="swatch" style={{ background: measurement.color }} />
+                    <span className="measure-text">
+                      {KIND_NAMES[measurement.kind]}
+                      {measurement.label.length > 0 && <span className="muted"> · {measurement.label.join(' · ')}</span>}
+                    </span>
+                    <button
+                      className="small ghost"
+                      title="Delete this measurement"
+                      aria-label={`Delete ${KIND_NAMES[measurement.kind]}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteMeasurement(measurement.id)
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              )}
+              <div className="swatches">
+                {PALETTE.map((colour) => (
+                  <button
+                    key={colour.hex}
+                    className={measureColour === colour.hex ? 'swatch-button on' : 'swatch-button'}
+                    style={{ background: colour.hex }}
+                    title={`${colour.name}, for the measurement chosen and the next ones`}
+                    aria-label={`Measurements in ${colour.name}`}
+                    onClick={() => recolourMeasurement(colour.hex)}
+                  />
+                ))}
+              </div>
+              {frame?.scale?.detector && (
+                <div className="muted small">
+                  Lengths use the detector&apos;s pixel spacing. On a radiograph they are larger than in the patient by the
+                  magnification.
+                </div>
+              )}
+              {frame && frame.scale === null && (
+                <div className="muted small">These images give no pixel spacing, so lengths and areas are in pixels.</div>
+              )}
+            </div>
+
             <div className="muted small annotate-help">
               Draw on a few images and the ones between are filled in. <kbd>Alt</kbd> erases with the brush and cuts
               with the polygon. <kbd>C</kbd> and <kbd>⇧C</kbd> copy the drawing from the image before or after. The
-              right button sets the contrast.
+              right button sets the contrast. Drag a measurement&apos;s points to move them; <kbd>Delete</kbd> removes the one
+              chosen.
             </div>
           </aside>
         </div>

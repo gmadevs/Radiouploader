@@ -1,5 +1,5 @@
 import type { AnonResult, CropRect, IngestResult, MaskRect, Series, Stack, StackSelection, WindowLevel } from '@shared/types'
-import { keptSlices, sanitiseDropped } from '@shared/selection'
+import { keptSlices, sanitiseDropped, sanitiseEvery } from '@shared/selection'
 import { cleanupTempDir } from './ingest'
 import { bySlice, carriedEdits } from './ingest/arrange'
 import { createSessionDir } from './tempDirs'
@@ -103,6 +103,7 @@ class Session {
           stack.trimStart = Math.min(Math.max(chosen.trimStart, 0), last)
           stack.trimEnd = Math.min(Math.max(chosen.trimEnd, stack.trimStart), last)
           stack.dropped = sanitiseDropped(chosen.dropped, stack.slices.length)
+          stack.every = sanitiseEvery(chosen.every)
           stack.masks = sanitiseMasks(chosen.masks)
           stack.crop = sanitiseCrop(chosen.crop)
           stack.window = sanitiseWindow(chosen.window)
@@ -116,8 +117,8 @@ class Session {
    *
    * Done here because this is the tree anonymisation and upload read; the
    * renderer's copy is replaced with what comes back. Blanked areas go with the
-   * series whichever way it is turned (see carriedEdits). A trim or a dropped
-   * image is a choice about one stack of one arrangement and does not.
+   * series whichever way it is turned (see carriedEdits). A trim, a dropped
+   * image or a step is a choice about one stack of one arrangement and does not.
    */
   arrange(seriesId: string, arrangement: 'phase' | 'slice'): Series {
     const series = this.ingest?.studies.flatMap((study) => study.series).find((s) => s.id === seriesId)
@@ -137,7 +138,8 @@ class Session {
         selected: stack.unsupported === null,
         trimStart: 0,
         trimEnd: stack.slices.length - 1,
-        dropped: []
+        dropped: [],
+        every: 1
       }))
       if (stacks.length === 0) throw new Error('That series cannot be rearranged')
     }

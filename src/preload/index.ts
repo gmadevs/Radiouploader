@@ -69,6 +69,9 @@ const api = {
   commitReformat: (plan: ReformatPlan): Promise<{ studyId: string; series: Series }> =>
     ipcRenderer.invoke('volume:commit', plan),
   closeVolume: (): Promise<void> => ipcRenderer.invoke('volume:close'),
+  /** Average each run of `slices` neighbouring images into one, as a series beside the stack. */
+  averageStack: (stackId: string, slices: number): Promise<{ studyId: string; series: Series }> =>
+    ipcRenderer.invoke('volume:average', stackId, slices),
   /** Write a stack again with the drawing painted into it, as a series beside it. */
   commitAnnotation: (stackId: string, request: AnnotationRequest): Promise<{ studyId: string; series: Series }> =>
     ipcRenderer.invoke('annotate:commit', stackId, request),

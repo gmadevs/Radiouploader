@@ -46,6 +46,7 @@ export function bySlice(seriesId: string, phaseStacks: Stack[]): Stack[] | null 
       trimStart: 0,
       trimEnd: slices.length - 1,
       dropped: [],
+      every: 1,
       masks: [],
       crop: null,
       window: null,

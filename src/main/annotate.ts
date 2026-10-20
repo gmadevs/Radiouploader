@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as dcmio from 'dicomanon'
-import { paintLegend, paintStructures } from '@shared/annotate/paint'
+import { paintLegend, paintStructures, type LegendBitmap } from '@shared/annotate/paint'
 import { fromMessage, type Structure } from '@shared/annotate/structures'
 import { applyWindow, fillMasks } from '@shared/dicomImage'
 import type { AnnotationRequest, Series, SliceRef, Stack, Study } from '@shared/types'
@@ -104,10 +104,31 @@ function fileDescription(source: Dict): string {
 }
 
 /**
+ * The measurements sent with a drawing, by image, keeping only bitmaps whose
+ * pixels are the size they say: the renderer's copy is not trusted, and a short
+ * buffer would be read past its end.
+ */
+export function overlaysByIndex(
+  overlays: AnnotationRequest['overlays'],
+  length: number
+): Map<number, LegendBitmap> {
+  const byIndex = new Map<number, LegendBitmap>()
+  for (const overlay of overlays ?? []) {
+    const { index, bitmap } = overlay
+    if (!Number.isInteger(index) || index < 0 || index >= length) continue
+    if (!(Number.isInteger(bitmap?.width) && Number.isInteger(bitmap?.height) && bitmap.width > 0 && bitmap.height > 0)) continue
+    if (!Number.isFinite(bitmap.x) || !Number.isFinite(bitmap.y)) continue
+    if (bitmap.rgba?.length !== bitmap.width * bitmap.height * 4) continue
+    byIndex.set(index, bitmap)
+  }
+  return byIndex
+}
+
+/**
  * One annotated image, as RGB samples at the image's full size.
  *
- * The stack's own redactions are painted in last, over the structures and the
- * legend: a structure drawn across a blanked banner must not bring back its outline, and
+ * The stack's own redactions are painted in last, over the structures, the
+ * measurements and the legend: a structure drawn across a blanked banner must not bring back its outline, and
  * the anonymiser, which blanks them again from the stack, would find them
  * already black.
  */
@@ -116,7 +137,8 @@ async function annotatedPixels(
   index: number,
   structures: Structure[],
   request: AnnotationRequest,
-  stack: Stack
+  stack: Stack,
+  overlay: LegendBitmap | undefined
 ): Promise<{ width: number; height: number; rgb: Uint8Array }> {
   const frame = await readPreviewFrame(slice.path, slice.frame, Number.POSITIVE_INFINITY)
   const rgba = frame.kind === 'grey' ? applyWindow(frame, request.window ?? frame.window).rgba : frame.rgba
@@ -135,6 +157,7 @@ async function annotatedPixels(
     rgb[j + 2] = rgba[i + 2]
   }
   paintStructures(rgb, frame.width, frame.height, 3, structures, index, request.grid)
+  if (overlay) paintLegend(rgb, frame.width, frame.height, 3, overlay, request.grid)
   if (request.legend) paintLegend(rgb, frame.width, frame.height, 3, request.legend, request.grid)
   fillMasks(
     rgb,
@@ -196,6 +219,7 @@ export async function commitAnnotation(
   const indices = request.indices.filter((i) => Number.isInteger(i) && i >= 0 && i < stack.slices.length)
   if (indices.length === 0) throw new AnnotationError('There are no images to write')
   const structures = request.structures.map((message) => fromMessage(message, width, height))
+  const overlays = overlaysByIndex(request.overlays, stack.slices.length)
 
   const workDir = await session.workDir()
   const outputDir = path.join(workDir, 'annotated', `${Date.now()}`)
@@ -211,7 +235,7 @@ export async function commitAnnotation(
 
   for (const [n, index] of indices.entries()) {
     const slice = stack.slices[index]
-    const image = await annotatedPixels(slice, index, structures, request, stack)
+    const image = await annotatedPixels(slice, index, structures, request, stack, overlays.get(index))
     const message = await readParent(slice.path)
     const source = message.dict as unknown as Dict
 

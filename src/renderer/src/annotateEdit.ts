@@ -2,6 +2,7 @@ import type { Grid } from '@shared/annotate/paint'
 import type { Point } from '@shared/annotate/raster'
 import { maskAt, type Structure, type StructureMessage } from '@shared/annotate/structures'
 import type { WindowLevel } from '@shared/types'
+import type { Measurement } from './measure'
 
 /**
  * The parts of the annotation dialog that are arithmetic rather than React,
@@ -17,6 +18,8 @@ export interface SavedAnnotation {
   window: WindowLevel | null
   onlyDrawn: boolean
   legend: boolean
+  /** Absent from a drawing kept before there were measurements. */
+  measurements?: Measurement[]
 }
 
 export type StripMark = { position: number; kind: 'key' | 'empty' | 'filled' }
@@ -58,11 +61,19 @@ export function vertexReach(grid: Grid, displayedWidth: number): number {
 /**
  * The images to write: every one being kept, or only those from the first to
  * the last with any colour on it. Filled images count, so a structure that
- * fades out towards a cleared image is written to the end of its fade.
+ * fades out towards a cleared image is written to the end of its fade, and so
+ * does an image with a measurement on it.
  */
-export function indicesToWrite(structures: Structure[], kept: number[], onlyDrawn: boolean): number[] {
+export function indicesToWrite(
+  structures: Structure[],
+  kept: number[],
+  onlyDrawn: boolean,
+  measured: readonly number[] = []
+): number[] {
   if (!onlyDrawn) return kept
+  const marked = new Set(measured)
   const coloured = (index: number): boolean =>
+    marked.has(index) ||
     structures.some((structure) => structure.visible && (maskAt(structure, index)?.some((v) => v) ?? false))
   const first = kept.findIndex(coloured)
   if (first < 0) return kept

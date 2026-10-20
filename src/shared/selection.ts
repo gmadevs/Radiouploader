@@ -1,10 +1,12 @@
 /**
  * Which images of a stack are really going up.
  *
- * Two things take images out of a stack and they are not the same shape. The
+ * Three things take images out of a stack and they are not the same shape. The
  * **trim** is a range, for the dead ends of a series — the localisers before
  * the anatomy, the tail after it. A **drop** is one image, for the one that is
- * blurred, doubled, or shows the wrong thing while its neighbours are fine.
+ * blurred, doubled, or shows the wrong thing while its neighbours are fine. A
+ * **step** keeps one image in every few, for a stack of thin slices with more
+ * images than a case can use.
  *
  * Both are indices into `slices` as it arrived, and the rule that combines them
  * lives here rather than at each of the three places that needs it: the
@@ -16,11 +18,24 @@
 import type { Stack } from './types'
 
 /** The fields of a stack that decide what is kept. */
-export type Kept = Pick<Stack, 'slices' | 'trimStart' | 'trimEnd' | 'dropped'>
+export type Kept = Pick<Stack, 'slices' | 'trimStart' | 'trimEnd' | 'dropped' | 'every'>
 
-/** Is this image, by its index in the stack as it arrived, going to be uploaded? */
+/**
+ * Is this image, by its index in the stack as it arrived, going to be uploaded?
+ *
+ * The step is counted from the first image of the trim, so the first image kept
+ * is the one the trim starts on. It is counted over the indices as they arrived
+ * and not over what the drops leave: an image dropped on a step leaves a gap,
+ * which is what a drop is meant to do, and it does not move every image after it.
+ */
 export function isKept(stack: Kept, index: number): boolean {
-  return index >= stack.trimStart && index <= stack.trimEnd && !(stack.dropped ?? []).includes(index)
+  const every = stack.every ?? 1
+  return (
+    index >= stack.trimStart &&
+    index <= stack.trimEnd &&
+    (index - stack.trimStart) % every === 0 &&
+    !(stack.dropped ?? []).includes(index)
+  )
 }
 
 /** The slices that are going up, in order, with the trim and the drops applied. */
@@ -61,4 +76,15 @@ export function sanitiseDropped(dropped: readonly number[] | undefined, length: 
     seen.add(index)
   }
   return [...seen].sort((a, b) => a - b)
+}
+
+/** The largest step offered. Past it a stack is better trimmed or averaged. */
+export const MAX_EVERY = 10
+
+/**
+ * Re-check a step against the stack it belongs to: a whole number from one to
+ * MAX_EVERY, and one wherever the renderer's copy says anything else.
+ */
+export function sanitiseEvery(every: number | undefined): number {
+  return Number.isInteger(every) && (every as number) >= 1 && (every as number) <= MAX_EVERY ? (every as number) : 1
 }

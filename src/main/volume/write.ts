@@ -116,13 +116,15 @@ export async function writeReformatted(
   built: BuiltVolume,
   plan: ReformatPlan,
   outputDir: string,
-  parent: { seriesId: string; seriesNumber: number | null; description: string | null; modality: string | null; window: WindowLevel | null }
+  parent: { seriesId: string; seriesNumber: number | null; description: string | null; modality: string | null; window: WindowLevel | null },
+  /** Where each image sits along the normal, when the plan's spacing is not the whole story. */
+  at?: number[]
 ): Promise<Series> {
   await fs.mkdir(outputDir, { recursive: true })
 
   const source = await fs.readFile(built.sourcePath)
   const seriesUid = uid()
-  const offsets = slabOffsets(built.volume, plan.frame, plan.spacing)
+  const offsets = at ?? slabOffsets(built.volume, plan.frame, plan.spacing)
   const label = describePlan(built, plan)
 
   const channels = built.volume.channels

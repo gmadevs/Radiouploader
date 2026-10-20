@@ -7,6 +7,9 @@ interface Props {
   failures: { path: string; reason: string }[]
   onToggle: (id: string, selected: boolean) => void
   onTrim: (id: string, trimStart: number, trimEnd: number) => void
+  onEvery: (id: string, every: number) => void
+  /** Average a stack into thicker slices, as a series of its own beside it. */
+  onAverage: (stack: Stack, series: Series, slices: number) => Promise<void>
   onKeepOnePhase: (series: Series) => void
   /** Lay a dynamic series out as a stack per time point or a stack per slice. */
   onArrange: (series: Series, arrangement: 'phase' | 'slice') => void
@@ -70,6 +73,8 @@ export function ReviewStep({
   failures,
   onToggle,
   onTrim,
+  onEvery,
+  onAverage,
   onKeepOnePhase,
   onArrange,
   onOpen,
@@ -263,6 +268,8 @@ export function ReviewStep({
                       stack={stack}
                       onToggle={onToggle}
                       onTrim={onTrim}
+                      onEvery={onEvery}
+                      onAverage={(slices) => onAverage(stack, series, slices)}
                       onOpen={() => onOpen(stack, series, study)}
                       onReformat={() => onReformat(stack, series, study)}
                       onAnnotate={() => onAnnotate(stack, series, study)}

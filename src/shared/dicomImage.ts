@@ -113,6 +113,12 @@ export interface ImageHeader extends PixelGeometry {
    * one everything else here counts in.
    */
   pixelSpacing: { row: number; column: number } | null
+  /**
+   * ImagerPixelSpacing (0018,1164), in the same order: the spacing at the
+   * detector, which is what a radiograph often states instead of PixelSpacing.
+   * Absent from a header that was not parsed from a file.
+   */
+  imagerPixelSpacing?: { row: number; column: number } | null
   /** ImagePositionPatient (0020,0032): where this image's first voxel is, in mm. */
   imagePosition: [number, number, number] | null
   /** ImageOrientationPatient (0020,0037): the row and column directions. */
@@ -201,6 +207,7 @@ export function parseHeader(bytes: Uint8Array): ImageHeader {
     frames: Math.max(1, Number.parseInt(ds.string('x00280008') ?? '1', 10) || 1),
     burnedInAnnotation: ds.string('x00280301') ?? null,
     pixelSpacing: pairOf(ds.string('x00280030')),
+    imagerPixelSpacing: pairOf(ds.string('x00181164')),
     imagePosition: tripleOf(ds.string('x00200032')),
     imageOrientation: numbersOf(ds.string('x00200037'), 6),
     bigEndian: transferSyntax === EXPLICIT_VR_BIG_ENDIAN,

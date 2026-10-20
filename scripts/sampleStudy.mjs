@@ -348,8 +348,11 @@ function buildStudy(dir, { index, studyDate, description, lesion, withUltrasound
   const studyUid = `${ROOT}.${index}.1`
   let files = 0
 
+  // Thin slices, more of them than a case needs, so the review step has a
+  // stack to warn about and to average.
   const ctSeries = `${ROOT}.${index}.2`
-  for (let i = 0; i < 12; i++) {
+  const ctSlices = 120
+  for (let i = 0; i < ctSlices; i++) {
     write(dir, `ct_${index}_${String(i).padStart(2, '0')}.dcm`, instance({
       sopClassUid: CT_SOP,
       sopInstanceUid: `${ctSeries}.${i}`,
@@ -357,12 +360,12 @@ function buildStudy(dir, { index, studyDate, description, lesion, withUltrasound
       seriesUid: ctSeries,
       studyDate,
       studyDescription: description,
-      seriesDescription: 'Chest 1.0 mm',
+      seriesDescription: 'Chest 0.5 mm',
       modality: 'CT',
       seriesNumber: 2,
       instanceNumber: i + 1,
-      position: (i * 5).toFixed(1),
-      pixels: ctSlice(i, 12, lesion),
+      position: (i * 0.5).toFixed(1),
+      pixels: ctSlice(i, ctSlices, lesion),
       windowCentre: '40',
       windowWidth: '400',
       intercept: '-1024'

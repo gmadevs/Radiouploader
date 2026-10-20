@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PreviewFrame, Stack } from '@shared/types'
 import { isKept, keptCount } from '@shared/selection'
 import { loadFrame, paintFrame, previewErrorText } from '../dicomPreview'
+import { averageOptions, countLevel, countWarning, stepOptions, suggestedOption } from '../imageCount'
 import { extentOf, formatSize, millimetres, perImage } from '../stackDetail'
 import { useWheelScrub } from '../wheelScrub'
 
@@ -9,6 +10,10 @@ interface Props {
   stack: Stack
   onToggle: (id: string, selected: boolean) => void
   onTrim: (id: string, trimStart: number, trimEnd: number) => void
+  /** Keep one image in this many. */
+  onEvery: (id: string, every: number) => void
+  /** Add a copy of the stack with each run of `slices` images averaged into one. */
+  onAverage: (slices: number) => Promise<void>
   /** Open the full-size viewer, where text can be blanked and contrast set. */
   onOpen: (stack: Stack) => void
   /** Cut this stack another way, if there is enough of it to cut. */
@@ -17,7 +22,16 @@ interface Props {
 }
 
 /** One stack: a scrubable preview, the trim range, and the include control. */
-export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat, onAnnotate }: Props): React.JSX.Element {
+export function StackCard({
+  stack,
+  onToggle,
+  onTrim,
+  onEvery,
+  onAverage,
+  onOpen,
+  onReformat,
+  onAnnotate
+}: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const [frame, setFrame] = useState<PreviewFrame | null>(null)
@@ -26,10 +40,21 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat, onAnnot
   const [error, setError] = useState<string | null>(null)
   // Trimming is the exception, so the controls stay out of the way until asked for.
   const [showTrim, setShowTrim] = useState(false)
+  const [averageChoice, setAverageChoice] = useState<number | null>(null)
+  const [averaging, setAveraging] = useState(false)
+  const [averageError, setAverageError] = useState<string | null>(null)
 
   const last = stack.slices.length - 1
   const kept = keptCount(stack)
   const trimmed = stack.trimStart > 0 || stack.trimEnd < last
+  const every = stack.every ?? 1
+  const level = countLevel(kept)
+  const warning = countWarning(kept)
+  const steps = stepOptions(stack)
+  // Colour is refused by the main process too; offering it here would be a
+  // button that can only fail.
+  const averages = frame?.kind === 'colour' || !stack.sharedPlane ? [] : averageOptions(stack)
+  const average = averages.find((option) => option.slices === averageChoice) ?? suggestedOption(averages)
   // Only the ones inside the trim: an image dropped and then trimmed away as
   // well is one image missing from the upload, not two.
   const droppedInside = (stack.dropped ?? []).filter((i) => i >= stack.trimStart && i <= stack.trimEnd).length
@@ -140,9 +165,60 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat, onAnnot
             />
             <span className="n">{stack.trimEnd + 1}</span>
           </label>
+          <label title="Keep one image in every few, across the whole trim">
+            <span>Keep</span>
+            <select
+              value={every}
+              aria-label={`Images of ${stack.label} to keep`}
+              onChange={(e) => onEvery(stack.id, Number(e.target.value))}
+            >
+              {steps.map((option) => (
+                <option key={option.every} value={option.every}>
+                  {option.every === 1 ? `All ${option.count} images` : `1 in ${option.every}, ${option.count} images`}
+                </option>
+              ))}
+            </select>
+          </label>
+          {average && (
+            <label title="Add a copy of this stack with neighbouring images averaged into thicker slices. The copy replaces this stack in the upload.">
+              <span>Average</span>
+              <select
+                value={average.slices}
+                disabled={averaging}
+                aria-label={`Thickness to average ${stack.label} to`}
+                onChange={(e) => setAverageChoice(Number(e.target.value))}
+              >
+                {averages.map((option) => (
+                  <option key={option.slices} value={option.slices}>
+                    {millimetres(option.thickness)} mm, {option.count} images
+                  </option>
+                ))}
+              </select>
+              <button
+                className="small"
+                disabled={averaging}
+                onClick={() => {
+                  setAveraging(true)
+                  setAverageError(null)
+                  onAverage(average.slices)
+                    .catch((err: unknown) => setAverageError(previewErrorText(err)))
+                    .finally(() => setAveraging(false))
+                }}
+              >
+                {averaging ? 'Adding…' : 'Add'}
+              </button>
+            </label>
+          )}
+          {averageError && <div className="trim-error">{averageError}</div>}
           <div style={{ display: 'flex', gap: 6 }}>
-            {trimmed && (
-              <button className="small ghost" onClick={() => onTrim(stack.id, 0, last)}>
+            {(trimmed || every > 1) && (
+              <button
+                className="small ghost"
+                onClick={() => {
+                  onTrim(stack.id, 0, last)
+                  onEvery(stack.id, 1)
+                }}
+              >
                 Reset
               </button>
             )}
@@ -166,13 +242,16 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat, onAnnot
           <div className="stack-facts">
             {kept < stack.slices.length ? (
               <>
-                {kept} of {stack.slices.length} images
+                <span className={`count ${level}`}>{kept}</span> of {stack.slices.length} images
                 {trimmed && <> · {stack.trimStart + 1}–{stack.trimEnd + 1}</>}
                 {droppedInside > 0 && <> · {droppedInside} dropped</>}
+                {every > 1 && <> · 1 in {every}</>}
               </>
             ) : (
               <>
-                {stack.slices.length} image{stack.slices.length === 1 ? '' : 's'}
+                <span className={`count ${level}`}>
+                  {stack.slices.length} image{stack.slices.length === 1 ? '' : 's'}
+                </span>
               </>
             )}
             {maskCount > 0 && <> · {maskCount} blanked</>}
@@ -198,6 +277,23 @@ export function StackCard({ stack, onToggle, onTrim, onOpen, onReformat, onAnnot
           </button>
         )}
       </div>
+
+      {/* Only on a stack that is going up: a long series left unticked is
+          already the reduction. */}
+      {warning && stack.selected && (
+        <div className={`count-warning ${level}`}>
+          <span>{warning}</span>
+          {!showTrim && stack.slices.length > 2 && !stack.unsupported && (
+            <button
+              className="small"
+              title="Keep one image in every few, average them into thicker slices, or trim the ends"
+              onClick={() => setShowTrim(true)}
+            >
+              Reduce
+            </button>
+          )}
+        </div>
+      )}
 
       {/* The two things this screen asks of everyone, spelled out on the card
           rather than waiting under the pointer: the check before anonymising

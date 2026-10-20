@@ -15,7 +15,7 @@ import { session } from '../session'
 import { buildVolume, pixelSpacingOf, VolumeError, type BuiltVolume } from './build'
 import { ACQUISITION_FRAMES, anatomicalFrames } from './orientation'
 import { defaultWindow } from './window'
-import { extent, reformatSlice, slabOffsets } from './reformat'
+import { averageCentres, extent, reformatSlice, slabOffsets } from './reformat'
 import { describePlan, writeReformatted } from './write'
 
 /**
@@ -151,6 +151,62 @@ export async function commitReformat(plan: ReformatPlan): Promise<{ studyId: str
 
   const study = open.parent.study
   study.series.splice(study.series.indexOf(open.parent.series) + 1, 0, series)
+  return { studyId: study.id, series }
+}
+
+/**
+ * Average each run of neighbouring images of a stack into one, and put the
+ * result in the tree beside it.
+ *
+ * A thick-slab mean in the plane the images were acquired in, written through
+ * the reformat's own writer. The plane is the volume's own axes rather than the
+ * patient's, so an oblique acquisition stays oblique and the averaged images lie
+ * on the grid of the originals; and each slab is centred so that it reads
+ * exactly `slices` voxel planes (see averageCentres), which makes the result
+ * the average of those images and not of samples interpolated between them.
+ *
+ * Built from the images that are going up, like a reformat, and with its own
+ * volume: the one a reformat dialog holds is not touched.
+ */
+export async function averageStack(stackId: string, slices: number): Promise<{ studyId: string; series: Series }> {
+  if (!Number.isInteger(slices) || slices < 2 || slices > 10) {
+    throw new VolumeError('Between 2 and 10 images can be averaged into one')
+  }
+  const parent = find(stackId)
+  const built = await buildVolume({ ...parent.stack, slices: keptSlices(parent.stack) })
+  if (built.volume.channels > 1) {
+    throw new VolumeError('Colour images cannot be averaged: the result would mix the colours of different images')
+  }
+
+  const { depth, spacing } = built.volume
+  const centres = averageCentres(depth, spacing.z, slices)
+  if (centres.length < 2) throw new VolumeError('There are too few images here to average')
+
+  const thickness = slices * spacing.z
+  const plan: ReformatPlan = {
+    frame: ACQUISITION_FRAMES.axial,
+    projection: 'mean',
+    thickness,
+    spacing: thickness,
+    window: null
+  }
+  const workDir = await session.workDir()
+  const series = await writeReformatted(
+    built,
+    plan,
+    path.join(workDir, 'averaged', `${Date.now()}`),
+    {
+      seriesId: parent.series.id,
+      seriesNumber: parent.series.seriesNumber,
+      description: parent.series.description,
+      modality: parent.series.modality,
+      window: defaultWindow(built.volume, built.header, parent.stack.window)
+    },
+    centres
+  )
+
+  const study = parent.study
+  study.series.splice(study.series.indexOf(parent.series) + 1, 0, series)
   return { studyId: study.id, series }
 }
 

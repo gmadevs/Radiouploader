@@ -225,3 +225,18 @@ export function slabOffsets(volume: Volume, frame: Frame, spacing: number): numb
   const start = (span - (count - 1) * step) / 2
   return Array.from({ length: count }, (_, i) => start + i * step)
 }
+
+/**
+ * Where to centre slabs along the volume's own z axis so that each one reads
+ * exactly `slices` voxel planes, in millimetres.
+ *
+ * A slab of `slices` planes is that many spacings thick, so its two faces fall
+ * half a spacing outside its first and last planes, never on a plane: an odd
+ * run is centred on a plane, an even one between two. Groups are whole, and
+ * the planes left over are split between the two ends.
+ */
+export function averageCentres(depth: number, spacing: number, slices: number): number[] {
+  const count = Math.floor(depth / slices)
+  const first = Math.floor((depth - count * slices) / 2)
+  return Array.from({ length: count }, (_, i) => (first + i * slices + (slices - 1) / 2) * spacing)
+}

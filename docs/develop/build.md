@@ -47,6 +47,6 @@ For anything visual, generate the sample study:
 npm run sample
 ```
 
-This writes 49 files to `.sample-study/`, which git ignores: a CT phantom in two studies six
+This writes 265 files to `.sample-study/`, which git ignores: a CT phantom in two studies six
 months apart, a diffusion series, and an ultrasound with a banner burnt into its pixels. The
 [screenshots](/develop/screenshots) are taken on this study.

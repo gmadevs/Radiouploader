@@ -59,6 +59,14 @@ describe('the images written', () => {
     s.visible = false
     expect(indicesToWrite([s], kept, true)).toEqual(kept)
   })
+
+  it('counts an image with a measurement on it as annotated', () => {
+    const s = createStructure('Canal', '#ff0000')
+    s.keys.set(3, dot(5, 5))
+    reinterpolate(s, W, H)
+    expect(indicesToWrite([s], [0, 1, 2, 3, 4, 5, 6, 7], true, [6])).toEqual([3, 4, 5, 6])
+    expect(indicesToWrite([], [0, 1, 2, 3], true, [1, 2])).toEqual([1, 2])
+  })
 })
 
 describe('the legend', () => {

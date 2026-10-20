@@ -11,7 +11,7 @@ import {
   parseHeader,
   type ImageHeader
 } from '@shared/dicomImage'
-import type { PreviewFrame } from '@shared/types'
+import type { PixelScale, PreviewFrame } from '@shared/types'
 import { decodeEncapsulatedFrame, type DecodedSamples } from './codecs/decode'
 import { encodedFrame } from './codecs/frames'
 import { isVideoSyntax, readVideoFrame } from './codecs/video'
@@ -106,6 +106,21 @@ async function decodedFrame(filePath: string, header: ImageHeader, frame: number
   return decodeEncapsulatedFrame(await encapsulatedFrame(filePath, frame, header.frames), header)
 }
 
+/**
+ * The size of a pixel of the frame as shown, which is the file's own pixel
+ * scaled by how far the frame was shrunk. PixelSpacing first, since it is the
+ * patient's; ImagerPixelSpacing only where that is all there is.
+ */
+function scaleOf(header: ImageHeader, width: number, height: number): PixelScale | null {
+  const own = header.pixelSpacing ?? header.imagerPixelSpacing ?? null
+  if (own === null || !(own.row > 0 && own.column > 0)) return null
+  return {
+    row: (own.row * header.rows) / height,
+    column: (own.column * header.columns) / width,
+    detector: header.pixelSpacing === null
+  }
+}
+
 /** Decode one frame of one file, shrunk to fit `maxEdge`. */
 export async function readPreviewFrame(
   filePath: string,
@@ -113,6 +128,16 @@ export async function readPreviewFrame(
   maxEdge: number = MAX_PREVIEW_EDGE
 ): Promise<PreviewFrame> {
   const header = await imageHeader(filePath)
+  const decoded = await decodePreview(filePath, header, frame, maxEdge)
+  return { ...decoded, scale: scaleOf(header, decoded.width, decoded.height) }
+}
+
+async function decodePreview(
+  filePath: string,
+  header: ImageHeader,
+  frame: number,
+  maxEdge: number
+): Promise<PreviewFrame> {
 
   if (header.encapsulated) {
     const decoded = await decodedFrame(filePath, header, frame)

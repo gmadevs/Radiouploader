@@ -6,7 +6,7 @@ All screenshots on this site are generated from the running app with one command
 npm run shots
 ```
 
-It builds the app, starts it, goes through every step of the wizard and writes eleven PNG files
+It builds the app, starts it, goes through every step of the wizard and writes twelve PNG files
 to `docs/public/shots/`.
 
 ## Why they are generated
@@ -21,8 +21,9 @@ A real study cannot be used, because the repository is public and real studies c
 patient data. `scripts/sampleStudy.mjs` therefore generates one, writing explicit VR little
 endian files directly:
 
-- a **CT chest phantom** of 12 slices, in two studies six months apart, with a nodule that
-  grows between them;
+- a **CT chest phantom** of 120 slices 0.5 mm apart, in two studies six months apart, with a
+  nodule that grows between them. It has more images than a case needs, so the review step
+  shows the warning about the number of images;
 - a **diffusion pair**, b=0 and b=1000, with the b-value in `(0018,9087)`, so the app splits
   it as it would a real one;
 - an **ultrasound** with `DEMO^PATIENT / ID 000000 / GENERAL HOSPITAL` burnt into the

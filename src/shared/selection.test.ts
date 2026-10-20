@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SliceRef } from './types'
-import { isKept, keptCount, keptSlices, sanitiseDropped, toggleDropped } from './selection'
+import { isKept, keptCount, keptSlices, sanitiseDropped, sanitiseEvery, toggleDropped } from './selection'
 
 function slices(count: number): SliceRef[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -12,11 +12,12 @@ function slices(count: number): SliceRef[] {
   }))
 }
 
-const stack = (count: number, trimStart = 0, trimEnd = count - 1, dropped: number[] = []) => ({
+const stack = (count: number, trimStart = 0, trimEnd = count - 1, dropped: number[] = [], every = 1) => ({
   slices: slices(count),
   trimStart,
   trimEnd,
-  dropped
+  dropped,
+  every
 })
 
 describe('keptSlices', () => {
@@ -70,5 +71,33 @@ describe('sanitiseDropped', () => {
 
   it('treats a missing list as nothing dropped', () => {
     expect(sanitiseDropped(undefined, 5)).toEqual([])
+  })
+})
+
+describe('the step', () => {
+  it('keeps one image in every few, starting from the first', () => {
+    expect(keptSlices(stack(10, 0, 9, [], 3)).map((s) => s.instanceNumber)).toEqual([0, 3, 6, 9])
+  })
+
+  // From the trim, so the first image kept is the one the trim was set on.
+  it('counts from the first image of the trim', () => {
+    expect(keptSlices(stack(12, 2, 11, [], 4)).map((s) => s.instanceNumber)).toEqual([2, 6, 10])
+  })
+
+  it('leaves a gap where an image on a step was dropped, and moves nothing after it', () => {
+    expect(keptSlices(stack(10, 0, 9, [3], 3)).map((s) => s.instanceNumber)).toEqual([0, 6, 9])
+  })
+
+  it('keeps everything when absent', () => {
+    expect(keptCount({ slices: slices(5), trimStart: 0, trimEnd: 4, dropped: [] })).toBe(5)
+  })
+
+  it('is a whole number from one to ten, and one otherwise', () => {
+    expect(sanitiseEvery(4)).toBe(4)
+    expect(sanitiseEvery(undefined)).toBe(1)
+    expect(sanitiseEvery(0)).toBe(1)
+    expect(sanitiseEvery(2.5)).toBe(1)
+    expect(sanitiseEvery(11)).toBe(1)
+    expect(isKept(stack(4, 0, 3, [], 1), 3)).toBe(true)
   })
 })

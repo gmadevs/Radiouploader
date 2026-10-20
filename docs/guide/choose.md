@@ -7,7 +7,7 @@ a heading, and each **stack** is a card with a preview. A stack is a set of imag
 uploaded as one series. Usually a stack is a whole series; a series that contains more than
 one acquisition is split into several stacks.
 
-In the example above, the CT is one stack of 12 images. The diffusion series was split by
+In the example above, the CT is one stack of 120 images. The diffusion series was split by
 b-value into `b=0` and `b=1000`, and its heading shows the badge **Split by b-value**.
 
 The rows scroll sideways, so series stay next to each other and are easier to compare. The
@@ -40,8 +40,9 @@ You can also change the order by dragging the thumbnails in
 
 Below the preview, a card shows:
 
-- **The number of images**, and how many are left after trimming.
-- **The plane, extent and spacing**, for example `Axial · 55 / 5 mm`: the plane in the
+- **The number of images**, and how many are left after trimming. Above 70 the number is
+  yellow, and above 100 it is red (see [too many images](#too-many-images)).
+- **The plane, extent and spacing**, for example `Axial · 59.5 / 0.5 mm`: the plane in the
   patient's axes, the distance the stack covers, and the distance between images. The spacing
   is the median gap, so a stack with a missing slice still shows a spacing that occurs
   between its images. A cine shows none of these, because all its frames are in the same
@@ -107,6 +108,39 @@ marked *not uploaded*. They are not processed or uploaded.
 To leave out a single image in the middle of a stack, open the stack and use **Drop image**
 in the viewer (see [review](/guide/review#drop-this-image)). The card shows both as
 `N of M images`, with the range and the number of dropped images.
+
+## Too many images
+
+Radiopaedia's [case publishing guidelines](https://radiopaedia.org/articles/case-publishing-guidelines-2)
+ask for 20 to 70 images per stack and discourage more than 100, because a long stack takes too
+long to load on a slow connection.
+
+A selected stack with more than 70 images to upload has a yellow box under its details. Above
+100 the box is red. **Reduce** in the box opens the trim controls, which also have two ways to
+bring the number down without cutting off anatomy:
+
+- **Keep** uploads one image in every 2 to 10, counted from the first image of the trim. Each
+  choice shows the number of images it leaves, for example `1 in 2, 60 images`. The stack is
+  not copied: the other images are left out like trimmed ones, and the card shows `1 in 2`.
+  An image you dropped is still left out, and the step does not move to the next image.
+- **Average** adds a copy of the stack in which each run of 2 to 10 neighbouring images is
+  averaged into one thicker image. Each choice shows the thickness and the number of images,
+  for example `2.5 mm, 24 images` for 0.5 mm slices. **Add** writes the copy next to the stack
+  and clears the tick of the original, so only the copy is uploaded. Tick the original again to
+  upload both.
+
+An averaged image is the mean of exactly that many source images, in the plane they were
+acquired in and on the same pixel grid. Its `SliceThickness` is the new thickness. Images
+left over when the stack does not divide evenly are left out, half at each end. Averaging
+uses the images that are going to be uploaded, so set the trim first. It needs the same
+images as a [reformat](/guide/reformat): parallel slices with a position, evenly spaced, in
+greyscale. A stack that does not qualify shows the reason under **Average**.
+
+**Keep** suits a stack where each image must stay as sharp as acquired. **Average** gives
+less noise and fewer images, and loses some detail across the slices, like a thicker
+acquisition. For thicker slabs or another plane, use [Reformat](/guide/reformat).
+
+**Reset** puts the trim and the step back to every image.
 
 ## Formats
 

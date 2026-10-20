@@ -30,7 +30,7 @@ import { ingest } from './ingest'
 import { MAX_PREVIEW_EDGE, MAX_VIEWER_EDGE, clearPreviewHeaders, readPreviewFrame } from './preview'
 import { session } from './session'
 import { checkForUpdate, setUpdateChecks, skipVersion } from './update'
-import { closeVolume, commitReformat, openVolume, planCount, previewReformat } from './volume'
+import { averageStack, closeVolume, commitReformat, openVolume, planCount, previewReformat } from './volume'
 import { clearInterruptedUpload } from './interruptedUpload'
 import { interruptedForSelection, uploadCase, type UploadRequest } from './uploadCase'
 
@@ -106,6 +106,7 @@ export function registerIpc(): void {
   ipcMain.handle('volume:count', (_e, plan: ReformatPlan): number => planCount(plan))
   ipcMain.handle('volume:commit', async (_e, plan: ReformatPlan) => commitReformat(plan))
   ipcMain.handle('volume:close', () => closeVolume())
+  ipcMain.handle('volume:average', async (_e, stackId: string, slices: number) => averageStack(stackId, slices))
 
   // Annotating. The keys of the drawing come over; the pixels are read, painted
   // and written here, at full size, and never cross back.

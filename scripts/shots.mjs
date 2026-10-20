@@ -144,14 +144,14 @@ async function run() {
   await click('Done')
   await sleep(400)
 
-  await openReformatOn('Chest 1.0 mm')
+  await openReformatOn('Chest 0.5 mm')
   await settle(6000)
   await click('MIP')
   await shot('09-reformat', 'a coronal MIP of the chest CT', isOn('MIP'))
   await click('Cancel')
   await sleep(500)
 
-  await openStackAction('Chest 1.0 mm', 'Annotate')
+  await openStackAction('Chest 0.5 mm', 'Annotate')
   await until(`(document.querySelector('.annotate canvas')?.width ?? 0) > 0`, 'the annotation canvas')
   await click('Polygon')
   await until(isOn('Polygon'), 'the polygon to be the tool in hand')
@@ -184,6 +184,22 @@ async function run() {
     'a structure drawn on the chest CT, with its legend',
     `document.querySelectorAll('.key-strip .mark').length === 1 &&
      [...document.querySelectorAll('.annotate label.setting')].some((l) => l.textContent.trim() === 'Legend' && l.querySelector('input').checked)`
+  )
+  // A ruler across the chest and an ROI in the right lung, drawn over the
+  // structure. The ROI's figures come from the phantom's own values.
+  await click('ROI')
+  await until(isOn('ROI'), 'the ROI to be the tool in hand')
+  await dragOnCanvas({ x: 0.3, y: 0.42 }, { x: 0.43, y: 0.6 })
+  await until(`document.querySelectorAll('.measure-list .structure').length === 1`, 'the ROI to be listed')
+  await click('Ruler')
+  await until(isOn('Ruler'), 'the ruler to be the tool in hand')
+  await dragOnCanvas({ x: 0.14, y: 0.75 }, { x: 0.86, y: 0.75 })
+  await until(`document.querySelectorAll('.measure-list .structure').length === 2`, 'the ruler to be listed')
+  await repaintAll()
+  await shot(
+    '12-measure',
+    'an ROI and a ruler on the chest CT',
+    `document.querySelectorAll('.measure-list .structure').length === 2`
   )
   // Closed rather than added: the copy would be one more series on every
   // screen after this one.
@@ -354,6 +370,25 @@ async function run() {
       return 'ok'
     })()`)
     if (result !== 'ok') problems.push(`${label} on ${JSON.stringify(name)}: ${result}`)
+  }
+
+  /**
+   * Have the whole window drawn again.
+   *
+   * A drag redraws only the parts of the window it touches, as often as its
+   * events happen to arrive, and the rounded corners of the buttons beside the
+   * canvas came out a shade apart from one run to the next depending on which
+   * parts that had been. Hidden and shown, everything is drawn once more from
+   * the same state.
+   */
+  async function repaintAll() {
+    await evaluate(`new Promise((done) => {
+      document.body.style.visibility = 'hidden'
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.body.style.visibility = ''
+        requestAnimationFrame(() => requestAnimationFrame(done))
+      }))
+    })`)
   }
 
   /** A click at a point given as a fraction of the dialog's canvas. */

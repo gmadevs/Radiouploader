@@ -26,6 +26,39 @@ change it too.
 
 **Outline** draws the edge of the structure at full opacity. **Opacity** sets the fill.
 
+## Measurements
+
+![An ROI and a ruler on the chest CT](/shots/12-measure.png)
+
+The second group of tools draws measurements. Each measurement is on one image, and its value
+is written next to it in the copy.
+
+| Tool | Key | Use | Shows |
+|---|---|---|---|
+| **Ruler** | R | drag across what to measure | the length in mm |
+| **Angle** | A | click the end of one arm, the vertex, then the end of the other arm | the angle in degrees |
+| **ROI** | O | drag the box an ellipse fills | the mean and standard deviation of the values inside it, and its area in cm² |
+| **Arrow** | W | drag from the tail to the point | nothing |
+
+With a measuring tool chosen, the points of the measurements on the image are shown as
+circles. Drag one to move it; the value is worked out again. **Measurements on this image**, on
+the right, lists them with their values. Click one to choose it, and press Delete or click ×
+to remove it. The colour buttons under the list set the colour of the chosen measurement and of
+the next ones. Undo applies to the structures only, not to measurements.
+
+Lengths and areas use `PixelSpacing`. A radiograph that has only `ImagerPixelSpacing` is
+measured with that, which is the spacing at the detector: lengths on it are larger than in the
+patient by the magnification, and the dialog says so. Images with neither are measured in
+pixels.
+
+The ROI values are Hounsfield units on a CT. On other modalities they are the stored values
+after the rescale, with no unit. They are read from the image as shown in the dialog: for
+images larger than 1024 pixels, that is a reduced image, read by nearest pixel. The standard
+deviation is the sample standard deviation.
+
+**Only the annotated images** counts an image with a measurement as annotated. A copy can hold
+measurements and no structures.
+
 ## Images between drawn ones
 
 Draw on a few images of the stack. The images between two drawn images are filled in: the
@@ -51,8 +84,9 @@ images then have colour.
 | Mouse wheel, arrow keys, Page Up, Page Down | previous or next image |
 | Home, End | first or last image |
 | `C`, `Shift+C` | copy the structure from the previous or the next image |
-| Backspace | remove the last corner of the polygon |
-| Esc | cancel the polygon, or close the dialog |
+| Backspace | remove the last corner of the polygon or the angle |
+| Delete or Backspace | remove the chosen measurement |
+| Esc | cancel the polygon or the angle, or close the dialog |
 | ⌘Z or Ctrl+Z | undo |
 | ⇧⌘Z, Ctrl+Shift+Z or Ctrl+Y | redo |
 | Right-button drag | set the window: right widens it, down raises its centre |
@@ -91,8 +125,8 @@ stack again shows it where you left it. After a copy has been added, the button 
 
 ## What the copy keeps from the stack
 
-- Areas you erased in **Open for review** are black in the copy, over the drawing and the
-  legend.
+- Areas you erased in **Open for review** are black in the copy, over the drawing, the
+  measurements and the legend.
 - The crop of the stack applies to the copy.
 - Each image keeps the position and orientation of its source image, so the copy scrolls in
   step with the stack.

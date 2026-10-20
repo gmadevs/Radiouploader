@@ -296,6 +296,22 @@ export function App(): React.JSX.Element {
     })
   }
 
+  /** Put a series the main process has written into this copy of the tree, after its parent. */
+  const insertSeries = (studyId: string, parentId: string, series: Series): void =>
+    setIngest((current) => {
+      if (current === null) return current
+      return {
+        ...current,
+        studies: current.studies.map((study) => {
+          if (study.id !== studyId) return study
+          const after = study.series.findIndex((existing) => existing.id === parentId)
+          const next = [...study.series]
+          next.splice(after < 0 ? next.length : after + 1, 0, series)
+          return { ...study, series: next }
+        })
+      }
+    })
+
   /** Rebuild the tree, applying `change` to each stack; null leaves it alone. */
   const mutateStacks = (change: (stack: Stack, series: Series) => Partial<Stack> | null): void => {
     setIngest((current) => {
@@ -368,6 +384,7 @@ export function App(): React.JSX.Element {
         trimStart: s.trimStart,
         trimEnd: s.trimEnd,
         dropped: s.dropped ?? [],
+        every: s.every ?? 1,
         masks: s.masks ?? [],
         crop: s.crop ?? null,
         window: s.window ?? null
@@ -677,6 +694,17 @@ export function App(): React.JSX.Element {
             onTrim={(id, trimStart, trimEnd) =>
               mutateStacks((stack) => (stack.id === id ? { trimStart, trimEnd } : null))
             }
+            onEvery={(id, every) => mutateStacks((stack) => (stack.id === id ? { every } : null))}
+            onAverage={async (stack, series, slices) => {
+              // Built in the main process from its own copy of the tree, like a
+              // reformat, so the edits made here have to be there first.
+              await pushSelection()
+              const added = await window.api.averageStack(stack.id, slices)
+              insertSeries(added.studyId, series.id, added.series)
+              // The copy is there to go up in place of the thin slices; sending
+              // both would add the images the averaging was meant to take out.
+              mutateStacks((s) => (s.id === stack.id ? { selected: false } : null))
+            }}
             onSelectAll={(series, selected) =>
               mutateStacks((_stack, s) => (s.id === series.id ? { selected } : null))
             }
@@ -819,21 +847,7 @@ export function App(): React.JSX.Element {
           onClose={() => setReformatting(null)}
           // The main process has already put it in the tree it reads; this is
           // the same insertion in the copy the picker draws from.
-          onAdded={(studyId, series) =>
-            setIngest((current) => {
-              if (current === null) return current
-              return {
-                ...current,
-                studies: current.studies.map((study) => {
-                  if (study.id !== studyId) return study
-                  const after = study.series.findIndex((existing) => existing.id === reformatting.seriesId)
-                  const next = [...study.series]
-                  next.splice(after < 0 ? next.length : after + 1, 0, series)
-                  return { ...study, series: next }
-                })
-              }
-            })
-          }
+          onAdded={(studyId, series) => insertSeries(studyId, reformatting.seriesId, series)}
         />
       )}
 
