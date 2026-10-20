@@ -219,6 +219,56 @@ function cutOut(dataUrl, size, shape) {
       }
       for (const i of fringe) isPaper[i] = 1
 
+      // The pixels left on the edge are still part paper: opaque, a blend of
+      // navy and white reads as a pale grey outline on any dark background, the
+      // Dock's included. Each is given the edge's own colour and as much opacity
+      // as it had of that colour, measured against white.
+      const depth = new Uint8Array(w * h)
+      let ring = []
+      for (let i = 0; i < isPaper.length; i++) {
+        if (isPaper[i]) continue
+        const x = i % w
+        const y = (i - x) / w
+        if (
+          (x > 0 && isPaper[i - 1]) ||
+          (x < w - 1 && isPaper[i + 1]) ||
+          (y > 0 && isPaper[i - w]) ||
+          (y < h - 1 && isPaper[i + w])
+        ) {
+          depth[i] = 1
+          ring.push(i)
+        }
+      }
+      const EDGE = 3
+      const INSIDE = 6
+      const rings = [ring]
+      for (let d = 2; d <= INSIDE; d++) {
+        const next = []
+        for (const i of ring) {
+          const x = i % w
+          const y = (i - x) / w
+          for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) {
+            if (j < 0 || isPaper[j] || depth[j]) continue
+            depth[j] = d
+            next.push(j)
+          }
+        }
+        rings.push(next)
+        ring = next
+      }
+      const inner = rings.slice(EDGE + 1).flat()
+      if (inner.length) {
+        const edge = [0, 1, 2].map((c) => inner.reduce((sum, i) => sum + px[i * 4 + c], 0) / inner.length)
+        const edgeLuminance = 0.299 * edge[0] + 0.587 * edge[1] + 0.114 * edge[2]
+        for (const i of rings.slice(0, EDGE).flat()) {
+          const alpha = Math.min(1, Math.max(0, (255 - luminance(i)) / (255 - edgeLuminance)))
+          px[i * 4] = edge[0]
+          px[i * 4 + 1] = edge[1]
+          px[i * 4 + 2] = edge[2]
+          px[i * 4 + 3] = Math.round(alpha * 255)
+        }
+      }
+
       let left = w
       let top = h
       let right = -1
