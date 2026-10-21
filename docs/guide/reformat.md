@@ -19,6 +19,12 @@ in the dialog and in its series description.
 The window is set on the result pane: drag right to widen it and down to raise its centre. All
 four panes use the same window.
 
+Each pane can be zoomed and panned on its own. Pinch on the trackpad, or hold Cmd (Ctrl on
+Windows and Linux) and turn the mouse wheel, to zoom about the pointer. Hold Shift and drag, or
+drag with the middle mouse button, to pan. **Fit** in the corner of a zoomed pane shows the
+whole image again. Zoom and pan only change the view: **Add to the case** always adds the whole
+plane.
+
 **Add to the case** adds the result to the case as a new series, next to the series it was
 made from. It is anonymised and uploaded like any other series. The images are real DICOM
 files, written to the session's temporary folder and deleted with it.
@@ -50,11 +56,15 @@ written to the new images.
 For CT, the [CT window presets](/guide/review#the-ct-presets) are available here too. A MIP of
 a 10 mm slab usually needs a wider window than the source slices.
 
-The dialog opens with the window stored in the files (`WindowCenter` and `WindowWidth`), if
-that window covers at least a fifth of the range of values in the volume. Otherwise it uses
-the range from the 1st to the 99th percentile of the volume. This avoids an unusable starting
-window when a file stores a window that does not match its data. If you set a window in
-[Open for review](/guide/review), that window is used.
+If you set a window in [Open for review](/guide/review), the dialog opens with that window.
+Otherwise it opens with the window stored in the files (`WindowCenter` and `WindowWidth`).
+
+On a CT, the stored window is always used, because CT values are Hounsfield units. On other
+modalities, the stored window is used only if it covers at least a fifth of the range of values
+in the volume. Otherwise the dialog uses the range from the 1st to the 99th percentile of the
+volume. This avoids an unusable starting window when a file stores a window that does not match
+its data. A narrow CT window, such as a brain window of 80 HU, covers much less than a fifth of
+a head that runs from air to bone, so it is not measured.
 
 The starting window is set once, when the volume is built, so it does not change as you move
 through the volume.

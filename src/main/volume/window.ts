@@ -15,6 +15,12 @@ import type { Volume } from './reformat'
  * measured rather than guessed: if hardly any of the volume falls inside it,
  * the volume's own spread is used instead. Either way the dialog lets it be
  * changed, and what the user chooses is what gets written.
+ *
+ * A CT is believed outright. Its values are Hounsfield units, so a stated
+ * window is about these pixels whatever its width — and the windows a CT is
+ * read at are narrow on purpose: a brain window of 80 covers 4% of a head that
+ * runs from air to bone, and measuring it threw it away for the whole range,
+ * which opened every head CT as a grey blur.
  */
 
 /**
@@ -53,7 +59,8 @@ function percentile(sorted: Float32Array, fraction: number): number {
 export function defaultWindow(
   volume: Volume,
   header: { windowCentre: number | null; windowWidth: number | null; slope: number; intercept: number },
-  chosen: WindowLevel | null
+  chosen: WindowLevel | null,
+  hounsfield: boolean
 ): WindowLevel {
   // A window the user picked in the viewer is a decision, not a suggestion.
   if (chosen) return chosen
@@ -68,6 +75,7 @@ export function defaultWindow(
       ? { centre: header.windowCentre, width: header.windowWidth }
       : null
 
+  if (stated !== null && hounsfield) return stated
   if (stated !== null) {
     const spread = high - low
     // Nothing to compare against: one value throughout, or a volume of air.

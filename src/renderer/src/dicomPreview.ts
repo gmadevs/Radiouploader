@@ -1,5 +1,6 @@
 import { applyWindow, cropBoundsOf } from '@shared/dicomImage'
 import type { CropRect, MaskRect, PreviewFrame, WindowLevel } from '@shared/types'
+import { FITTED, viewRect, type PaneView } from './paneView'
 
 /**
  * Painting only. Decoding happens in the main process, which reads a single
@@ -95,12 +96,16 @@ export function fitRect(boxWidth: number, boxHeight: number, frameWidth: number,
  * The panelled reformat view needs this rather than `paintFrame`: four images
  * of four different shapes share a grid, so each canvas is the cell and the
  * image is drawn into it rather than the other way round.
+ *
+ * Both rectangles come back: the one the image fits, which a zoom and a pan are
+ * measured against, and the one it was actually drawn into with `view` applied.
  */
 export function paintFitted(
   canvas: HTMLCanvasElement,
   frame: PreviewFrame,
-  window?: WindowLevel | null
-): FitRect | null {
+  window?: WindowLevel | null,
+  view: PaneView = FITTED
+): { fit: FitRect; shown: FitRect } | null {
   const box = canvas.getBoundingClientRect()
   if (box.width === 0 || box.height === 0) return null
 
@@ -121,7 +126,8 @@ export function paintFitted(
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   const fit = fitRect(canvas.width, canvas.height, frame.width, frame.height)
+  const shown = viewRect(fit, view)
   ctx.imageSmoothingEnabled = true
-  ctx.drawImage(source, fit.x, fit.y, fit.width, fit.height)
-  return fit
+  ctx.drawImage(source, shown.x, shown.y, shown.width, shown.height)
+  return { fit, shown }
 }

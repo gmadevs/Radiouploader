@@ -327,7 +327,7 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
               <ReformatPanel
                 key={pane}
                 label={PANE_NAMES[pane]}
-                title="Drag the centre of the crosshair to move it, or an arm to turn the other two planes. The mouse wheel moves through the images."
+                title="Drag the centre of the crosshair to move it, or an arm to turn the other two planes. The mouse wheel moves through the images. Pinch or Cmd/Ctrl with the wheel zooms; Shift-drag or the middle button pans."
                 frame={frames[pane] ?? null}
                 window={level}
                 lines={crosshair(pane)}
@@ -339,10 +339,13 @@ export function ReformatDialog({ stack, heading, modality, onAdded, onClose }: P
                 }}
               />
             ))}
+            {/* Keyed on the plane, so a zoom into the coronal is not carried
+                over onto an axial of a different shape. */}
             <ReformatPanel
+              key={`result-${output}`}
               result
               label={`${nameOf(frame.n)} · ${PROJECTIONS.find((p) => p.id === projection)?.label ?? ''}`}
-              title="The images that will be added. Drag to set the window. The mouse wheel moves through the series."
+              title="The images that will be added, whole whatever the zoom. Drag to set the window. The mouse wheel moves through the series. Pinch or Cmd/Ctrl with the wheel zooms; Shift-drag or the middle button pans."
               frame={result}
               window={level}
               onWindow={onWindowDrag}

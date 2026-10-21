@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { downscale, downscaleGrey, type DecodedFrame, type GreyFrame } from '@shared/dicomImage'
+import { usesHounsfield } from '@shared/windowPresets'
 import type {
   PreviewFrame,
   ReformatPlan,
@@ -82,7 +83,12 @@ export async function openVolume(stackId: string): Promise<VolumeInfo> {
  */
 function openingWindow(): WindowLevel {
   if (open === null) throw new VolumeError('No volume is open to reformat')
-  open.window ??= defaultWindow(open.built.volume, open.built.header, open.parent.stack.window)
+  open.window ??= defaultWindow(
+    open.built.volume,
+    open.built.header,
+    open.parent.stack.window,
+    usesHounsfield(open.parent.series.modality)
+  )
   return open.window
 }
 
@@ -200,7 +206,7 @@ export async function averageStack(stackId: string, slices: number): Promise<{ s
       seriesNumber: parent.series.seriesNumber,
       description: parent.series.description,
       modality: parent.series.modality,
-      window: defaultWindow(built.volume, built.header, parent.stack.window)
+      window: defaultWindow(built.volume, built.header, parent.stack.window, usesHounsfield(parent.series.modality))
     },
     centres
   )
