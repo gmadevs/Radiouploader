@@ -79,6 +79,8 @@ count as done and are shown separately, for example *"40 MB already there"*.
 If the upload stops partway, for example because the connection drops, the files already
 uploaded are on Radiopaedia in a draft case, and the app selects that draft. Click
 **Upload to Radiopaedia** again to continue in the same case from the series where it stopped.
+When Radiopaedia refuses a request, the message ends with the reason it gives, after
+*"Radiopaedia says:"*, for example a field it did not accept.
 
 This also works after you close the app: import the same study again, make the same choices
 and anonymise it. The case step then shows that an upload of these images stopped partway,
