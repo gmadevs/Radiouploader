@@ -52,7 +52,7 @@
     "vite": "^7.3.7",
     "vitepress": "^1.6.4",
     "vitepress-plugin-mermaid": "^2.0.17",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "author": "Giorgio Maria Agazzi",
   "repository": {
