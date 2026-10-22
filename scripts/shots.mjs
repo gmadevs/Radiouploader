@@ -30,6 +30,16 @@ const sampleDir = path.join(root, '.sample-study')
  * Before the app is loaded, since it has to be said before `ready`.
  */
 app.disableHardwareAcceleration()
+/**
+ * Each tile redrawn whole. Chromium otherwise redraws only the rectangle a
+ * change invalidated, and keeps the antialiased fringe around it from the frame
+ * before, so the corner of a button the pointer had crossed, or of a slider the
+ * script had moved, came out one to four levels off depending on what had been
+ * on screen. The picture held still within a run and changed between runs: four
+ * PNGs rewrote themselves with nothing in the app changed, and five of twelve
+ * differed from the same screen captured with every tile drawn afresh.
+ */
+app.commandLine.appendSwitch('disable-partial-raster')
 
 await import(path.join(root, 'out/main/index.js'))
 
