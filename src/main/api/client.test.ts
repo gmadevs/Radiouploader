@@ -11,7 +11,7 @@ vi.mock('./store', () => ({
   }
 }))
 
-const { RadiopaediaClient } = await import('./client')
+const { RadiopaediaClient, serverReason } = await import('./client')
 
 const config = { clientId: 'app', redirectUri: 'urn:ietf:wg:oauth:2.0:oob' }
 const later = () => Date.now() + 3600_000
@@ -116,5 +116,29 @@ describe('RadiopaediaClient.request', () => {
     await expect(client.request('https://example.org/steal')).rejects.toThrow(/sent only to radiopaedia.org/)
     await expect(client.request('https://radiopaedia.org/direct_s3_uploads')).resolves.toBeDefined()
     expect(calls.api).toEqual(['old'])
+  })
+})
+
+describe('serverReason', () => {
+  it('names the field a Rails validation refused', () => {
+    expect(serverReason('{"errors":{"caption":["is too long (maximum is 255 characters)"]}}')).toBe(
+      'caption is too long (maximum is 255 characters)'
+    )
+  })
+
+  it('reads a list of messages and a single error', () => {
+    expect(serverReason('{"errors":["Modality is not included in the list"]}')).toBe(
+      'Modality is not included in the list'
+    )
+    expect(serverReason('{"error":"Case is locked"}')).toBe('Case is locked')
+  })
+
+  it('leaves out a page of HTML and an empty body', () => {
+    expect(serverReason('<!DOCTYPE html><html><body>Unprocessable</body></html>')).toBeNull()
+    expect(serverReason('  ')).toBeNull()
+  })
+
+  it('keeps short plain text as it came', () => {
+    expect(serverReason('Study limit reached')).toBe('Study limit reached')
   })
 })

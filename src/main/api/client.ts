@@ -58,6 +58,43 @@ export class RadiopaediaApiError extends Error {
   }
 }
 
+/**
+ * What the server gave as its reason for refusing, in one line, or null.
+ *
+ * A 422 on creating a study once reached the user as the status and nothing
+ * else, and the field the server objected to was in the body all along. The
+ * API reference documents no error format, so this reads the shapes Rails
+ * answers with — `{errors: {field: [..]}}`, `{errors: [..]}`, `{error: ".."}` —
+ * and falls back to the text itself when it is short and not a page of HTML.
+ */
+export function serverReason(body: string): string | null {
+  const text = body.trim()
+  if (text === '') return null
+
+  const flatten = (value: unknown, field?: string): string[] => {
+    if (typeof value === 'string') return [field ? `${field.replace(/_/g, ' ')} ${value}` : value]
+    if (Array.isArray(value)) return value.flatMap((v) => flatten(v, field))
+    if (value && typeof value === 'object') {
+      return Object.entries(value).flatMap(([key, v]) => flatten(v, key === 'base' ? undefined : key))
+    }
+    return []
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    if (text.startsWith('<') || text.length > 300) return null
+    return text
+  }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const record = parsed as Record<string, unknown>
+    const found = flatten(record.errors ?? record.error ?? record.message ?? record.error_description)
+    if (found.length > 0) return found.join('; ')
+  }
+  return text.length > 300 ? null : text
+}
+
 export class RadiopaediaClient {
   private tokens: TokenSet | null = null
   /** Set between beginSignIn() and completeSignIn() in the out-of-band flow. */
@@ -189,7 +226,12 @@ export class RadiopaediaClient {
     if (!res.ok) {
       const body = await res.text().catch(() => '')
       const hint = res.status === 429 ? 'Too many requests to Radiopaedia, try again in a moment' : res.statusText
-      throw new RadiopaediaApiError(res.status, `${res.status} ${hint} (${url})`, body)
+      const reason = serverReason(body)
+      throw new RadiopaediaApiError(
+        res.status,
+        `${res.status} ${hint} (${url})${reason ? `. Radiopaedia says: ${reason}` : ''}`,
+        body
+      )
     }
     return res
   }
